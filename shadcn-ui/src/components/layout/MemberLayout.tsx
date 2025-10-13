@@ -3,11 +3,11 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { 
-  LayoutDashboard, 
-  User, 
-  PiggyBank, 
-  CreditCard, 
+import {
+  LayoutDashboard,
+  User,
+  PiggyBank,
+  CreditCard,
   History,
   Settings,
   LogOut,
@@ -29,45 +29,14 @@ export function MemberLayout({ children }: MemberLayoutProps) {
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
 
   const navigation = [
-    {
-      name: 'Dashboard',
-      href: '/member',
-      icon: LayoutDashboard,
-      current: location.pathname === '/member'
-    },
-    {
-      name: 'Profil Saya',
-      href: '/member/profile',
-      icon: User,
-      current: location.pathname === '/member/profile'
-    },
-    {
-      name: 'Simpanan',
-      href: '/member/savings',
-      icon: PiggyBank,
-      current: location.pathname === '/member/savings'
-    },
-    {
-      name: 'Pinjaman',
-      href: '/member/loans',
-      icon: CreditCard,
-      current: location.pathname === '/member/loans'
-    },
-    {
-      name: 'Jasa Pelayanan',
-      href: '/member/payroll',
-      icon: DollarSign,
-      current: location.pathname === '/member/payroll'
-    },
-    {
-      name: 'Riwayat Transaksi',
-      href: '/member/transactions',
-      icon: History,
-      current: location.pathname === '/member/transactions'
-    }
+    { name: 'Dashboard', href: '/member', icon: LayoutDashboard },
+    { name: 'Profil Saya', href: '/member/profile', icon: User },
+    { name: 'Simpanan', href: '/member/savings', icon: PiggyBank },
+    { name: 'Pinjaman', href: '/member/loans', icon: CreditCard },
+    { name: 'Jasa Pelayanan', href: '/member/payroll', icon: DollarSign },
+    { name: 'Riwayat Transaksi', href: '/member/transactions', icon: History },
   ];
 
-  // Mock member data
   const memberData = {
     name: 'Ahmad Sutanto',
     memberId: 'A001',
@@ -76,36 +45,31 @@ export function MemberLayout({ children }: MemberLayoutProps) {
   };
 
   const handleLogout = () => {
-    // Clear all authentication data
     localStorage.clear();
     sessionStorage.clear();
-    
-    // Clear any cookies if they exist
     document.cookie.split(";").forEach((c) => {
       document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
     });
-    
-    // Navigate to login page
     navigate('/login', { replace: true });
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Mobile sidebar overlay */}
+    <div className="flex bg-gray-50 min-h-screen">
+      {/* Overlay untuk mobile */}
       {isSidebarOpen && (
-        <div 
-          className="fixed inset-0 z-40 lg:hidden"
+        <div
+          className="fixed inset-0 z-50 bg-black bg-opacity-30 lg:hidden"
           onClick={() => setIsSidebarOpen(false)}
-        >
-          <div className="fixed inset-0 bg-gray-600 bg-opacity-75" />
-        </div>
+        />
       )}
 
       {/* Sidebar */}
-      <div className={cn(
-        "fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform transition-transform duration-200 ease-in-out lg:translate-x-0 lg:static lg:inset-0",
-        isSidebarOpen ? "translate-x-0" : "-translate-x-full"
-      )}>
+      <div
+        className={cn(
+          "fixed inset-y-0 left-0 z-40 w-64 bg-white shadow-lg transform transition-transform duration-200 ease-in-out",
+          isSidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+        )}
+      >
         <div className="flex flex-col h-full">
           {/* Header */}
           <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200">
@@ -125,7 +89,7 @@ export function MemberLayout({ children }: MemberLayoutProps) {
             </Button>
           </div>
 
-          {/* Member Info Card */}
+          {/* Member Info */}
           <div className="p-4">
             <Card className="bg-gradient-to-r from-blue-500 to-blue-600 text-white">
               <CardContent className="p-4">
@@ -136,7 +100,9 @@ export function MemberLayout({ children }: MemberLayoutProps) {
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">{memberData.name}</p>
                     <p className="text-xs opacity-90">ID: {memberData.memberId}</p>
-                    <p className="text-xs opacity-75">Bergabung: {new Date(memberData.joinDate).toLocaleDateString('id-ID')}</p>
+                    <p className="text-xs opacity-75">
+                      Bergabung: {new Date(memberData.joinDate).toLocaleDateString('id-ID')}
+                    </p>
                   </div>
                 </div>
                 <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
@@ -157,13 +123,14 @@ export function MemberLayout({ children }: MemberLayoutProps) {
           <nav className="flex-1 px-4 pb-4 space-y-1 overflow-y-auto">
             {navigation.map((item) => {
               const Icon = item.icon;
+              const isActive = location.pathname === item.href;
               return (
                 <Link
                   key={item.name}
                   to={item.href}
                   className={cn(
                     "flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors",
-                    item.current
+                    isActive
                       ? "bg-blue-100 text-blue-700 border-r-2 border-blue-600"
                       : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
                   )}
@@ -204,36 +171,28 @@ export function MemberLayout({ children }: MemberLayoutProps) {
         </div>
       </div>
 
-      {/* Main content */}
-      <div className="lg:pl-64">
-        {/* Top bar for mobile */}
+      {/* Konten utama */}
+      <div className="flex-1 flex flex-col lg:pl-64">
+        {/* Top bar untuk mobile */}
         <div className="lg:hidden">
-          <div className="flex items-center justify-between h-16 px-4 bg-white border-b border-gray-200">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setIsSidebarOpen(true)}
-            >
+          <div className="flex items-center justify-between h-16 px-4 bg-white border-b">
+            <Button variant="ghost" size="sm" onClick={() => setIsSidebarOpen(true)}>
               <Menu className="h-5 w-5" />
             </Button>
-            <div className="flex items-center space-x-2">
-              <Button variant="ghost" size="sm">
-                <Bell className="h-4 w-4" />
-                {memberData.notifications > 0 && (
-                  <Badge className="ml-1 bg-red-500 text-white text-xs px-1.5 py-0.5">
-                    {memberData.notifications}
-                  </Badge>
-                )}
-              </Button>
-            </div>
+            <Button variant="ghost" size="sm">
+              <Bell className="h-4 w-4" />
+              {memberData.notifications > 0 && (
+                <Badge className="ml-1 bg-red-500 text-white text-xs px-1.5 py-0.5">
+                  {memberData.notifications}
+                </Badge>
+              )}
+            </Button>
           </div>
         </div>
 
-        {/* Page content */}
-        <main className="flex-1">
-          <div className="p-6 lg:p-8">
-            {children}
-          </div>
+        {/* Page Content */}
+        <main className="flex-1 overflow-y-auto p-6 lg:p-8">
+          {children}
         </main>
       </div>
     </div>

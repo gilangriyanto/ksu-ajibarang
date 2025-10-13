@@ -103,7 +103,7 @@ export default function ManagerDashboard() {
 
   // Mock data matching the images
   const dashboardData = {
-    totalMembers: 150,
+    totalMembers: 10,
     newMembersThisMonth: 8,
     totalSavings: 125000000,
     totalLoans: 85000000,

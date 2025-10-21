@@ -1,13 +1,13 @@
-import React from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { 
-  LayoutDashboard, 
-  Users, 
-  PiggyBank, 
-  CreditCard, 
+import React from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import {
+  LayoutDashboard,
+  Users,
+  PiggyBank,
+  CreditCard,
   FileText,
   Settings,
   LogOut,
@@ -20,9 +20,9 @@ import {
   BarChart3,
   TrendingUp,
   Wallet,
-  DollarSign
-} from 'lucide-react';
-import { cn } from '@/lib/utils';
+  DollarSign,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface ManagerLayoutProps {
   children: React.ReactNode;
@@ -35,100 +35,108 @@ export function ManagerLayout({ children }: ManagerLayoutProps) {
 
   const navigation = [
     {
-      name: 'Dashboard',
-      href: '/manager',
+      name: "Dashboard",
+      href: "/manager",
       icon: LayoutDashboard,
-      current: location.pathname === '/manager'
+      current: location.pathname === "/manager",
     },
     {
-      name: 'Manajemen Anggota',
-      href: '/manager/members',
+      name: "Manajemen Anggota",
+      href: "/manager/members",
       icon: Users,
-      current: location.pathname === '/manager/members'
+      current: location.pathname === "/manager/members",
     },
     {
-      name: 'Manajemen Simpanan',
-      href: '/manager/savings',
+      name: "Manajemen Simpanan",
+      href: "/manager/savings",
       icon: PiggyBank,
-      current: location.pathname === '/manager/savings'
+      current: location.pathname === "/manager/savings",
     },
     {
-      name: 'Manajemen Pinjaman',
-      href: '/manager/loans',
+      name: "Manajemen Pinjaman",
+      href: "/manager/loans",
       icon: CreditCard,
-      current: location.pathname === '/manager/loans'
+      current: location.pathname === "/manager/loans",
     },
     {
-      name: 'Jasa Pelayanan',
-      href: '/manager/payroll',
+      name: "Jasa Pelayanan",
+      href: "/manager/payroll",
       icon: DollarSign,
-      current: location.pathname === '/manager/payroll'
+      current: location.pathname === "/manager/payroll",
     },
     {
-      name: 'Manajemen Akun',
-      href: '/manager/accounts',
+      name: "Manajemen Akun",
+      href: "/manager/accounts",
       icon: Wallet,
-      current: location.pathname === '/manager/accounts'
+      current: location.pathname === "/manager/accounts",
     },
     {
-      name: 'Manajemen Aset',
-      href: '/manager/assets',
+      name: "Manajemen Aset",
+      href: "/manager/assets",
       icon: Building,
-      current: location.pathname === '/manager/assets'
+      current: location.pathname === "/manager/assets",
     },
     {
-      name: 'Akuntansi & Jurnal',
-      href: '/manager/accounting',
+      name: "Akuntansi & Jurnal",
+      href: "/manager/accounting",
       icon: Calculator,
-      current: location.pathname === '/manager/accounting'
+      current: location.pathname === "/manager/accounting",
     },
     {
-      name: 'Neraca',
-      href: '/manager/balance-sheet',
+      name: "Neraca",
+      href: "/manager/balance-sheet",
       icon: BarChart3,
-      current: location.pathname === '/manager/balance-sheet'
+      current: location.pathname === "/manager/balance-sheet",
     },
     {
-      name: 'Laporan Laba Rugi',
-      href: '/manager/income-statement',
+      name: "Laporan Laba Rugi",
+      href: "/manager/income-statement",
       icon: TrendingUp,
-      current: location.pathname === '/manager/income-statement'
+      current: location.pathname === "/manager/income-statement",
     },
     {
-      name: 'Laporan & Analitik',
-      href: '/manager/reports',
+      name: "Laporan & Analitik",
+      href: "/manager/reports",
       icon: FileText,
-      current: location.pathname === '/manager/reports'
-    }
+      current: location.pathname === "/manager/reports",
+    },
+    {
+      name: "Pengaturan",
+      href: "/manager/settings",
+      icon: Settings,
+      current: location.pathname === "/manager/settings",
+    },
   ];
 
   // Mock manager data
   const managerData = {
-    name: 'Dr. Siti Nurhaliza',
-    role: 'Manager Koperasi',
-    employeeId: 'MGR001',
-    notifications: 5
+    name: "Dr. Siti Nurhaliza",
+    role: "Manager Koperasi",
+    employeeId: "MGR001",
+    notifications: 5,
   };
 
   const handleLogout = () => {
     // Clear all authentication data
     localStorage.clear();
     sessionStorage.clear();
-    
+
     // Clear any cookies if they exist
     document.cookie.split(";").forEach((c) => {
-      document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+      document.cookie = c
+        .replace(/^ +/, "")
+        .replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
     });
-    
+
     // Navigate to login page
-    navigate('/login', { replace: true });
+    navigate("/login", { replace: true });
   };
 
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Mobile sidebar overlay */}
       {isSidebarOpen && (
-        <div 
+        <div
           className="fixed inset-0 z-40 lg:hidden"
           onClick={() => setIsSidebarOpen(false)}
         >
@@ -137,10 +145,12 @@ export function ManagerLayout({ children }: ManagerLayoutProps) {
       )}
 
       {/* Sidebar */}
-      <div className={cn(
-        "fixed inset-y-0 left-0 z-40 w-64 bg-white shadow-lg transform transition-transform duration-200 ease-in-out",
-        isSidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
-      )}>
+      <div
+        className={cn(
+          "fixed inset-y-0 left-0 z-40 w-64 bg-white shadow-lg transform transition-transform duration-200 ease-in-out",
+          isSidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+        )}
+      >
         <div className="flex flex-col h-full">
           {/* Header */}
           <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200">
@@ -148,7 +158,9 @@ export function ManagerLayout({ children }: ManagerLayoutProps) {
               <div className="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center">
                 <Shield className="w-5 h-5 text-white" />
               </div>
-              <span className="text-lg font-bold text-gray-900">KoperasiKu</span>
+              <span className="text-lg font-bold text-gray-900">
+                KoperasiKu
+              </span>
             </div>
             <Button
               variant="ghost"
@@ -169,9 +181,13 @@ export function ManagerLayout({ children }: ManagerLayoutProps) {
                     <Shield className="w-6 h-6" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{managerData.name}</p>
+                    <p className="text-sm font-medium truncate">
+                      {managerData.name}
+                    </p>
                     <p className="text-xs opacity-90">{managerData.role}</p>
-                    <p className="text-xs opacity-75">ID: {managerData.employeeId}</p>
+                    <p className="text-xs opacity-75">
+                      ID: {managerData.employeeId}
+                    </p>
                   </div>
                 </div>
                 <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
@@ -206,11 +222,12 @@ export function ManagerLayout({ children }: ManagerLayoutProps) {
                 >
                   <Icon className="w-5 h-5 mr-3 flex-shrink-0" />
                   <span className="truncate">{item.name}</span>
-                  {item.name === 'Dashboard' && managerData.notifications > 0 && (
-                    <Badge className="ml-auto bg-red-500 text-white text-xs px-1.5 py-0.5">
-                      {managerData.notifications}
-                    </Badge>
-                  )}
+                  {item.name === "Dashboard" &&
+                    managerData.notifications > 0 && (
+                      <Badge className="ml-auto bg-red-500 text-white text-xs px-1.5 py-0.5">
+                        {managerData.notifications}
+                      </Badge>
+                    )}
                 </Link>
               );
             })}
@@ -266,9 +283,7 @@ export function ManagerLayout({ children }: ManagerLayoutProps) {
 
         {/* Page content */}
         <main className="flex-1">
-          <div className="p-6 lg:p-8">
-            {children}
-          </div>
+          <div className="p-6 lg:p-8">{children}</div>
         </main>
       </div>
     </div>

@@ -22,3 +22,36 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# ===== TAMBAHKAN INI ===== #
+
+# Next.js
+.next/
+out/
+build/
+
+# Environment variables
+.env
+.env*.local
+*.env
+
+# MGX AI specific files
+.mgx_git_dirty
+.MGXEnv.json
+.timeline.json
+.storage/
+
+# Testing
+coverage/
+.nyc_output/
+
+# Vercel
+.vercel
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# Production
+/build
+

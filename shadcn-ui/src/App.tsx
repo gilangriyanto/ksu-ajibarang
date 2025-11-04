@@ -25,6 +25,12 @@ import IncomeStatement from "./pages/manager/IncomeStatement";
 import Reports from "./pages/manager/Reports";
 import Settings from "./pages/manager/Settings";
 
+// Kas Pages (NEW!)
+import KasDashboard from "./pages/kas/KasDashboard";
+import KasLoanManagement from "./pages/kas/KasLoanManagement";
+import KasSavings from "./pages/kas/KasSavings";
+import KasAccounting from "./pages/kas/KasAccounting";
+
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -34,7 +40,7 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <Routes>
-            <Route path="/" element={<Index />} />
+            <Route path="/" element={<Login />} />
             <Route path="/login" element={<Login />} />
 
             {/* Member Routes */}
@@ -60,6 +66,12 @@ const App = () => (
               path="/manager/income-statement"
               element={<IncomeStatement />}
             />
+
+            {/* Kas Routes (NEW!) - Dynamic untuk semua kas */}
+            <Route path="/kas/:kasId" element={<KasDashboard />} />
+            <Route path="/kas/:kasId/loans" element={<KasLoanManagement />} />
+            <Route path="/kas/:kasId/savings" element={<KasSavings />} />
+            <Route path="/kas/:kasId/accounting" element={<KasAccounting />} />
 
             <Route path="*" element={<NotFound />} />
           </Routes>

@@ -1,374 +1,354 @@
-import React, { useState } from 'react';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
-import { DollarSign, Calendar, FileText, CreditCard } from 'lucide-react';
+import React, { useState, useEffect } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { AlertCircle, Info } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
-interface LoanApplication {
-  amount: number;
-  purpose: string;
-  term: number;
-  collateral: string;
-  monthlyIncome: number;
-  notes: string;
+interface KasOption {
+  id: number;
+  name: string;
+  description: string;
+  interest_rate: number;
+  max_amount: number;
 }
 
 interface LoanApplicationModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (application: LoanApplication) => void;
+  onSubmit: (data: any) => void;
+  availableKas?: KasOption[];
 }
 
-export function LoanApplicationModal({ isOpen, onClose, onSubmit }: LoanApplicationModalProps) {
-  const [formData, setFormData] = useState<LoanApplication>({
-    amount: 0,
-    purpose: '',
-    term: 12,
-    collateral: '',
-    monthlyIncome: 0,
-    notes: ''
+export function LoanApplicationModal({
+  isOpen,
+  onClose,
+  onSubmit,
+  availableKas = [],
+}: LoanApplicationModalProps) {
+  const [formData, setFormData] = useState({
+    kas_id: "",
+    amount: "",
+    purpose: "",
+    term: "",
+    collateral: "",
+    description: "",
   });
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const validateForm = () => {
-    const newErrors: Record<string, string> = {};
+  const [selectedKas, setSelectedKas] = useState<number | null>(null);
+  const selectedKasOption = availableKas?.find((k) => k.id === selectedKas); // ✅ Fixed dengan optional chaining
 
-    if (!formData.amount || formData.amount <= 0) {
-      newErrors.amount = 'Jumlah pinjaman harus lebih dari 0';
+  useEffect(() => {
+    if (selectedKas) {
+      setFormData((prev) => ({ ...prev, kas_id: selectedKas.toString() }));
     }
-
-    if (formData.amount < 500000) {
-      newErrors.amount = 'Minimal pinjaman Rp 500.000';
-    }
-
-    if (formData.amount > 100000000) {
-      newErrors.amount = 'Maksimal pinjaman Rp 100.000.000';
-    }
-
-    if (!formData.purpose) {
-      newErrors.purpose = 'Tujuan pinjaman harus dipilih';
-    }
-
-    if (!formData.term || formData.term < 6) {
-      newErrors.term = 'Jangka waktu minimal 6 bulan';
-    }
-
-    if (!formData.collateral) {
-      newErrors.collateral = 'Jaminan harus dipilih';
-    }
-
-    if (!formData.monthlyIncome || formData.monthlyIncome <= 0) {
-      newErrors.monthlyIncome = 'Penghasilan bulanan harus diisi';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!validateForm()) {
-      return;
-    }
-
-    setIsSubmitting(true);
-    
-    try {
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      onSubmit(formData);
-      handleClose();
-    } catch (error) {
-      console.error('Error submitting loan application:', error);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleInputChange = (field: keyof LoanApplication, value: string | number) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-    if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: '' }));
-    }
-  };
+  }, [selectedKas]);
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('id-ID', {
-      style: 'currency',
-      currency: 'IDR',
-      minimumFractionDigits: 0
+    return new Intl.NumberFormat("id-ID", {
+      style: "currency",
+      currency: "IDR",
+      minimumFractionDigits: 0,
     }).format(amount);
   };
 
   const calculateMonthlyPayment = () => {
-    if (formData.amount && formData.term) {
-      const interestRate = 0.12 / 12; // 12% per tahun
-      const principal = formData.amount;
-      const months = formData.term;
-      
-      const monthlyPayment = (principal * interestRate * Math.pow(1 + interestRate, months)) / 
-                            (Math.pow(1 + interestRate, months) - 1);
-      
-      return monthlyPayment;
+    if (!formData.amount || !formData.term || !selectedKasOption) return 0;
+
+    const principal = parseFloat(formData.amount);
+    const months = parseInt(formData.term);
+    const annualRate = selectedKasOption.interest_rate / 100;
+    const monthlyRate = annualRate / 12;
+
+    if (monthlyRate === 0) {
+      return principal / months;
     }
-    return 0;
+
+    const monthlyPayment =
+      (principal * monthlyRate * Math.pow(1 + monthlyRate, months)) /
+      (Math.pow(1 + monthlyRate, months) - 1);
+
+    return monthlyPayment;
   };
 
-  const calculateTotalPayment = () => {
-    return calculateMonthlyPayment() * formData.term;
-  };
-
-  const handleClose = () => {
-    setFormData({
-      amount: 0,
-      purpose: '',
-      term: 12,
-      collateral: '',
-      monthlyIncome: 0,
-      notes: ''
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSubmit({
+      ...formData,
+      amount: parseFloat(formData.amount),
+      term: parseInt(formData.term),
+      kas_id: parseInt(formData.kas_id),
+      estimatedMonthlyPayment: calculateMonthlyPayment(),
     });
-    setErrors({});
-    setIsSubmitting(false);
     onClose();
+    setFormData({
+      kas_id: "",
+      amount: "",
+      purpose: "",
+      term: "",
+      collateral: "",
+      description: "",
+    });
+    setSelectedKas(null);
+  };
+
+  const isFormValid = () => {
+    return (
+      formData.kas_id &&
+      formData.amount &&
+      formData.purpose &&
+      formData.term &&
+      formData.collateral &&
+      parseFloat(formData.amount) > 0 &&
+      parseInt(formData.term) > 0
+    );
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center space-x-2">
-            <CreditCard className="h-5 w-5" />
-            <span>Ajukan Pinjaman Baru</span>
-          </DialogTitle>
+          <DialogTitle>Ajukan Pinjaman Baru</DialogTitle>
           <DialogDescription>
-            Lengkapi formulir untuk mengajukan pinjaman baru
+            Isi formulir di bawah ini untuk mengajukan pinjaman. Pengajuan akan
+            diproses oleh admin kas yang dipilih.
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Loan Amount */}
-          <div className="space-y-2">
-            <Label htmlFor="amount">Jumlah Pinjaman *</Label>
-            <div className="relative">
-              <DollarSign className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-              <Input
-                id="amount"
-                type="number"
-                value={formData.amount || ''}
-                onChange={(e) => handleInputChange('amount', parseInt(e.target.value) || 0)}
-                placeholder="0"
-                className="pl-10"
-              />
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Pilih Kas */}
+          <div className="space-y-3">
+            <Label>Pilih Kas Pinjaman *</Label>
+            <div className="grid gap-3">
+              {availableKas.map((kas) => (
+                <div
+                  key={kas.id}
+                  onClick={() => setSelectedKas(kas.id)}
+                  className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                    selectedKas === kas.id
+                      ? "border-blue-500 bg-blue-50"
+                      : "border-gray-200 hover:border-blue-300"
+                  }`}
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-2">
+                        <h4 className="font-semibold text-gray-900">
+                          {kas.name}
+                        </h4>
+                        <Badge
+                          variant="secondary"
+                          className="bg-green-100 text-green-800"
+                        >
+                          Bunga {kas.interest_rate}%
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-gray-600 mt-1">
+                        {kas.description}
+                      </p>
+                      <p className="text-sm text-gray-500 mt-2">
+                        Maksimal: {formatCurrency(kas.max_amount)}
+                      </p>
+                    </div>
+                    {selectedKas === kas.id && (
+                      <div className="ml-4 flex-shrink-0">
+                        <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
+                          <svg
+                            className="w-4 h-4 text-white"
+                            fill="none"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth="2"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path d="M5 13l4 4L19 7"></path>
+                          </svg>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
-            <p className="text-sm text-gray-600">
-              Minimal: Rp 500.000 | Maksimal: Rp 100.000.000
-            </p>
-            {errors.amount && (
-              <p className="text-sm text-red-600">{errors.amount}</p>
-            )}
           </div>
 
-          {/* Purpose and Term */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="purpose">Tujuan Pinjaman *</Label>
-              <Select value={formData.purpose} onValueChange={(value) => handleInputChange('purpose', value)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Pilih tujuan pinjaman" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="business">Modal Usaha</SelectItem>
-                  <SelectItem value="education">Pendidikan</SelectItem>
-                  <SelectItem value="health">Kesehatan</SelectItem>
-                  <SelectItem value="home_improvement">Renovasi Rumah</SelectItem>
-                  <SelectItem value="vehicle">Kendaraan</SelectItem>
-                  <SelectItem value="emergency">Kebutuhan Darurat</SelectItem>
-                  <SelectItem value="other">Lainnya</SelectItem>
-                </SelectContent>
-              </Select>
-              {errors.purpose && (
-                <p className="text-sm text-red-600">{errors.purpose}</p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="term">Jangka Waktu (Bulan) *</Label>
-              <div className="relative">
-                <Calendar className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+          {selectedKas && (
+            <>
+              {/* Jumlah Pinjaman */}
+              <div className="space-y-2">
+                <Label htmlFor="amount">Jumlah Pinjaman *</Label>
                 <Input
-                  id="term"
+                  id="amount"
                   type="number"
-                  value={formData.term || ''}
-                  onChange={(e) => handleInputChange('term', parseInt(e.target.value) || 0)}
-                  placeholder="12"
-                  className="pl-10"
-                  min="6"
-                  max="60"
+                  placeholder="Masukkan jumlah pinjaman"
+                  value={formData.amount}
+                  onChange={(e) =>
+                    setFormData({ ...formData, amount: e.target.value })
+                  }
+                  min="0"
+                  max={selectedKasOption?.max_amount}
+                  required
+                />
+                {selectedKasOption && (
+                  <p className="text-sm text-gray-500">
+                    Maksimal: {formatCurrency(selectedKasOption.max_amount)}
+                  </p>
+                )}
+              </div>
+
+              {/* Tujuan Pinjaman */}
+              <div className="space-y-2">
+                <Label htmlFor="purpose">Tujuan Pinjaman *</Label>
+                <Select
+                  value={formData.purpose}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, purpose: value })
+                  }
+                  required
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Pilih tujuan pinjaman" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="business">Modal Usaha</SelectItem>
+                    <SelectItem value="education">Pendidikan</SelectItem>
+                    <SelectItem value="health">Kesehatan</SelectItem>
+                    <SelectItem value="home_improvement">
+                      Renovasi Rumah
+                    </SelectItem>
+                    <SelectItem value="vehicle">Kendaraan</SelectItem>
+                    <SelectItem value="emergency">Kebutuhan Darurat</SelectItem>
+                    <SelectItem value="other">Lainnya</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Jangka Waktu */}
+              <div className="space-y-2">
+                <Label htmlFor="term">Jangka Waktu (Bulan) *</Label>
+                <Select
+                  value={formData.term}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, term: value })
+                  }
+                  required
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Pilih jangka waktu" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="6">6 Bulan</SelectItem>
+                    <SelectItem value="12">12 Bulan (1 Tahun)</SelectItem>
+                    <SelectItem value="24">24 Bulan (2 Tahun)</SelectItem>
+                    <SelectItem value="36">36 Bulan (3 Tahun)</SelectItem>
+                    <SelectItem value="48">48 Bulan (4 Tahun)</SelectItem>
+                    <SelectItem value="60">60 Bulan (5 Tahun)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Jaminan */}
+              <div className="space-y-2">
+                <Label htmlFor="collateral">Jaminan *</Label>
+                <Select
+                  value={formData.collateral}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, collateral: value })
+                  }
+                  required
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Pilih jenis jaminan" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="certificate">
+                      Sertifikat Tanah/Rumah
+                    </SelectItem>
+                    <SelectItem value="vehicle">BPKB Kendaraan</SelectItem>
+                    <SelectItem value="savings">Simpanan</SelectItem>
+                    <SelectItem value="salary">Potongan Gaji</SelectItem>
+                    <SelectItem value="other">Lainnya</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Keterangan */}
+              <div className="space-y-2">
+                <Label htmlFor="description">Keterangan Tambahan</Label>
+                <Textarea
+                  id="description"
+                  placeholder="Jelaskan detail kebutuhan pinjaman Anda..."
+                  value={formData.description}
+                  onChange={(e) =>
+                    setFormData({ ...formData, description: e.target.value })
+                  }
+                  rows={3}
                 />
               </div>
-              <p className="text-sm text-gray-600">6 - 60 bulan</p>
-              {errors.term && (
-                <p className="text-sm text-red-600">{errors.term}</p>
+
+              {/* Estimasi Pembayaran */}
+              {formData.amount && formData.term && (
+                <Alert>
+                  <Info className="h-4 w-4" />
+                  <AlertDescription>
+                    <div className="space-y-2">
+                      <p className="font-semibold">Estimasi Pembayaran:</p>
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <div>
+                          <p className="text-gray-600">Angsuran per bulan:</p>
+                          <p className="font-semibold text-blue-600">
+                            {formatCurrency(calculateMonthlyPayment())}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-gray-600">Total pembayaran:</p>
+                          <p className="font-semibold text-blue-600">
+                            {formatCurrency(
+                              calculateMonthlyPayment() *
+                                parseInt(formData.term)
+                            )}
+                          </p>
+                        </div>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-2">
+                        * Estimasi ini bersifat sementara dan dapat berubah
+                        sesuai persetujuan admin
+                      </p>
+                    </div>
+                  </AlertDescription>
+                </Alert>
               )}
-            </div>
-          </div>
-
-          {/* Collateral */}
-          <div className="space-y-2">
-            <Label htmlFor="collateral">Jaminan *</Label>
-            <Select value={formData.collateral} onValueChange={(value) => handleInputChange('collateral', value)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Pilih jenis jaminan" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="savings">Simpanan di Koperasi</SelectItem>
-                <SelectItem value="certificate">Sertifikat Tanah/Rumah</SelectItem>
-                <SelectItem value="vehicle">BPKB Kendaraan</SelectItem>
-                <SelectItem value="salary">Slip Gaji</SelectItem>
-                <SelectItem value="business">Surat Izin Usaha</SelectItem>
-                <SelectItem value="guarantor">Penjamin Personal</SelectItem>
-              </SelectContent>
-            </Select>
-            {errors.collateral && (
-              <p className="text-sm text-red-600">{errors.collateral}</p>
-            )}
-          </div>
-
-          {/* Monthly Income */}
-          <div className="space-y-2">
-            <Label htmlFor="monthlyIncome">Penghasilan Bulanan *</Label>
-            <div className="relative">
-              <DollarSign className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-              <Input
-                id="monthlyIncome"
-                type="number"
-                value={formData.monthlyIncome || ''}
-                onChange={(e) => handleInputChange('monthlyIncome', parseInt(e.target.value) || 0)}
-                placeholder="0"
-                className="pl-10"
-              />
-            </div>
-            {errors.monthlyIncome && (
-              <p className="text-sm text-red-600">{errors.monthlyIncome}</p>
-            )}
-          </div>
-
-          {/* Notes */}
-          <div className="space-y-2">
-            <Label htmlFor="notes">Catatan Tambahan</Label>
-            <Textarea
-              id="notes"
-              value={formData.notes}
-              onChange={(e) => handleInputChange('notes', e.target.value)}
-              placeholder="Informasi tambahan yang mendukung pengajuan pinjaman"
-              rows={3}
-            />
-          </div>
-
-          {/* Loan Calculation */}
-          {formData.amount > 0 && formData.term > 0 && (
-            <div className="bg-blue-50 p-4 rounded-lg">
-              <h4 className="font-medium text-blue-900 mb-3">Simulasi Pinjaman</h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-blue-700">Jumlah Pinjaman:</span>
-                    <span className="font-medium">{formatCurrency(formData.amount)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-blue-700">Jangka Waktu:</span>
-                    <span className="font-medium">{formData.term} bulan</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-blue-700">Suku Bunga:</span>
-                    <span className="font-medium">12% per tahun</span>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-blue-700">Angsuran per Bulan:</span>
-                    <span className="font-medium text-orange-600">
-                      {formatCurrency(calculateMonthlyPayment())}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-blue-700">Total Pembayaran:</span>
-                    <span className="font-medium">{formatCurrency(calculateTotalPayment())}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-blue-700">Total Bunga:</span>
-                    <span className="font-medium text-red-600">
-                      {formatCurrency(calculateTotalPayment() - formData.amount)}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Eligibility Check */}
-          {formData.monthlyIncome > 0 && formData.amount > 0 && (
-            <div className={`p-4 rounded-lg ${
-              (calculateMonthlyPayment() / formData.monthlyIncome) <= 0.3 
-                ? 'bg-green-50 border-green-200' 
-                : 'bg-yellow-50 border-yellow-200'
-            }`}>
-              <h4 className={`font-medium mb-2 ${
-                (calculateMonthlyPayment() / formData.monthlyIncome) <= 0.3 
-                  ? 'text-green-900' 
-                  : 'text-yellow-900'
-              }`}>
-                Analisis Kemampuan Bayar
-              </h4>
-              <div className="text-sm space-y-1">
-                <div className="flex justify-between">
-                  <span>Rasio Angsuran terhadap Penghasilan:</span>
-                  <span className="font-medium">
-                    {((calculateMonthlyPayment() / formData.monthlyIncome) * 100).toFixed(1)}%
-                  </span>
-                </div>
-                <p className={`text-xs ${
-                  (calculateMonthlyPayment() / formData.monthlyIncome) <= 0.3 
-                    ? 'text-green-700' 
-                    : 'text-yellow-700'
-                }`}>
-                  {(calculateMonthlyPayment() / formData.monthlyIncome) <= 0.3 
-                    ? '✓ Rasio angsuran baik (≤30% dari penghasilan)'
-                    : '⚠ Rasio angsuran tinggi (>30% dari penghasilan)'}
-                </p>
-              </div>
-            </div>
+            </>
           )}
 
           <DialogFooter>
-            <Button 
-              type="button" 
-              variant="outline" 
-              onClick={handleClose}
-              disabled={isSubmitting}
-            >
+            <Button type="button" variant="outline" onClick={onClose}>
               Batal
             </Button>
-            <Button 
-              type="submit" 
-              disabled={isSubmitting}
-              className="min-w-[140px]"
+            <Button
+              type="submit"
+              disabled={!isFormValid()}
+              className="bg-blue-600 hover:bg-blue-700"
             >
-              {isSubmitting ? (
-                <div className="flex items-center space-x-2">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                  <span>Mengajukan...</span>
-                </div>
-              ) : (
-                <>
-                  <FileText className="h-4 w-4 mr-2" />
-                  Ajukan Pinjaman
-                </>
-              )}
+              Ajukan Pinjaman
             </Button>
           </DialogFooter>
         </form>

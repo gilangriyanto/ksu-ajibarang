@@ -1,25 +1,32 @@
-import React, { useState } from 'react';
-import { MemberLayout } from '@/components/layout/MemberLayout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
-  CreditCard, 
-  Plus, 
-  DollarSign, 
+import React, { useState } from "react";
+import { MemberLayout } from "@/components/layout/MemberLayout";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  CreditCard,
+  Plus,
+  DollarSign,
   Calendar,
   AlertCircle,
   CheckCircle,
   Eye,
-  TrendingDown
-} from 'lucide-react';
-import { LoanApplicationModal } from '@/components/modals/LoanApplicationModal';
-import { LoanDetailModal } from '@/components/modals/LoanDetailModal';
-import { LoanPaymentModal } from '@/components/modals/LoanPaymentModal';
+  TrendingDown,
+} from "lucide-react";
+import { LoanApplicationModal } from "@/components/modals/LoanApplicationModal";
+import { LoanDetailModal } from "@/components/modals/LoanDetailModal";
+import { LoanPaymentModal } from "@/components/modals/LoanPaymentModal";
 
 interface Loan {
   id: string;
+  kas_id: number;
   amount: number;
   purpose: string;
   term: number;
@@ -40,97 +47,143 @@ export default function MemberLoans() {
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [selectedLoan, setSelectedLoan] = useState<Loan | null>(null);
 
+  // Tambahkan interface ini
+  interface KasOption {
+    id: number;
+    name: string;
+    description: string;
+    interest_rate: number;
+    max_amount: number;
+  }
+
+  // Tambahkan data kas yang tersedia untuk member
+  const availableKas: KasOption[] = [
+    {
+      id: 1,
+      name: "Kas 1 - Pembiayaan Umum",
+      description: "Pinjaman untuk kebutuhan operasional dan pembiayaan umum",
+      interest_rate: 12,
+      max_amount: 50000000,
+    },
+    {
+      id: 3,
+      name: "Kas 3 - Sebrakan",
+      description:
+        "Pinjaman tanpa bunga untuk kebutuhan khusus (pernikahan, pendidikan, dll)",
+      interest_rate: 0,
+      max_amount: 20000000,
+    },
+  ];
+
   // Mock data - replace with actual API calls
   const loans: Loan[] = [
     {
-      id: '1',
+      id: "1",
+      kas_id: 1,
       amount: 10000000,
-      purpose: 'business',
+      purpose: "business",
       term: 24,
       monthlyPayment: 500000,
       remainingBalance: 6000000,
       paidInstallments: 8,
       interestRate: 12,
-      startDate: '2023-06-01',
-      endDate: '2025-06-01',
-      status: 'active',
-      collateral: 'certificate',
-      nextPaymentDate: '2024-02-15'
+      startDate: "2023-06-01",
+      endDate: "2025-06-01",
+      status: "active",
+      collateral: "certificate",
+      nextPaymentDate: "2024-02-15",
     },
     {
-      id: '2',
+      id: "2",
+      kas_id: 21,
       amount: 5000000,
-      purpose: 'education',
+      purpose: "education",
       term: 12,
       monthlyPayment: 450000,
       remainingBalance: 1800000,
       paidInstallments: 8,
       interestRate: 10,
-      startDate: '2023-08-01',
-      endDate: '2024-08-01',
-      status: 'active',
-      collateral: 'savings',
-      nextPaymentDate: '2024-02-10'
+      startDate: "2023-08-01",
+      endDate: "2024-08-01",
+      status: "active",
+      collateral: "savings",
+      nextPaymentDate: "2024-02-10",
     },
     {
-      id: '3',
+      id: "3",
+      kas_id: 11,
       amount: 15000000,
-      purpose: 'home_improvement',
+      purpose: "home_improvement",
       term: 36,
       monthlyPayment: 520000,
       remainingBalance: 0,
       paidInstallments: 36,
       interestRate: 11,
-      startDate: '2021-01-01',
-      endDate: '2024-01-01',
-      status: 'completed',
-      collateral: 'vehicle',
-      nextPaymentDate: '2024-01-01'
-    }
+      startDate: "2021-01-01",
+      endDate: "2024-01-01",
+      status: "completed",
+      collateral: "vehicle",
+      nextPaymentDate: "2024-01-01",
+    },
   ];
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('id-ID', {
-      style: 'currency',
-      currency: 'IDR',
-      minimumFractionDigits: 0
+    return new Intl.NumberFormat("id-ID", {
+      style: "currency",
+      currency: "IDR",
+      minimumFractionDigits: 0,
     }).format(amount);
   };
 
   const getPurposeName = (purpose: string) => {
     switch (purpose) {
-      case 'business': return 'Modal Usaha';
-      case 'education': return 'Pendidikan';
-      case 'health': return 'Kesehatan';
-      case 'home_improvement': return 'Renovasi Rumah';
-      case 'vehicle': return 'Kendaraan';
-      case 'emergency': return 'Kebutuhan Darurat';
-      default: return 'Lainnya';
+      case "business":
+        return "Modal Usaha";
+      case "education":
+        return "Pendidikan";
+      case "health":
+        return "Kesehatan";
+      case "home_improvement":
+        return "Renovasi Rumah";
+      case "vehicle":
+        return "Kendaraan";
+      case "emergency":
+        return "Kebutuhan Darurat";
+      default:
+        return "Lainnya";
     }
   };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'active':
+      case "active":
         return <Badge className="bg-green-100 text-green-800">Aktif</Badge>;
-      case 'overdue':
+      case "overdue":
         return <Badge className="bg-red-100 text-red-800">Terlambat</Badge>;
-      case 'completed':
+      case "completed":
         return <Badge className="bg-blue-100 text-blue-800">Lunas</Badge>;
-      case 'pending':
+      case "pending":
         return <Badge className="bg-yellow-100 text-yellow-800">Pending</Badge>;
       default:
         return <Badge variant="secondary">{status}</Badge>;
     }
   };
 
-  const activeLoans = loans.filter(loan => loan.status === 'active');
-  const totalOutstanding = activeLoans.reduce((sum, loan) => sum + loan.remainingBalance, 0);
-  const totalMonthlyPayment = activeLoans.reduce((sum, loan) => sum + loan.monthlyPayment, 0);
+  const activeLoans = loans.filter((loan) => loan.status === "active");
+  const totalOutstanding = activeLoans.reduce(
+    (sum, loan) => sum + loan.remainingBalance,
+    0
+  );
+  const totalMonthlyPayment = activeLoans.reduce(
+    (sum, loan) => sum + loan.monthlyPayment,
+    0
+  );
 
   const handleLoanApplication = (applicationData: any) => {
-    console.log('Submitting loan application:', applicationData);
-    alert('Pengajuan pinjaman berhasil dikirim! Silakan tunggu persetujuan dari admin.');
+    console.log("Submitting loan application:", applicationData);
+    alert(
+      "Pengajuan pinjaman berhasil dikirim! Silakan tunggu persetujuan dari admin."
+    );
   };
 
   const handleViewDetails = (loan: Loan) => {
@@ -144,8 +197,8 @@ export default function MemberLoans() {
   };
 
   const handlePayment = (paymentData: any) => {
-    console.log('Processing payment:', paymentData);
-    alert('Pembayaran berhasil diproses!');
+    console.log("Processing payment:", paymentData);
+    alert("Pembayaran berhasil diproses!");
   };
 
   const calculateProgress = (loan: Loan) => {
@@ -159,9 +212,11 @@ export default function MemberLoans() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Pinjaman Saya</h1>
-            <p className="text-gray-600 mt-1">Kelola pinjaman dan pembayaran Anda</p>
+            <p className="text-gray-600 mt-1">
+              Kelola pinjaman dan pembayaran Anda
+            </p>
           </div>
-          <Button 
+          <Button
             onClick={() => setIsApplicationModalOpen(true)}
             className="bg-blue-600 hover:bg-blue-700"
           >
@@ -213,7 +268,7 @@ export default function MemberLoans() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-green-600">
-                {loans.filter(loan => loan.status === 'completed').length}
+                {loans.filter((loan) => loan.status === "completed").length}
               </div>
               <p className="text-xs text-gray-500 mt-1">Pinjaman lunas</p>
             </CardContent>
@@ -241,12 +296,12 @@ export default function MemberLoans() {
                         <CardTitle className="text-lg">
                           Pinjaman {getPurposeName(loan.purpose)}
                         </CardTitle>
-                        <CardDescription className="flex items-center space-x-2">
+                        <div className="flex items-center space-x-2 mt-1">
                           {getStatusBadge(loan.status)}
                           <span className="text-sm text-gray-500">
                             Progress: {calculateProgress(loan)}%
                           </span>
-                        </CardDescription>
+                        </div>
                       </div>
                     </div>
                     <div className="text-right">
@@ -263,7 +318,7 @@ export default function MemberLoans() {
                   <div className="space-y-4">
                     {/* Progress Bar */}
                     <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div 
+                      <div
                         className="bg-green-600 h-2 rounded-full transition-all duration-300"
                         style={{ width: `${calculateProgress(loan)}%` }}
                       ></div>
@@ -271,13 +326,21 @@ export default function MemberLoans() {
 
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                       <div>
-                        <p className="text-sm text-gray-500">Angsuran Bulanan</p>
-                        <p className="font-medium">{formatCurrency(loan.monthlyPayment)}</p>
+                        <p className="text-sm text-gray-500">
+                          Angsuran Bulanan
+                        </p>
+                        <p className="font-medium">
+                          {formatCurrency(loan.monthlyPayment)}
+                        </p>
                       </div>
                       <div>
-                        <p className="text-sm text-gray-500">Jatuh Tempo Berikutnya</p>
+                        <p className="text-sm text-gray-500">
+                          Jatuh Tempo Berikutnya
+                        </p>
                         <p className="font-medium">
-                          {new Date(loan.nextPaymentDate).toLocaleDateString('id-ID')}
+                          {new Date(loan.nextPaymentDate).toLocaleDateString(
+                            "id-ID"
+                          )}
                         </p>
                       </div>
                       <div>
@@ -320,6 +383,7 @@ export default function MemberLoans() {
           isOpen={isApplicationModalOpen}
           onClose={() => setIsApplicationModalOpen(false)}
           onSubmit={handleLoanApplication}
+          availableKas={availableKas}
         />
 
         <LoanDetailModal

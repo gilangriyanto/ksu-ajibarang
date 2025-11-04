@@ -54,7 +54,7 @@ const memberNavigation: NavItem[] = [
     children: [
       { title: "Overview", href: "/member/savings", icon: PiggyBank },
       { title: "Setoran", href: "/member/savings-deposit", icon: TrendingUp },
-      { title: "Riwayat", href: "/member/savings-history", icon: BookOpen },
+      // { title: 'Riwayat', href: '/member/savings-history', icon: BookOpen },
     ],
   },
   {
@@ -149,11 +149,6 @@ const managerNavigation: NavItem[] = [
   {
     title: "Manajemen Pengguna",
     href: "/manager/users",
-    icon: Users,
-  },
-  {
-    title: "Laporan dan Anlytics",
-    href: "/manager/reports",
     icon: Users,
   },
   {

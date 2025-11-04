@@ -5,69 +5,85 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   LayoutDashboard,
-  User,
-  PiggyBank,
   CreditCard,
-  // History,
+  PiggyBank,
+  Calculator,
   Settings,
   LogOut,
   Menu,
   X,
   Bell,
   Shield,
-  DollarSign,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
 
-interface MemberLayoutProps {
+interface KasLayoutProps {
   children: React.ReactNode;
 }
 
-export function MemberLayout({ children }: MemberLayoutProps) {
+export function KasLayout({ children }: KasLayoutProps) {
   const location = useLocation();
   const navigate = useNavigate();
+  const { user, logout } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
 
+  const kasId = user?.kas_id || 1;
+  const kasNames = {
+    1: "Kas 1 - Pembiayaan Umum",
+    2: "Kas 2 - Barang & Logistik",
+    3: "Kas 3 - Sebrakan",
+    4: "Kas 4 - Kantin",
+  };
+
   const navigation = [
-    { name: "Dashboard", href: "/member", icon: LayoutDashboard },
-    { name: "Profil Saya", href: "/member/profile", icon: User },
-    { name: "Simpanan", href: "/member/savings", icon: PiggyBank },
-    { name: "Pinjaman", href: "/member/loans", icon: CreditCard },
-    { name: "Jasa Pelayanan", href: "/member/payroll", icon: DollarSign },
-    // { name: "Riwayat Transaksi", href: "/member/transactions", icon: History },
+    {
+      name: "Dashboard",
+      href: `/kas/${kasId}`,
+      icon: LayoutDashboard,
+      current: location.pathname === `/kas/${kasId}`,
+    },
+    {
+      name: "Manajemen Pinjaman",
+      href: `/kas/${kasId}/loans`,
+      icon: CreditCard,
+      current: location.pathname === `/kas/${kasId}/loans`,
+    },
+    {
+      name: "Manajemen Simpanan",
+      href: `/kas/${kasId}/savings`,
+      icon: PiggyBank,
+      current: location.pathname === `/kas/${kasId}/savings`,
+    },
+    {
+      name: "Akuntansi & Jurnal",
+      href: `/kas/${kasId}/accounting`,
+      icon: Calculator,
+      current: location.pathname === `/kas/${kasId}/accounting`,
+    },
   ];
 
-  const memberData = {
-    name: "Ahmad Sutanto",
-    memberId: "A001",
-    joinDate: "2023-01-15",
-    notifications: 2,
+  const kasData = {
+    name: user?.name || "Admin Kas",
+    kasId: kasId,
+    kasName: kasNames[kasId as keyof typeof kasNames],
+    notifications: 3,
   };
 
   const handleLogout = () => {
-    // Clear all authentication data
-    localStorage.clear();
-    sessionStorage.clear();
-
-    // Clear any cookies if they exist
-    document.cookie.split(";").forEach((c) => {
-      document.cookie = c
-        .replace(/^ +/, "")
-        .replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
-    });
-
-    // Force full page reload to login
-    window.location.href = "/login";
+    logout();
   };
 
   return (
-    <div className="flex bg-gray-50 min-h-screen">
-      {/* Overlay untuk mobile */}
+    <div className="min-h-screen bg-gray-50">
+      {/* Mobile sidebar overlay */}
       {isSidebarOpen && (
         <div
-          className="fixed inset-0 z-50 bg-black bg-opacity-30 lg:hidden"
+          className="fixed inset-0 z-40 lg:hidden"
           onClick={() => setIsSidebarOpen(false)}
-        />
+        >
+          <div className="fixed inset-0 bg-gray-600 bg-opacity-75" />
+        </div>
       )}
 
       {/* Sidebar */}
@@ -81,7 +97,7 @@ export function MemberLayout({ children }: MemberLayoutProps) {
           {/* Header */}
           <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200">
             <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+              <div className="w-8 h-8 bg-purple-600 rounded-lg flex items-center justify-center">
                 <Shield className="w-5 h-5 text-white" />
               </div>
               <span className="text-lg font-bold text-gray-900">
@@ -98,37 +114,30 @@ export function MemberLayout({ children }: MemberLayoutProps) {
             </Button>
           </div>
 
-          {/* Member Info */}
+          {/* Kas Info Card */}
           <div className="p-4">
-            <Card className="bg-gradient-to-r from-blue-500 to-blue-600 text-white">
+            <Card className="bg-gradient-to-r from-purple-500 to-purple-600 text-white">
               <CardContent className="p-4">
                 <div className="flex items-center space-x-3">
                   <div className="w-12 h-12 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
-                    <User className="w-6 h-6" />
+                    <Shield className="w-6 h-6" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">
-                      {memberData.name}
+                      {kasData.name}
                     </p>
-                    <p className="text-xs opacity-90">
-                      ID: {memberData.memberId}
-                    </p>
-                    <p className="text-xs opacity-75">
-                      Bergabung:{" "}
-                      {new Date(memberData.joinDate).toLocaleDateString(
-                        "id-ID"
-                      )}
-                    </p>
+                    <p className="text-xs opacity-90">{kasData.kasName}</p>
+                    <p className="text-xs opacity-75">ID: KAS{kasData.kasId}</p>
                   </div>
                 </div>
                 <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
                   <div className="bg-white bg-opacity-10 rounded p-2">
-                    <p className="opacity-75">Simpanan</p>
-                    <p className="font-semibold">Rp 2.5M</p>
+                    <p className="opacity-75">Pinjaman Pending</p>
+                    <p className="font-semibold">5</p>
                   </div>
                   <div className="bg-white bg-opacity-10 rounded p-2">
-                    <p className="opacity-75">Pinjaman</p>
-                    <p className="font-semibold">Rp 3.5M</p>
+                    <p className="opacity-75">Pinjaman Aktif</p>
+                    <p className="font-semibold">12</p>
                   </div>
                 </div>
               </CardContent>
@@ -139,27 +148,25 @@ export function MemberLayout({ children }: MemberLayoutProps) {
           <nav className="flex-1 px-4 pb-4 space-y-1 overflow-y-auto">
             {navigation.map((item) => {
               const Icon = item.icon;
-              const isActive = location.pathname === item.href;
               return (
                 <Link
                   key={item.name}
                   to={item.href}
                   className={cn(
                     "flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors",
-                    isActive
-                      ? "bg-blue-100 text-blue-700 border-r-2 border-blue-600"
+                    item.current
+                      ? "bg-purple-100 text-purple-700 border-r-2 border-purple-600"
                       : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
                   )}
                   onClick={() => setIsSidebarOpen(false)}
                 >
                   <Icon className="w-5 h-5 mr-3 flex-shrink-0" />
                   <span className="truncate">{item.name}</span>
-                  {item.name === "Dashboard" &&
-                    memberData.notifications > 0 && (
-                      <Badge className="ml-auto bg-red-500 text-white text-xs px-1.5 py-0.5">
-                        {memberData.notifications}
-                      </Badge>
-                    )}
+                  {item.name === "Dashboard" && kasData.notifications > 0 && (
+                    <Badge className="ml-auto bg-red-500 text-white text-xs px-1.5 py-0.5">
+                      {kasData.notifications}
+                    </Badge>
+                  )}
                 </Link>
               );
             })}
@@ -168,13 +175,13 @@ export function MemberLayout({ children }: MemberLayoutProps) {
           {/* Footer */}
           <div className="p-4 border-t border-gray-200">
             <div className="space-y-2">
-              {/* <Link
-                to="/member/settings"
+              <Link
+                to={`/kas/${kasId}/settings`}
                 className="flex items-center px-3 py-2 text-sm text-gray-600 rounded-lg hover:bg-gray-100"
               >
                 <Settings className="w-4 h-4 mr-3" />
                 Pengaturan
-              </Link> */}
+              </Link>
               <Button
                 variant="ghost"
                 className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50"
@@ -188,11 +195,11 @@ export function MemberLayout({ children }: MemberLayoutProps) {
         </div>
       </div>
 
-      {/* Konten utama */}
-      <div className="flex-1 flex flex-col lg:pl-64">
-        {/* Top bar untuk mobile */}
+      {/* Main content */}
+      <div className="lg:pl-64">
+        {/* Top bar for mobile */}
         <div className="lg:hidden">
-          <div className="flex items-center justify-between h-16 px-4 bg-white border-b">
+          <div className="flex items-center justify-between h-16 px-4 bg-white border-b border-gray-200">
             <Button
               variant="ghost"
               size="sm"
@@ -200,20 +207,25 @@ export function MemberLayout({ children }: MemberLayoutProps) {
             >
               <Menu className="h-5 w-5" />
             </Button>
-            <Button variant="ghost" size="sm">
-              <Bell className="h-4 w-4" />
-              {memberData.notifications > 0 && (
-                <Badge className="ml-1 bg-red-500 text-white text-xs px-1.5 py-0.5">
-                  {memberData.notifications}
-                </Badge>
-              )}
-            </Button>
+            <div className="flex items-center space-x-2">
+              <Button variant="ghost" size="sm">
+                <Bell className="h-4 w-4" />
+                {kasData.notifications > 0 && (
+                  <Badge className="ml-1 bg-red-500 text-white text-xs px-1.5 py-0.5">
+                    {kasData.notifications}
+                  </Badge>
+                )}
+              </Button>
+            </div>
           </div>
         </div>
 
-        {/* Page Content */}
-        <main className="flex-1 overflow-y-auto p-6 lg:p-8">{children}</main>
+        {/* Page content */}
+        <main className="flex-1">
+          <div className="p-6 lg:p-8">{children}</div>
+        </main>
       </div>
     </div>
   );
 }
+export default KasLayout;

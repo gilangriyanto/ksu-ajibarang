@@ -94,18 +94,18 @@ export function ManagerLayout({ children }: ManagerLayoutProps) {
       icon: TrendingUp,
       current: location.pathname === "/manager/income-statement",
     },
-    {
-      name: "Laporan & Analitik",
-      href: "/manager/reports",
-      icon: FileText,
-      current: location.pathname === "/manager/reports",
-    },
-    {
-      name: "Pengaturan",
-      href: "/manager/settings",
-      icon: Settings,
-      current: location.pathname === "/manager/settings",
-    },
+    // {
+    //   name: "Laporan & Analitik",
+    //   href: "/manager/reports",
+    //   icon: FileText,
+    //   current: location.pathname === "/manager/reports",
+    // },
+    // {
+    //   name: "Pengaturan",
+    //   href: "/manager/settings",
+    //   icon: Settings,
+    //   current: location.pathname === "/manager/settings",
+    // },
   ];
 
   // Mock manager data
@@ -128,8 +128,8 @@ export function ManagerLayout({ children }: ManagerLayoutProps) {
         .replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
     });
 
-    // Navigate to login page
-    navigate("/login", { replace: true });
+    // Force full page reload to login
+    window.location.href = "/login";
   };
 
   return (

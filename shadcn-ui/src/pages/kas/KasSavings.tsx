@@ -1,6 +1,5 @@
 import React, { useState } from "react";
-// import { Layout } from "@/components/layout/Layout";
-import { BackButton } from "@/components/ui/back-button";
+import { KasLayout } from "@/components/layout/KasLayout";
 import {
   Card,
   CardContent,
@@ -18,7 +17,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
   TableBody,
@@ -49,13 +47,15 @@ import {
   Upload,
 } from "lucide-react";
 import { SavingsAddModal } from "@/components/modals/SavingsAddModal";
-import SavingsDetailModal from "@/components/modals/SavingsDetailModal";
+import { SavingsDetailViewModal } from "@/components/modals/SavingsDetailViewModal"; // ← GANTI INI
 import { SavingsEditModal } from "@/components/modals/SavingsEditModal";
 import { toast } from "sonner";
-import { ManagerLayout } from "@/components/layout/ManagerLayout";
+import { useAuth } from "@/contexts/AuthContext";
 
+// Interface untuk data internal
 interface SavingsRecord {
   id: string;
+  kas_id: number;
   memberNumber: string;
   memberName: string;
   savingsType: string;
@@ -66,6 +66,20 @@ interface SavingsRecord {
   description?: string;
 }
 
+// Interface untuk modal (dari SavingsDetailViewModal)
+interface SavingsAccount {
+  id: string;
+  type: string;
+  balance: number;
+  monthlyDeposit: number;
+  openDate: string;
+  lastTransaction: string;
+  status: string;
+  interestRate: number;
+  totalDeposits: number;
+  totalWithdrawals: number;
+}
+
 interface NewSavings {
   memberNumber: string;
   memberName: string;
@@ -74,12 +88,18 @@ interface NewSavings {
   description: string;
 }
 
-export default function Savings() {
+export default function KasSavings() {
+  const { user } = useAuth();
+  const kasId = user?.kas_id || 1;
+
   const [searchTerm, setSearchTerm] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [selectedRecord, setSelectedRecord] = useState<SavingsRecord | null>(
     null
   );
+  const [selectedAccount, setSelectedAccount] = useState<SavingsAccount | null>(
+    null
+  ); // ← TAMBAH INI
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -88,10 +108,12 @@ export default function Savings() {
   );
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
-  // Mock data for savings
-  const [savingsRecords, setSavingsRecords] = useState<SavingsRecord[]>([
+  // Mock data - SEMUA SIMPANAN dari SEMUA KAS
+  const allSavingsData: SavingsRecord[] = [
+    // Kas 1
     {
       id: "1",
+      kas_id: 1,
       memberNumber: "M001",
       memberName: "Dr. Ahmad Santoso",
       savingsType: "wajib",
@@ -103,6 +125,7 @@ export default function Savings() {
     },
     {
       id: "2",
+      kas_id: 1,
       memberNumber: "M001",
       memberName: "Dr. Ahmad Santoso",
       savingsType: "sukarela",
@@ -114,6 +137,7 @@ export default function Savings() {
     },
     {
       id: "3",
+      kas_id: 1,
       memberNumber: "M002",
       memberName: "Siti Nurhaliza",
       savingsType: "wajib",
@@ -123,10 +147,12 @@ export default function Savings() {
       status: "active",
       description: "Simpanan wajib bulanan",
     },
+    // Kas 3
     {
       id: "4",
-      memberNumber: "M002",
-      memberName: "Siti Nurhaliza",
+      kas_id: 3,
+      memberNumber: "M003",
+      memberName: "Budi Prasetyo",
       savingsType: "hariRaya",
       amount: 200000,
       balance: 2400000,
@@ -136,8 +162,9 @@ export default function Savings() {
     },
     {
       id: "5",
-      memberNumber: "M003",
-      memberName: "Budi Prasetyo",
+      kas_id: 3,
+      memberNumber: "M004",
+      memberName: "Dewi Sartika",
       savingsType: "pokok",
       amount: 500000,
       balance: 500000,
@@ -145,7 +172,25 @@ export default function Savings() {
       status: "active",
       description: "Simpanan pokok",
     },
-  ]);
+    // Kas 2
+    {
+      id: "7",
+      kas_id: 2,
+      memberNumber: "M006",
+      memberName: "Rini Kusuma",
+      savingsType: "wajib",
+      amount: 150000,
+      balance: 1800000,
+      lastTransaction: "2024-01-27",
+      status: "active",
+      description: "Simpanan wajib",
+    },
+  ];
+
+  // ✨ MAGIC FILTER
+  const [savingsRecords, setSavingsRecords] = useState<SavingsRecord[]>(
+    allSavingsData.filter((record) => record.kas_id === kasId)
+  );
 
   const filteredRecords = savingsRecords.filter((record) => {
     const matchesSearch =
@@ -223,8 +268,33 @@ export default function Savings() {
     .filter((r) => r.savingsType === "hariRaya")
     .reduce((sum, record) => sum + record.balance, 0);
 
+  // ✨ HELPER: Convert SavingsRecord ke SavingsAccount untuk modal
+  const convertToSavingsAccount = (record: SavingsRecord): SavingsAccount => {
+    // Get interest rate based on savings type from settings
+    const interestRates: Record<string, number> = {
+      wajib: 12,
+      sukarela: 2,
+      pokok: 3,
+      hariRaya: 14,
+    };
+
+    return {
+      id: record.id,
+      type: record.savingsType,
+      balance: record.balance,
+      monthlyDeposit: record.amount,
+      openDate: "2023-01-15", // Mock - nanti dari database
+      lastTransaction: record.lastTransaction,
+      status: record.status,
+      interestRate: interestRates[record.savingsType] || 0,
+      totalDeposits: record.balance, // Simplified - nanti hitung dari transaction history
+      totalWithdrawals: 0, // Mock - nanti dari database
+    };
+  };
+
   const handleViewRecord = (record: SavingsRecord) => {
-    setSelectedRecord(record);
+    const account = convertToSavingsAccount(record);
+    setSelectedAccount(account);
     setIsDetailModalOpen(true);
   };
 
@@ -236,6 +306,7 @@ export default function Savings() {
   const handleAddSavings = (newSavingsData: NewSavings) => {
     const newSavings: SavingsRecord = {
       id: generateSavingsId(),
+      kas_id: kasId,
       ...newSavingsData,
       balance: newSavingsData.amount,
       lastTransaction: new Date().toISOString().split("T")[0],
@@ -243,14 +314,7 @@ export default function Savings() {
     };
 
     setSavingsRecords((prev) => [newSavings, ...prev]);
-    toast.success(
-      `Simpanan ${newSavingsData.memberName} berhasil ditambahkan`,
-      {
-        description: `${getSavingsTypeBadge(
-          newSavingsData.savingsType
-        )} - ${formatCurrency(newSavingsData.amount)}`,
-      }
-    );
+    toast.success(`Simpanan ${newSavingsData.memberName} berhasil ditambahkan`);
   };
 
   const handleSaveSavings = (updatedSavings: SavingsRecord) => {
@@ -278,29 +342,38 @@ export default function Savings() {
     }
   };
 
-  return (
-    <ManagerLayout>
-      <div className="space-y-6">
-        <BackButton to="/manager" />
+  const handleExport = () => {
+    toast.info("Mengekspor data simpanan Kas " + kasId);
+  };
 
+  const handleImport = () => {
+    toast.info("Mengimpor data simpanan Kas " + kasId);
+  };
+
+  return (
+    <KasLayout>
+      <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">
               Manajemen Simpanan
             </h1>
-            <p className="text-gray-600">Kelola simpanan anggota koperasi</p>
+            <p className="text-gray-600">Kelola simpanan anggota Kas {kasId}</p>
           </div>
           <div className="flex space-x-2">
-            <Button variant="outline">
+            <Button variant="outline" onClick={handleExport}>
               <Download className="h-4 w-4 mr-2" />
               Export
             </Button>
-            <Button variant="outline">
+            <Button variant="outline" onClick={handleImport}>
               <Upload className="h-4 w-4 mr-2" />
               Import
             </Button>
-            <Button onClick={() => setIsAddModalOpen(true)}>
+            <Button
+              onClick={() => setIsAddModalOpen(true)}
+              className="bg-purple-600 hover:bg-purple-700"
+            >
               <Plus className="h-4 w-4 mr-2" />
               Tambah Simpanan
             </Button>
@@ -380,7 +453,7 @@ export default function Savings() {
           </Card>
         </div>
 
-        {/* Main Content */}
+        {/* Main Content - Table */}
         <Card>
           <CardHeader>
             <div className="flex justify-between items-center">
@@ -390,7 +463,7 @@ export default function Savings() {
                   <span>Daftar Simpanan</span>
                 </CardTitle>
                 <CardDescription>
-                  Kelola semua jenis simpanan anggota
+                  Kelola semua jenis simpanan anggota di Kas {kasId}
                 </CardDescription>
               </div>
               <div className="flex space-x-2">
@@ -507,28 +580,23 @@ export default function Savings() {
           </CardContent>
         </Card>
 
-        {/* Savings Add Modal */}
+        {/* Modals */}
         <SavingsAddModal
           isOpen={isAddModalOpen}
           onClose={() => setIsAddModalOpen(false)}
           onAdd={handleAddSavings}
         />
 
-        {/* Savings Detail Modal */}
-        <SavingsDetailModal
-          savings={selectedRecord}
+        {/* ✨ GANTI dengan SavingsDetailViewModal */}
+        <SavingsDetailViewModal
+          account={selectedAccount}
           isOpen={isDetailModalOpen}
           onClose={() => {
             setIsDetailModalOpen(false);
-            setSelectedRecord(null);
-          }}
-          onEdit={(savings) => {
-            setIsDetailModalOpen(false);
-            handleEditRecord(savings);
+            setSelectedAccount(null);
           }}
         />
 
-        {/* Savings Edit Modal */}
         <SavingsEditModal
           savings={selectedRecord}
           isOpen={isEditModalOpen}
@@ -572,6 +640,6 @@ export default function Savings() {
           </AlertDialogContent>
         </AlertDialog>
       </div>
-    </ManagerLayout>
+    </KasLayout>
   );
 }

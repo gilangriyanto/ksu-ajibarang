@@ -1,7 +1,7 @@
 import React from "react";
 import { KasLayout } from "@/components/layout/KasLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/hooks/useAuth";
 import { DollarSign, CreditCard, PiggyBank, TrendingUp } from "lucide-react";
 
 function KasDashboard() {

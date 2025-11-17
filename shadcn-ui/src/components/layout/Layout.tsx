@@ -56,7 +56,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   const handleLogout = () => {
     logout();
-    navigate('/login');
+    navigate('/');
   };
 
   // Navigation items based on user role

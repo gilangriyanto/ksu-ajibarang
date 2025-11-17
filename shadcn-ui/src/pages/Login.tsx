@@ -1,17 +1,23 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Building2, LogIn } from 'lucide-react';
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Building2, LogIn } from "lucide-react";
 
 export default function Login() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const { user, login } = useAuth();
   const navigate = useNavigate();
@@ -19,47 +25,50 @@ export default function Login() {
   // Redirect if already logged in
   useEffect(() => {
     if (user) {
-      const redirectPath = user.role === 'manager' ? '/manager' : '/member';
+      const redirectPath = user.role === "manager" ? "/manager" : "/member";
       navigate(redirectPath, { replace: true });
     }
   }, [user, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    setError("");
     setLoading(true);
 
     try {
       const success = await login(email, password);
       if (!success) {
-        setError('Email atau password salah');
+        setError("Email atau password salah");
       }
       // Navigation will be handled by the login function
     } catch (err) {
-      setError('Terjadi kesalahan saat login');
+      setError("Terjadi kesalahan saat login");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDemoLogin = async (role: 'manager' | 'member') => {
+  const handleDemoLogin = async (role: "manager" | "member") => {
     const demoCredentials = {
-      manager: { email: 'manager@koperasi.com', password: 'manager123' },
-      member: { email: 'member@koperasi.com', password: 'member123' }
+      manager: { email: "manager@koperasi.com", password: "manager123" },
+      member: { email: "member@koperasi.com", password: "member123" },
     };
-    
+
     setEmail(demoCredentials[role].email);
     setPassword(demoCredentials[role].password);
-    setError('');
+    setError("");
     setLoading(true);
 
     try {
-      const success = await login(demoCredentials[role].email, demoCredentials[role].password);
+      const success = await login(
+        demoCredentials[role].email,
+        demoCredentials[role].password
+      );
       if (!success) {
-        setError('Demo login gagal');
+        setError("Demo login gagal");
       }
     } catch (err) {
-      setError('Terjadi kesalahan saat demo login');
+      setError("Terjadi kesalahan saat demo login");
     } finally {
       setLoading(false);
     }
@@ -83,8 +92,12 @@ export default function Login() {
               <Building2 className="h-8 w-8 text-white" />
             </div>
           </div>
-          <h1 className="text-3xl font-bold text-gray-900">Koperasi Rumah Sakit</h1>
-          <p className="text-gray-600 mt-2">Sistem Informasi Manajemen Koperasi</p>
+          <h1 className="text-3xl font-bold text-gray-900">
+            Koperasi Rumah Sakit
+          </h1>
+          <p className="text-gray-600 mt-2">
+            Sistem Informasi Manajemen Koperasi
+          </p>
         </div>
 
         <Card>
@@ -129,7 +142,7 @@ export default function Login() {
 
               <Button type="submit" className="w-full" disabled={loading}>
                 <LogIn className="h-4 w-4 mr-2" />
-                {loading ? 'Memproses...' : 'Masuk'}
+                {loading ? "Memproses..." : "Masuk"}
               </Button>
             </form>
 
@@ -139,25 +152,29 @@ export default function Login() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => handleDemoLogin('manager')}
+                  onClick={() => handleDemoLogin("manager")}
                   disabled={loading}
                   className="text-xs"
                 >
-                  {loading ? 'Loading...' : 'Login sebagai Manager'}
+                  {loading ? "Loading..." : "Login sebagai Manager"}
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => handleDemoLogin('member')}
+                  onClick={() => handleDemoLogin("member")}
                   disabled={loading}
                   className="text-xs"
                 >
-                  {loading ? 'Loading...' : 'Login sebagai Anggota'}
+                  {loading ? "Loading..." : "Login sebagai Anggota"}
                 </Button>
               </div>
               <div className="mt-3 text-xs text-gray-500">
-                <p><strong>Manager:</strong> manager@koperasi.com / manager123</p>
-                <p><strong>Member:</strong> member@koperasi.com / member123</p>
+                <p>
+                  <strong>Manager:</strong> manager@koperasi.com / manager123
+                </p>
+                <p>
+                  <strong>Member:</strong> member@koperasi.com / member123
+                </p>
               </div>
             </div>
           </CardContent>

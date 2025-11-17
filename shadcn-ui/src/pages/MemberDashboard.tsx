@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from "react";
+// src/pages/member/MemberDashboard.tsx
+import React from "react";
 import { MemberLayout } from "@/components/layout/MemberLayout";
 import {
   Card,
@@ -22,170 +23,15 @@ import {
   Loader2,
   Clock,
   CheckCircle,
+  ArrowUpRight,
+  ArrowDownRight,
 } from "lucide-react";
-import { useMembers } from "@/hooks/useMembers";
-import { useSavings } from "@/hooks/useSavings";
-import { useLoans } from "@/hooks/useLoans";
-import { useServiceFees } from "@/hooks/useServiceFees";
-
-// For demo purposes, we'll use a sample member ID
-// In a real app, this would come from authentication/session
-const SAMPLE_MEMBER_ID = "A001";
+import { useMemberDashboard } from "@/hooks/useDashboard";
+import { useNavigate } from "react-router-dom";
 
 export default function MemberDashboard() {
-  const {
-    members,
-    loading: membersLoading,
-    error: membersError,
-  } = useMembers();
-  const {
-    savingsAccounts,
-    savingsTransactions,
-    loading: savingsLoading,
-    error: savingsError,
-  } = useSavings();
-  const { loans, loading: loansLoading, error: loansError } = useLoans();
-  const {
-    serviceFees,
-    loading: feesLoading,
-    error: feesError,
-  } = useServiceFees();
-
-  const [memberStats, setMemberStats] = useState({
-    memberInfo: null as any,
-    totalSavings: 0,
-    savingsByType: {
-      pokok: 0,
-      wajib: 0,
-      sukarela: 0,
-    },
-    recentTransactions: [] as any[],
-    activeLoans: [] as any[],
-    totalLoanAmount: 0,
-    serviceFees: [] as any[],
-    pendingServiceFees: 0,
-    paidServiceFeesThisMonth: 0,
-  });
-
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const calculateMemberStats = () => {
-    try {
-      console.log("=== CALCULATING MEMBER DASHBOARD STATS ===");
-      console.log("Member ID:", SAMPLE_MEMBER_ID);
-
-      // Find member info
-      const memberInfo = members.find((m) => m.member_id === SAMPLE_MEMBER_ID);
-
-      // Calculate savings by type
-      const memberSavingsAccounts = savingsAccounts.filter(
-        (acc) => acc.member_id === SAMPLE_MEMBER_ID
-      );
-
-      const savingsByType = {
-        pokok:
-          memberSavingsAccounts.find((acc) => acc.account_type === "pokok")
-            ?.balance || 0,
-        wajib:
-          memberSavingsAccounts.find((acc) => acc.account_type === "wajib")
-            ?.balance || 0,
-        sukarela:
-          memberSavingsAccounts.find((acc) => acc.account_type === "sukarela")
-            ?.balance || 0,
-      };
-
-      const totalSavings = Object.values(savingsByType).reduce(
-        (sum, amount) => sum + amount,
-        0
-      );
-
-      // Get recent transactions (last 5)
-      const recentTransactions = savingsTransactions
-        .filter((t) => t.member_id === SAMPLE_MEMBER_ID)
-        .slice(0, 5);
-
-      // Get active loans
-      const activeLoans = loans.filter(
-        (l) => l.member_id === SAMPLE_MEMBER_ID && l.status === "active"
-      );
-
-      const totalLoanAmount = activeLoans.reduce(
-        (sum, loan) => sum + (loan.remaining_balance || 0),
-        0
-      );
-
-      // Get service fees
-      const memberServiceFees = serviceFees.filter(
-        (sf) => sf.member_id === SAMPLE_MEMBER_ID
-      );
-      const pendingServiceFees = memberServiceFees.filter(
-        (sf) => sf.status === "pending"
-      ).length;
-
-      // Service fees paid this month
-      const currentMonth = new Date().toISOString().slice(0, 7);
-      const paidServiceFeesThisMonth = memberServiceFees
-        .filter(
-          (sf) =>
-            sf.status === "paid" &&
-            sf.period?.startsWith(currentMonth.replace("-", "-"))
-        )
-        .reduce((sum, sf) => sum + sf.net_amount, 0);
-
-      const stats = {
-        memberInfo,
-        totalSavings,
-        savingsByType,
-        recentTransactions,
-        activeLoans,
-        totalLoanAmount,
-        serviceFees: memberServiceFees,
-        pendingServiceFees,
-        paidServiceFeesThisMonth,
-      };
-
-      console.log("Calculated member stats:", stats);
-      setMemberStats(stats);
-      setError(null);
-    } catch (err) {
-      console.error("Error calculating member stats:", err);
-      setError("Gagal menghitung statistik anggota");
-    }
-  };
-
-  const refreshData = () => {
-    setLoading(true);
-    setTimeout(() => {
-      calculateMemberStats();
-      setLoading(false);
-    }, 1000);
-  };
-
-  useEffect(() => {
-    // Calculate stats when all data is loaded
-    if (!membersLoading && !savingsLoading && !loansLoading && !feesLoading) {
-      calculateMemberStats();
-      setLoading(false);
-    }
-  }, [
-    members,
-    savingsAccounts,
-    savingsTransactions,
-    loans,
-    serviceFees,
-    membersLoading,
-    savingsLoading,
-    loansLoading,
-    feesLoading,
-  ]);
-
-  // Check for any loading state
-  const isLoading =
-    loading || membersLoading || savingsLoading || loansLoading || feesLoading;
-
-  // Check for any errors
-  const hasError = membersError || savingsError || loansError || feesError;
+  const { data, loading, error, refresh } = useMemberDashboard();
+  const navigate = useNavigate();
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("id-ID", {
@@ -196,15 +42,66 @@ export default function MemberDashboard() {
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("id-ID");
+    return new Date(dateString).toLocaleDateString("id-ID", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    });
   };
 
-  if (isLoading) {
+  const getDaysUntilDue = (days: number) => {
+    if (days < 0)
+      return <Badge className="bg-red-100 text-red-800">Terlambat</Badge>;
+    if (days === 0)
+      return (
+        <Badge className="bg-yellow-100 text-yellow-800">
+          Jatuh Tempo Hari Ini
+        </Badge>
+      );
+    if (days <= 7)
+      return (
+        <Badge className="bg-orange-100 text-orange-800">
+          {days} hari lagi
+        </Badge>
+      );
+    return (
+      <Badge className="bg-green-100 text-green-800">{days} hari lagi</Badge>
+    );
+  };
+
+  if (loading) {
     return (
       <MemberLayout>
         <div className="flex items-center justify-center h-64">
-          <Loader2 className="h-8 w-8 animate-spin" />
+          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
           <span className="ml-2">Memuat data dashboard...</span>
+        </div>
+      </MemberLayout>
+    );
+  }
+
+  if (error) {
+    return (
+      <MemberLayout>
+        <Alert className="border-red-200 bg-red-50">
+          <AlertCircle className="h-4 w-4 text-red-600" />
+          <AlertDescription className="text-red-800">{error}</AlertDescription>
+        </Alert>
+        <div className="mt-4">
+          <Button onClick={refresh}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Coba Lagi
+          </Button>
+        </div>
+      </MemberLayout>
+    );
+  }
+
+  if (!data) {
+    return (
+      <MemberLayout>
+        <div className="text-center py-12">
+          <p className="text-gray-500">Tidak ada data dashboard</p>
         </div>
       </MemberLayout>
     );
@@ -219,139 +116,157 @@ export default function MemberDashboard() {
             <h1 className="text-3xl font-bold text-gray-900">
               Dashboard Anggota
             </h1>
-            {memberStats.memberInfo && (
-              <p className="text-gray-600 mt-1">
-                Selamat datang, {memberStats.memberInfo.name} (
-                {memberStats.memberInfo.member_id})
-              </p>
-            )}
+            <p className="text-gray-600 mt-1">
+              Selamat datang, {data.profile.full_name}
+            </p>
           </div>
-          <Button variant="outline" onClick={refreshData} disabled={isLoading}>
+          <Button variant="outline" onClick={refresh}>
             <RefreshCw className="w-4 h-4 mr-2" />
             Refresh Data
           </Button>
         </div>
 
-        {/* Error Alert */}
-        {hasError && (
-          <Alert className="border-red-200 bg-red-50">
-            <AlertCircle className="h-4 w-4 text-red-600" />
-            <AlertDescription className="text-red-800">
-              Ada error saat memuat data: {hasError}
-            </AlertDescription>
-          </Alert>
-        )}
-
         {/* Member Info Card */}
-        {memberStats.memberInfo && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Informasi Anggota</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div>
+                <p className="text-sm text-gray-600">ID Karyawan</p>
+                <p className="font-semibold">{data.profile.employee_id}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Status</p>
+                <Badge className="bg-green-100 text-green-800">
+                  {data.profile.status}
+                </Badge>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Tanggal Bergabung</p>
+                <p className="font-semibold">{data.profile.joined_date}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Lama Keanggotaan</p>
+                <p className="font-semibold">
+                  {data.profile.membership_duration}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Financial Overview */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <Card>
-            <CardHeader>
-              <CardTitle>Informasi Anggota</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">ID Anggota</p>
-                  <p className="font-semibold">
-                    {memberStats.memberInfo.member_id}
+                  <p className="text-sm font-medium text-gray-600">
+                    Total Simpanan
+                  </p>
+                  <p className="text-2xl font-bold text-green-600 mt-2">
+                    {formatCurrency(data.financial_summary.savings.total)}
                   </p>
                 </div>
-                <div>
-                  <p className="text-sm text-gray-600">Status</p>
-                  <Badge
-                    className={
-                      memberStats.memberInfo.status === "active"
-                        ? "bg-green-100 text-green-800"
-                        : "bg-red-100 text-red-800"
-                    }
-                  >
-                    {memberStats.memberInfo.status === "active"
-                      ? "Aktif"
-                      : "Tidak Aktif"}
-                  </Badge>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">Tanggal Bergabung</p>
-                  <p className="font-semibold">
-                    {formatDate(memberStats.memberInfo.join_date)}
-                  </p>
-                </div>
+                <PiggyBank className="h-10 w-10 text-green-600 opacity-80" />
               </div>
             </CardContent>
           </Card>
-        )}
 
-        {/* Savings Overview */}
-        <div>
-          <h2 className="text-xl font-semibold mb-4">Ringkasan Simpanan</h2>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center">
-                  <PiggyBank className="h-8 w-8 text-green-600" />
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600">
-                      Total Simpanan
-                    </p>
-                    <p className="text-2xl font-bold text-gray-900">
-                      {formatCurrency(memberStats.totalSavings)}
-                    </p>
-                  </div>
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">
+                    Total Pinjaman
+                  </p>
+                  <p className="text-2xl font-bold text-red-600 mt-2">
+                    {formatCurrency(
+                      data.financial_summary.loans.remaining_balance
+                    )}
+                  </p>
                 </div>
-              </CardContent>
-            </Card>
+                <CreditCard className="h-10 w-10 text-red-600 opacity-80" />
+              </div>
+            </CardContent>
+          </Card>
 
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center">
-                  <Banknote className="h-8 w-8 text-blue-600" />
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600">
-                      Simpanan Pokok
-                    </p>
-                    <p className="text-xl font-bold text-gray-900">
-                      {formatCurrency(memberStats.savingsByType.pokok)}
-                    </p>
-                  </div>
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">
+                    Posisi Bersih
+                  </p>
+                  <p
+                    className={`text-2xl font-bold mt-2 ${
+                      data.financial_summary.net_position >= 0
+                        ? "text-green-600"
+                        : "text-red-600"
+                    }`}
+                  >
+                    {formatCurrency(data.financial_summary.net_position)}
+                  </p>
                 </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center">
-                  <Calculator className="h-8 w-8 text-orange-600" />
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600">
-                      Simpanan Wajib
-                    </p>
-                    <p className="text-xl font-bold text-gray-900">
-                      {formatCurrency(memberStats.savingsByType.wajib)}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center">
-                  <TrendingUp className="h-8 w-8 text-purple-600" />
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600">
-                      Simpanan Sukarela
-                    </p>
-                    <p className="text-xl font-bold text-gray-900">
-                      {formatCurrency(memberStats.savingsByType.sukarela)}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+                <TrendingUp
+                  className={`h-10 w-10 opacity-80 ${
+                    data.financial_summary.net_position >= 0
+                      ? "text-green-600"
+                      : "text-red-600"
+                  }`}
+                />
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
-        {/* Loans and Service Fees */}
+        {/* Savings Breakdown */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Rincian Simpanan</CardTitle>
+            <CardDescription>Simpanan berdasarkan jenis</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="p-4 border rounded-lg">
+                <p className="text-sm text-gray-600 mb-1">
+                  {data.savings_summary.pokok.name}
+                </p>
+                <p className="text-xl font-bold text-blue-600">
+                  {formatCurrency(data.savings_summary.pokok.balance)}
+                </p>
+              </div>
+              <div className="p-4 border rounded-lg">
+                <p className="text-sm text-gray-600 mb-1">
+                  {data.savings_summary.wajib.name}
+                </p>
+                <p className="text-xl font-bold text-green-600">
+                  {formatCurrency(data.savings_summary.wajib.balance)}
+                </p>
+              </div>
+              <div className="p-4 border rounded-lg">
+                <p className="text-sm text-gray-600 mb-1">
+                  {data.savings_summary.sukarela.name}
+                </p>
+                <p className="text-xl font-bold text-purple-600">
+                  {formatCurrency(data.savings_summary.sukarela.balance)}
+                </p>
+              </div>
+              <div className="p-4 border rounded-lg">
+                <p className="text-sm text-gray-600 mb-1">
+                  {data.savings_summary.hari_raya.name}
+                </p>
+                <p className="text-xl font-bold text-orange-600">
+                  {formatCurrency(data.savings_summary.hari_raya.balance)}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Loans and Installments */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Loan Summary */}
           <Card>
@@ -368,148 +283,88 @@ export default function MemberDashboard() {
                     Pinjaman Aktif
                   </span>
                   <Badge className="bg-orange-100 text-orange-800">
-                    {memberStats.activeLoans.length}
+                    {data.loans_summary.active_count}
                   </Badge>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm font-medium text-gray-600">
-                    Total Outstanding
+                    Total Dipinjam
                   </span>
-                  <span className="text-lg font-bold text-red-600">
-                    {formatCurrency(memberStats.totalLoanAmount)}
+                  <span className="text-lg font-bold">
+                    {formatCurrency(data.loans_summary.total_borrowed)}
                   </span>
                 </div>
-                {memberStats.activeLoans.length > 0 && (
-                  <div className="pt-2 border-t">
-                    <p className="text-sm font-medium text-gray-600 mb-2">
-                      Pinjaman Aktif:
-                    </p>
-                    {memberStats.activeLoans.map((loan) => (
-                      <div
-                        key={loan.id}
-                        className="flex justify-between text-sm"
-                      >
-                        <span>{loan.loan_id}</span>
-                        <span className="font-medium">
-                          {formatCurrency(loan.remaining_balance)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium text-gray-600">
+                    Sisa Hutang
+                  </span>
+                  <span className="text-lg font-bold text-red-600">
+                    {formatCurrency(data.loans_summary.remaining_balance)}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center border-t pt-3">
+                  <span className="text-sm font-medium text-gray-600">
+                    Cicilan Bulanan
+                  </span>
+                  <span className="text-lg font-bold text-blue-600">
+                    {formatCurrency(data.loans_summary.monthly_installment)}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium text-gray-600">
+                    Pinjaman Lunas
+                  </span>
+                  <Badge className="bg-green-100 text-green-800">
+                    {data.loans_summary.paid_off_count}
+                  </Badge>
+                </div>
               </div>
             </CardContent>
           </Card>
 
-          {/* Service Fees */}
+          {/* Upcoming Installments */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center">
-                <Calculator className="h-5 w-5 mr-2 text-blue-600" />
-                Jasa Pelayanan
+                <Clock className="h-5 w-5 mr-2 text-orange-600" />
+                Cicilan Mendatang
               </CardTitle>
+              <CardDescription>5 cicilan terdekat</CardDescription>
             </CardHeader>
             <CardContent>
-              {(() => {
-                // === Hitung total angsuran pinjaman aktif (per bulan) ===
-                const totalInstallment = memberStats.activeLoans.reduce(
-                  (sum, loan) => sum + (loan.monthly_installment || 0),
-                  0
-                );
-
-                // === Jasa pelayanan bulan ini ===
-                const serviceFeeThisMonth =
-                  memberStats.paidServiceFeesThisMonth;
-
-                // === Hitung kekurangan jika fee < angsuran ===
-                const remainingPayment =
-                  serviceFeeThisMonth < totalInstallment
-                    ? totalInstallment - serviceFeeThisMonth
-                    : 0;
-
-                return (
-                  <div className="space-y-4">
-                    {/* Total service fee bulan ini */}
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium text-gray-600">
-                        Jasa Pelayanan Diterima Bulan Ini
-                      </span>
-                      <span className="text-lg font-bold text-blue-600">
-                        {formatCurrency(serviceFeeThisMonth)}
-                      </span>
-                    </div>
-
-                    {/* Total angsuran bulan ini */}
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium text-gray-600">
-                        Total Angsuran Bulan Ini
-                      </span>
-                      <span className="text-lg font-bold text-gray-900">
-                        {formatCurrency(totalInstallment)}
-                      </span>
-                    </div>
-
-                    {/* Kekurangan pembayaran (jika ada) */}
-                    {remainingPayment > 0 ? (
-                      <div className="flex justify-between items-center border-t pt-3">
-                        <span className="text-sm font-medium text-gray-600">
-                          Sisa Angsuran yang Harus Dibayar
-                        </span>
-                        <span className="text-lg font-bold text-red-600">
-                          {formatCurrency(remainingPayment)}
-                        </span>
-                      </div>
-                    ) : (
-                      <div className="flex justify-between items-center border-t pt-3">
-                        <span className="text-sm font-medium text-gray-600">
-                          Status
-                        </span>
-                        <span className="flex items-center text-green-600 font-semibold">
-                          <CheckCircle className="h-4 w-4 mr-1" />
-                          Lunas bulan ini
-                        </span>
-                      </div>
-                    )}
-
-                    {/* Jumlah tagihan tertunda */}
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium text-gray-600">
-                        Tagihan Belum Dibayar
-                      </span>
-                      <Badge className="bg-yellow-100 text-yellow-800">
-                        {memberStats.pendingServiceFees}
-                      </Badge>
-                    </div>
-
-                    {/* Riwayat Service Fee */}
-                    {memberStats.serviceFees.length > 0 && (
-                      <div className="pt-3 border-t">
-                        <p className="text-sm font-medium text-gray-600 mb-2">
-                          Riwayat Terbaru:
+              {data.upcoming_installments &&
+              data.upcoming_installments.length > 0 ? (
+                <div className="space-y-3">
+                  {data.upcoming_installments.map((installment) => (
+                    <div
+                      key={installment.id}
+                      className="flex justify-between items-center p-3 border rounded-lg"
+                    >
+                      <div>
+                        <p className="font-medium text-sm">
+                          {installment.loan_number}
                         </p>
-                        {memberStats.serviceFees.slice(0, 3).map((fee) => (
-                          <div
-                            key={fee.id}
-                            className="flex justify-between text-sm"
-                          >
-                            <span>{fee.period}</span>
-                            <div className="flex items-center space-x-2">
-                              <span className="font-medium">
-                                {formatCurrency(fee.net_amount)}
-                              </span>
-                              {fee.status === "paid" ? (
-                                <CheckCircle className="h-3 w-3 text-green-600" />
-                              ) : (
-                                <Clock className="h-3 w-3 text-yellow-600" />
-                              )}
-                            </div>
-                          </div>
-                        ))}
+                        <p className="text-xs text-gray-600">
+                          Cicilan ke-{installment.installment_number}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          Jatuh tempo: {installment.due_date}
+                        </p>
                       </div>
-                    )}
-                  </div>
-                );
-              })()}
+                      <div className="text-right">
+                        <p className="font-bold text-sm">
+                          {formatCurrency(installment.amount)}
+                        </p>
+                        {getDaysUntilDue(installment.days_until_due)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-center text-gray-500 py-4">
+                  Tidak ada cicilan mendatang
+                </p>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -518,41 +373,59 @@ export default function MemberDashboard() {
         <Card>
           <CardHeader>
             <CardTitle>Transaksi Terbaru</CardTitle>
-            <CardDescription>5 transaksi simpanan terakhir</CardDescription>
+            <CardDescription>10 transaksi terakhir</CardDescription>
           </CardHeader>
           <CardContent>
-            {memberStats.recentTransactions.length > 0 ? (
+            {data.recent_transactions && data.recent_transactions.length > 0 ? (
               <div className="space-y-3">
-                {memberStats.recentTransactions.map((transaction) => (
+                {data.recent_transactions.map((transaction) => (
                   <div
                     key={transaction.id}
-                    className="flex justify-between items-center p-3 border rounded-lg"
+                    className="flex justify-between items-center p-3 border rounded-lg hover:bg-gray-50 transition-colors"
                   >
-                    <div>
-                      <p className="font-medium">
-                        {transaction.transaction_type === "deposit"
-                          ? "Setoran"
-                          : "Penarikan"}
-                      </p>
-                      <p className="text-sm text-gray-600">
-                        {formatDate(transaction.transaction_date)} •{" "}
-                        {transaction.description}
-                      </p>
+                    <div className="flex items-center space-x-3">
+                      <div
+                        className={`p-2 rounded-full ${
+                          transaction.type === "savings"
+                            ? "bg-green-100"
+                            : "bg-blue-100"
+                        }`}
+                      >
+                        {transaction.type === "savings" ? (
+                          <ArrowUpRight className="h-4 w-4 text-green-600" />
+                        ) : (
+                          <ArrowDownRight className="h-4 w-4 text-blue-600" />
+                        )}
+                      </div>
+                      <div>
+                        <p className="font-medium text-sm">
+                          {transaction.description}
+                        </p>
+                        <p className="text-xs text-gray-600">
+                          {formatDate(transaction.date)}
+                        </p>
+                      </div>
                     </div>
                     <div className="text-right">
                       <p
                         className={`font-bold ${
-                          transaction.transaction_type === "deposit"
+                          transaction.type === "savings"
                             ? "text-green-600"
-                            : "text-red-600"
+                            : "text-blue-600"
                         }`}
                       >
-                        {transaction.transaction_type === "deposit" ? "+" : "-"}
+                        {transaction.type === "savings" ? "+" : ""}
                         {formatCurrency(transaction.amount)}
                       </p>
-                      <p className="text-sm text-gray-600">
-                        Saldo: {formatCurrency(transaction.balance_after)}
-                      </p>
+                      <Badge
+                        className={`text-xs ${
+                          transaction.status === "completed"
+                            ? "bg-green-100 text-green-800"
+                            : "bg-yellow-100 text-yellow-800"
+                        }`}
+                      >
+                        {transaction.status}
+                      </Badge>
                     </div>
                   </div>
                 ))}
@@ -562,6 +435,46 @@ export default function MemberDashboard() {
                 Belum ada transaksi
               </p>
             )}
+          </CardContent>
+        </Card>
+
+        {/* This Year Summary */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Ringkasan Tahun {data.this_year_summary.year}</CardTitle>
+            <CardDescription>Total transaksi tahun ini</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div>
+                <p className="text-sm text-gray-600">Total Simpanan</p>
+                <p className="text-xl font-bold text-green-600">
+                  {formatCurrency(data.this_year_summary.total_savings)}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Cicilan Dibayar</p>
+                <p className="text-xl font-bold text-blue-600">
+                  {formatCurrency(
+                    data.this_year_summary.total_installments_paid
+                  )}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Jasa Pelayanan</p>
+                <p className="text-xl font-bold text-purple-600">
+                  {formatCurrency(
+                    data.this_year_summary.service_allowance_received
+                  )}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Hadiah Diterima</p>
+                <p className="text-xl font-bold text-orange-600">
+                  {formatCurrency(data.this_year_summary.gifts_received)}
+                </p>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>

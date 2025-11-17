@@ -45,7 +45,7 @@ import {
   Clock,
   FileText,
 } from "lucide-react";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { LoanDetailModal } from "@/components/modals/LoanDetailModal"; // ← IMPORT INI
 

@@ -50,7 +50,7 @@ import { SavingsAddModal } from "@/components/modals/SavingsAddModal";
 import { SavingsDetailViewModal } from "@/components/modals/SavingsDetailViewModal"; // ← GANTI INI
 import { SavingsEditModal } from "@/components/modals/SavingsEditModal";
 import { toast } from "sonner";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/hooks/useAuth";
 
 // Interface untuk data internal
 interface SavingsRecord {

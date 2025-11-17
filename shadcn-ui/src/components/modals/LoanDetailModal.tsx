@@ -1,8 +1,20 @@
-import React from 'react';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import React from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import {
   CreditCard,
   Calendar,
@@ -12,8 +24,8 @@ import {
   Clock,
   X,
   Download,
-  AlertCircle
-} from 'lucide-react';
+  AlertCircle,
+} from "lucide-react";
 
 interface Loan {
   id: string;
@@ -48,26 +60,31 @@ interface LoanDetailModalProps {
   onMakePayment?: (loan: Loan) => void;
 }
 
-export function LoanDetailModal({ loan, isOpen, onClose, onMakePayment }: LoanDetailModalProps) {
+export function LoanDetailModal({
+  loan,
+  isOpen,
+  onClose,
+  onMakePayment,
+}: LoanDetailModalProps) {
   if (!loan) return null;
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('id-ID', {
-      style: 'currency',
-      currency: 'IDR',
-      minimumFractionDigits: 0
+    return new Intl.NumberFormat("id-ID", {
+      style: "currency",
+      currency: "IDR",
+      minimumFractionDigits: 0,
     }).format(amount);
   };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'active':
+      case "active":
         return <Badge className="bg-green-100 text-green-800">Aktif</Badge>;
-      case 'overdue':
+      case "overdue":
         return <Badge className="bg-red-100 text-red-800">Terlambat</Badge>;
-      case 'completed':
+      case "completed":
         return <Badge className="bg-blue-100 text-blue-800">Lunas</Badge>;
-      case 'pending':
+      case "pending":
         return <Badge className="bg-yellow-100 text-yellow-800">Pending</Badge>;
       default:
         return <Badge variant="secondary">{status}</Badge>;
@@ -76,57 +93,71 @@ export function LoanDetailModal({ loan, isOpen, onClose, onMakePayment }: LoanDe
 
   const getPurposeName = (purpose: string) => {
     switch (purpose) {
-      case 'business': return 'Modal Usaha';
-      case 'education': return 'Pendidikan';
-      case 'health': return 'Kesehatan';
-      case 'home_improvement': return 'Renovasi Rumah';
-      case 'vehicle': return 'Kendaraan';
-      case 'emergency': return 'Kebutuhan Darurat';
-      default: return 'Lainnya';
+      case "business":
+        return "Modal Usaha";
+      case "education":
+        return "Pendidikan";
+      case "health":
+        return "Kesehatan";
+      case "home_improvement":
+        return "Renovasi Rumah";
+      case "vehicle":
+        return "Kendaraan";
+      case "emergency":
+        return "Kebutuhan Darurat";
+      default:
+        return "Lainnya";
     }
   };
 
   const getCollateralName = (collateral: string) => {
     switch (collateral) {
-      case 'savings': return 'Simpanan di Koperasi';
-      case 'certificate': return 'Sertifikat Tanah/Rumah';
-      case 'vehicle': return 'BPKB Kendaraan';
-      case 'salary': return 'Slip Gaji';
-      case 'business': return 'Surat Izin Usaha';
-      case 'guarantor': return 'Penjamin Personal';
-      default: return collateral;
+      case "savings":
+        return "Simpanan di Koperasi";
+      case "certificate":
+        return "Sertifikat Tanah/Rumah";
+      case "vehicle":
+        return "BPKB Kendaraan";
+      case "salary":
+        return "Slip Gaji";
+      case "business":
+        return "Surat Izin Usaha";
+      case "guarantor":
+        return "Penjamin Personal";
+      default:
+        return collateral;
     }
   };
 
   // Mock payment history
   const paymentHistory: PaymentHistory[] = [
     {
-      id: '1',
-      date: '2024-01-15',
+      id: "1",
+      date: "2024-01-15",
       amount: 235442,
       principal: 200000,
       interest: 35442,
       remainingBalance: 4800000,
-      status: 'paid'
+      status: "paid",
     },
     {
-      id: '2',
-      date: '2023-12-15',
+      id: "2",
+      date: "2023-12-15",
       amount: 235442,
       principal: 198000,
       interest: 37442,
       remainingBalance: 5000000,
-      status: 'paid'
+      status: "paid",
     },
     {
-      id: '3',
-      date: '2023-11-15',
+      id: "3",
+      date: "2023-11-15",
       amount: 235442,
       principal: 196000,
       interest: 39442,
       remainingBalance: 5198000,
-      status: 'paid'
-    }
+      status: "paid",
+    },
   ];
 
   const calculateProgress = () => {
@@ -140,14 +171,16 @@ export function LoanDetailModal({ loan, isOpen, onClose, onMakePayment }: LoanDe
   const isOverdue = () => {
     const nextPayment = new Date(loan.nextPaymentDate);
     const today = new Date();
-    return nextPayment < today && loan.status === 'active';
+    return nextPayment < today && loan.status === "active";
   };
 
   const getDaysOverdue = () => {
     if (!isOverdue()) return 0;
     const nextPayment = new Date(loan.nextPaymentDate);
     const today = new Date();
-    return Math.ceil((today.getTime() - nextPayment.getTime()) / (1000 * 60 * 60 * 24));
+    return Math.ceil(
+      (today.getTime() - nextPayment.getTime()) / (1000 * 60 * 60 * 24)
+    );
   };
 
   return (
@@ -160,7 +193,9 @@ export function LoanDetailModal({ loan, isOpen, onClose, onMakePayment }: LoanDe
                 <CreditCard className="h-6 w-6 text-blue-600" />
               </div>
               <div>
-                <DialogTitle className="text-xl font-bold">Detail Pinjaman</DialogTitle>
+                <DialogTitle className="text-xl font-bold">
+                  Detail Pinjaman
+                </DialogTitle>
                 <DialogDescription className="flex items-center space-x-2">
                   <span>{getPurposeName(loan.purpose)}</span>
                   {getStatusBadge(loan.status)}
@@ -168,7 +203,7 @@ export function LoanDetailModal({ loan, isOpen, onClose, onMakePayment }: LoanDe
               </div>
             </div>
             <div className="flex items-center space-x-2">
-              {loan.status === 'active' && onMakePayment && (
+              {loan.status === "active" && onMakePayment && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -196,10 +231,13 @@ export function LoanDetailModal({ loan, isOpen, onClose, onMakePayment }: LoanDe
             <div className="bg-red-50 border border-red-200 p-4 rounded-lg">
               <div className="flex items-center space-x-2">
                 <AlertCircle className="h-5 w-5 text-red-600" />
-                <h4 className="font-medium text-red-900">Pembayaran Terlambat</h4>
+                <h4 className="font-medium text-red-900">
+                  Pembayaran Terlambat
+                </h4>
               </div>
               <p className="text-red-700 text-sm mt-1">
-                Pembayaran Anda sudah terlambat {getDaysOverdue()} hari. Segera lakukan pembayaran untuk menghindari denda.
+                Pembayaran Anda sudah terlambat {getDaysOverdue()} hari. Segera
+                lakukan pembayaran untuk menghindari denda.
               </p>
             </div>
           )}
@@ -311,25 +349,31 @@ export function LoanDetailModal({ loan, isOpen, onClose, onMakePayment }: LoanDe
                 <div>
                   <p className="text-sm text-gray-500">Tanggal Mulai</p>
                   <p className="font-medium">
-                    {new Date(loan.startDate).toLocaleDateString('id-ID')}
+                    {new Date(loan.startDate).toLocaleDateString("id-ID")}
                   </p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">Tanggal Berakhir</p>
                   <p className="font-medium">
-                    {new Date(loan.endDate).toLocaleDateString('id-ID')}
+                    {new Date(loan.endDate).toLocaleDateString("id-ID")}
                   </p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">Pembayaran Berikutnya</p>
-                  <p className={`font-medium ${isOverdue() ? 'text-red-600' : 'text-blue-600'}`}>
-                    {new Date(loan.nextPaymentDate).toLocaleDateString('id-ID')}
-                    {isOverdue() && ' (Terlambat)'}
+                  <p
+                    className={`font-medium ${
+                      isOverdue() ? "text-red-600" : "text-blue-600"
+                    }`}
+                  >
+                    {new Date(loan.nextPaymentDate).toLocaleDateString("id-ID")}
+                    {isOverdue() && " (Terlambat)"}
                   </p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">Jaminan</p>
-                  <p className="font-medium">{getCollateralName(loan.collateral)}</p>
+                  <p className="font-medium">
+                    {getCollateralName(loan.collateral)}
+                  </p>
                 </div>
               </CardContent>
             </Card>
@@ -346,7 +390,7 @@ export function LoanDetailModal({ loan, isOpen, onClose, onMakePayment }: LoanDe
             <CardContent>
               <div className="space-y-4">
                 <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div 
+                  <div
                     className="bg-green-600 h-2 rounded-full transition-all duration-300"
                     style={{ width: `${calculateProgress()}%` }}
                   ></div>
@@ -354,15 +398,21 @@ export function LoanDetailModal({ loan, isOpen, onClose, onMakePayment }: LoanDe
                 <div className="grid grid-cols-3 gap-4 text-sm">
                   <div className="text-center">
                     <p className="text-gray-500">Sudah Dibayar</p>
-                    <p className="font-medium text-green-600">{loan.paidInstallments} cicilan</p>
+                    <p className="font-medium text-green-600">
+                      {loan.paidInstallments} cicilan
+                    </p>
                   </div>
                   <div className="text-center">
                     <p className="text-gray-500">Sisa Cicilan</p>
-                    <p className="font-medium text-orange-600">{calculateRemainingMonths()} cicilan</p>
+                    <p className="font-medium text-orange-600">
+                      {calculateRemainingMonths()} cicilan
+                    </p>
                   </div>
                   <div className="text-center">
                     <p className="text-gray-500">Total Cicilan</p>
-                    <p className="font-medium text-blue-600">{loan.term} cicilan</p>
+                    <p className="font-medium text-blue-600">
+                      {loan.term} cicilan
+                    </p>
                   </div>
                 </div>
               </div>
@@ -376,14 +426,15 @@ export function LoanDetailModal({ loan, isOpen, onClose, onMakePayment }: LoanDe
                 <FileText className="h-5 w-5" />
                 <span>Riwayat Pembayaran</span>
               </CardTitle>
-              <CardDescription>
-                3 pembayaran terakhir
-              </CardDescription>
+              <CardDescription>3 pembayaran terakhir</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
                 {paymentHistory.map((payment) => (
-                  <div key={payment.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <div
+                    key={payment.id}
+                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                  >
                     <div className="flex items-center space-x-3">
                       <div className="flex h-8 w-8 items-center justify-center rounded-full bg-green-100">
                         <DollarSign className="h-4 w-4 text-green-600" />
@@ -391,7 +442,7 @@ export function LoanDetailModal({ loan, isOpen, onClose, onMakePayment }: LoanDe
                       <div>
                         <p className="font-medium">Pembayaran Cicilan</p>
                         <p className="text-sm text-gray-500">
-                          {new Date(payment.date).toLocaleDateString('id-ID')}
+                          {new Date(payment.date).toLocaleDateString("id-ID")}
                         </p>
                       </div>
                     </div>
@@ -400,7 +451,8 @@ export function LoanDetailModal({ loan, isOpen, onClose, onMakePayment }: LoanDe
                         {formatCurrency(payment.amount)}
                       </p>
                       <p className="text-sm text-gray-500">
-                        Pokok: {formatCurrency(payment.principal)} | Bunga: {formatCurrency(payment.interest)}
+                        Pokok: {formatCurrency(payment.principal)} | Bunga:{" "}
+                        {formatCurrency(payment.interest)}
                       </p>
                     </div>
                   </div>
@@ -413,3 +465,4 @@ export function LoanDetailModal({ loan, isOpen, onClose, onMakePayment }: LoanDe
     </Dialog>
   );
 }
+export default LoanDetailModal;

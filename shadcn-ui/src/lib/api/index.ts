@@ -10,3 +10,25 @@ export type {
   RegisterRequest,
   RegisterResponse,
 } from "./auth.service";
+
+export { default as memberService } from "./member.service";
+export type {
+  Member,
+  MemberProfile,
+  MemberDetails,
+  MemberActivity,
+  MemberStatistics,
+  MemberListParams,
+  UpdateMemberRequest,
+  ChangePasswordRequest,
+  UpdateStatusRequest,
+  PaginatedResponse,
+} from "./member.service";
+
+export { default as dashboardService } from "./dashboard.service";
+export type {
+  AdminDashboardData,
+  MemberDashboardData,
+  AdminQuickStats,
+  MemberQuickStats,
+} from "./dashboard.service";

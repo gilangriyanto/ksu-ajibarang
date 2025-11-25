@@ -1,114 +1,118 @@
-// src/lib/api/api-client.ts (UPDATED VERSION)
 import axios, {
-  AxiosInstance,
   AxiosError,
+  AxiosResponse,
   InternalAxiosRequestConfig,
 } from "axios";
-import ENV from "@/lib/config/env";
 
-// Interface untuk standar response dari backend
-interface ApiResponse<T = any> {
-  success: boolean;
-  message: string;
-  data: T;
-}
-
-// Buat instance axios
-const apiClient: AxiosInstance = axios.create({
-  baseURL: ENV.API_BASE_URL,
-  timeout: ENV.API_TIMEOUT,
+// Create axios instance
+const apiClient = axios.create({
+  baseURL: "https://ksp.gascpns.id/api",
   headers: {
     "Content-Type": "application/json",
     Accept: "application/json",
   },
+  // Add timeout
+  timeout: 30000,
 });
 
-// Request Interceptor - Tambahkan token ke setiap request
+// Request interceptor - Add auth token
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
-    const token = localStorage.getItem(ENV.TOKEN_KEY);
-
+    const token = localStorage.getItem("token");
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
     }
 
-    // Log request di development
-    if (ENV.IS_DEV) {
-      console.log("🚀 API Request:", {
-        method: config.method?.toUpperCase(),
-        url: config.url,
+    console.log(
+      `🔵 API Request: ${config.method?.toUpperCase()} ${config.url}`,
+      {
+        params: config.params,
         data: config.data,
-      });
-    }
+      }
+    );
 
     return config;
   },
   (error: AxiosError) => {
+    console.error("❌ Request Error:", error);
     return Promise.reject(error);
   }
 );
 
-// Response Interceptor - Handle error global
+// Response interceptor - Handle responses
 apiClient.interceptors.response.use(
-  (response) => {
-    // Log response di development
-    if (ENV.IS_DEV) {
-      console.log("✅ API Response:", {
+  (response: AxiosResponse) => {
+    console.log(
+      `✅ API Response: ${response.config.method?.toUpperCase()} ${
+        response.config.url
+      }`,
+      {
         status: response.status,
         data: response.data,
-      });
+      }
+    );
+
+    // Handle 204 No Content
+    if (response.status === 204) {
+      console.warn("⚠️ 204 No Content received");
+      return {
+        ...response,
+        data: {
+          success: true,
+          data: [],
+          message: "No content",
+        },
+      };
     }
 
+    // Return response data directly
     return response;
   },
-  async (error: AxiosError<ApiResponse>) => {
-    const originalRequest = error.config as InternalAxiosRequestConfig & {
-      _retry?: boolean;
-    };
+  async (error: AxiosError) => {
+    console.error("❌ Response Error:", {
+      status: error.response?.status,
+      data: error.response?.data,
+      message: error.message,
+    });
 
-    // Log error di development
-    if (ENV.IS_DEV) {
-      console.error("❌ API Error:", {
-        status: error.response?.status,
-        message: error.message,
-        data: error.response?.data,
-      });
-    }
-
-    // Handle 401 Unauthorized
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      originalRequest._retry = true;
-
-      // Clear token dan redirect ke login
-      localStorage.removeItem(ENV.TOKEN_KEY);
-      localStorage.removeItem(ENV.USER_KEY);
-
-      // Redirect ke login page
-      if (typeof window !== "undefined") {
-        window.location.href = "/login";
-      }
-
+    // Handle 401 Unauthorized - Redirect to login
+    if (error.response?.status === 401) {
+      console.warn("⚠️ Unauthorized - Redirecting to login");
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      window.location.href = "/login";
       return Promise.reject(error);
     }
 
     // Handle 403 Forbidden
     if (error.response?.status === 403) {
-      console.error("Access forbidden - Insufficient permissions");
+      console.error("❌ Forbidden - Insufficient permissions");
+    }
+
+    // Handle 404 Not Found
+    if (error.response?.status === 404) {
+      console.error("❌ Not Found - Endpoint does not exist");
+    }
+
+    // Handle 422 Validation Error
+    if (error.response?.status === 422) {
+      console.error("❌ Validation Error:", error.response.data);
     }
 
     // Handle 500 Server Error
     if (error.response?.status === 500) {
-      console.error("Server error - Please try again later");
+      console.error("❌ Server Error");
     }
 
-    // Handle Network Error
-    if (!error.response) {
-      console.error("Network error - Please check your connection");
-    }
+    // Format error for easier handling
+    const formattedError = {
+      status: error.response?.status,
+      message: error.response?.data?.message || error.message,
+      data: error.response?.data,
+    };
 
-    return Promise.reject(error);
+    return Promise.reject(formattedError);
   }
 );
 
 export default apiClient;
-export type { ApiResponse };

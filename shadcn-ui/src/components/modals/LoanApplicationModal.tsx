@@ -3,9 +3,9 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,14 +18,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
-import { AlertCircle, Info } from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { DollarSign, Calculator, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 interface KasOption {
   id: number;
   name: string;
-  description: string;
+  description?: string;
   interest_rate: number;
   max_amount: number;
 }
@@ -34,6 +33,7 @@ interface LoanApplicationModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (data: any) => void;
+  userId: number;
   availableKas?: KasOption[];
 }
 
@@ -41,25 +41,164 @@ export function LoanApplicationModal({
   isOpen,
   onClose,
   onSubmit,
+  userId,
   availableKas = [],
 }: LoanApplicationModalProps) {
-  const [formData, setFormData] = useState({
-    kas_id: "",
-    amount: "",
-    purpose: "",
-    term: "",
-    collateral: "",
-    description: "",
-  });
+  const [selectedKas, setSelectedKas] = useState<string>("");
+  const [principalAmount, setPrincipalAmount] = useState<string>("");
+  const [tenureMonths, setTenureMonths] = useState<string>("");
+  const [loanPurpose, setLoanPurpose] = useState<string>("");
+  const [applicationDate, setApplicationDate] = useState<string>(
+    new Date().toISOString().split("T")[0]
+  );
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [monthlyPayment, setMonthlyPayment] = useState<number>(0);
 
-  const [selectedKas, setSelectedKas] = useState<number | null>(null);
-  const selectedKasOption = availableKas?.find((k) => k.id === selectedKas); // ✅ Fixed dengan optional chaining
-
+  // Reset form when modal opens
   useEffect(() => {
-    if (selectedKas) {
-      setFormData((prev) => ({ ...prev, kas_id: selectedKas.toString() }));
+    if (isOpen) {
+      setSelectedKas("");
+      setPrincipalAmount("");
+      setTenureMonths("");
+      setLoanPurpose("");
+      setApplicationDate(new Date().toISOString().split("T")[0]);
+      setErrors({});
+      setMonthlyPayment(0);
     }
-  }, [selectedKas]);
+  }, [isOpen]);
+
+  // Calculate monthly payment when values change
+  useEffect(() => {
+    if (principalAmount && tenureMonths && selectedKas) {
+      const kas = availableKas.find((k) => k.id.toString() === selectedKas);
+      if (kas) {
+        const principal = parseFloat(principalAmount);
+        const months = parseInt(tenureMonths);
+        const annualRate = kas.interest_rate;
+
+        if (principal > 0 && months > 0) {
+          // Calculate monthly payment with flat interest
+          const totalInterest = (principal * annualRate * months) / (12 * 100);
+          const totalAmount = principal + totalInterest;
+          const monthly = totalAmount / months;
+
+          setMonthlyPayment(monthly);
+        }
+      }
+    } else {
+      setMonthlyPayment(0);
+    }
+  }, [principalAmount, tenureMonths, selectedKas, availableKas]);
+
+  const validateForm = () => {
+    const newErrors: Record<string, string> = {};
+
+    if (!selectedKas) {
+      newErrors.selectedKas = "Pilih kas terlebih dahulu";
+    }
+
+    const principal = parseFloat(principalAmount);
+    if (!principalAmount || isNaN(principal) || principal <= 0) {
+      newErrors.principalAmount = "Jumlah pinjaman harus lebih dari 0";
+    }
+
+    // Check max amount
+    const kas = availableKas.find((k) => k.id.toString() === selectedKas);
+    if (kas && principal > kas.max_amount) {
+      newErrors.principalAmount = `Maksimal pinjaman dari ${
+        kas.name
+      } adalah ${formatCurrency(kas.max_amount)}`;
+    }
+
+    const months = parseInt(tenureMonths);
+    if (!tenureMonths || isNaN(months) || months <= 0) {
+      newErrors.tenureMonths = "Jangka waktu harus lebih dari 0";
+    } else if (months > 60) {
+      newErrors.tenureMonths = "Jangka waktu maksimal 60 bulan";
+    }
+
+    if (!loanPurpose || loanPurpose.trim().length < 10) {
+      newErrors.loanPurpose = "Tujuan pinjaman minimal 10 karakter";
+    }
+
+    if (!applicationDate) {
+      newErrors.applicationDate = "Tanggal pengajuan harus diisi";
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!validateForm()) {
+      toast.error("Periksa kembali form Anda");
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      // ✅ FIXED: Match backend API structure
+      const loanData = {
+        user_id: userId,
+        cash_account_id: parseInt(selectedKas),
+        principal_amount: parseFloat(principalAmount),
+        tenure_months: parseInt(tenureMonths),
+        application_date: applicationDate,
+        loan_purpose: loanPurpose.trim(),
+      };
+
+      console.log("📤 Submitting loan application:", loanData);
+
+      // Call API directly
+      const token = localStorage.getItem("token");
+      const response = await fetch("https://ksp.gascpns.id/api/loans", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(loanData),
+      });
+
+      console.log("📡 Response status:", response.status);
+
+      if (!response.ok) {
+        // Handle error response
+        const errorData = await response.json().catch(() => ({}));
+        console.error("❌ API Error:", errorData);
+
+        // Show validation errors if available
+        if (errorData.errors) {
+          const errorMessages = Object.values(errorData.errors).flat();
+          toast.error(errorMessages.join(", "));
+        } else {
+          toast.error(errorData.message || "Gagal mengajukan pinjaman");
+        }
+        return;
+      }
+
+      const result = await response.json();
+      console.log("✅ Loan created:", result);
+
+      toast.success("Pengajuan pinjaman berhasil!");
+
+      // Call parent onSubmit to refresh data
+      await onSubmit(loanData);
+
+      handleClose();
+    } catch (error: any) {
+      console.error("❌ Error submitting loan:", error);
+      toast.error(
+        error.message || "Terjadi kesalahan saat mengajukan pinjaman"
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("id-ID", {
@@ -69,286 +208,216 @@ export function LoanApplicationModal({
     }).format(amount);
   };
 
-  const calculateMonthlyPayment = () => {
-    if (!formData.amount || !formData.term || !selectedKasOption) return 0;
-
-    const principal = parseFloat(formData.amount);
-    const months = parseInt(formData.term);
-    const annualRate = selectedKasOption.interest_rate / 100;
-    const monthlyRate = annualRate / 12;
-
-    if (monthlyRate === 0) {
-      return principal / months;
-    }
-
-    const monthlyPayment =
-      (principal * monthlyRate * Math.pow(1 + monthlyRate, months)) /
-      (Math.pow(1 + monthlyRate, months) - 1);
-
-    return monthlyPayment;
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    onSubmit({
-      ...formData,
-      amount: parseFloat(formData.amount),
-      term: parseInt(formData.term),
-      kas_id: parseInt(formData.kas_id),
-      estimatedMonthlyPayment: calculateMonthlyPayment(),
-    });
+  const handleClose = () => {
+    setSelectedKas("");
+    setPrincipalAmount("");
+    setTenureMonths("");
+    setLoanPurpose("");
+    setApplicationDate(new Date().toISOString().split("T")[0]);
+    setErrors({});
+    setMonthlyPayment(0);
+    setIsSubmitting(false);
     onClose();
-    setFormData({
-      kas_id: "",
-      amount: "",
-      purpose: "",
-      term: "",
-      collateral: "",
-      description: "",
-    });
-    setSelectedKas(null);
   };
 
-  const isFormValid = () => {
-    return (
-      formData.kas_id &&
-      formData.amount &&
-      formData.purpose &&
-      formData.term &&
-      formData.collateral &&
-      parseFloat(formData.amount) > 0 &&
-      parseInt(formData.term) > 0
-    );
-  };
+  const selectedKasData = availableKas.find(
+    (k) => k.id.toString() === selectedKas
+  );
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+    <Dialog open={isOpen} onOpenChange={handleClose}>
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Ajukan Pinjaman Baru</DialogTitle>
+          <DialogTitle className="flex items-center space-x-2">
+            <DollarSign className="h-5 w-5" />
+            <span>Ajukan Pinjaman Baru</span>
+          </DialogTitle>
           <DialogDescription>
-            Isi formulir di bawah ini untuk mengajukan pinjaman. Pengajuan akan
-            diproses oleh admin kas yang dipilih.
+            Lengkapi form di bawah untuk mengajukan pinjaman
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Pilih Kas */}
-          <div className="space-y-3">
-            <Label>Pilih Kas Pinjaman *</Label>
-            <div className="grid gap-3">
-              {availableKas.map((kas) => (
-                <div
-                  key={kas.id}
-                  onClick={() => setSelectedKas(kas.id)}
-                  className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
-                    selectedKas === kas.id
-                      ? "border-blue-500 bg-blue-50"
-                      : "border-gray-200 hover:border-blue-300"
-                  }`}
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-2">
-                        <h4 className="font-semibold text-gray-900">
-                          {kas.name}
-                        </h4>
-                        <Badge
-                          variant="secondary"
-                          className="bg-green-100 text-green-800"
-                        >
-                          Bunga {kas.interest_rate}%
-                        </Badge>
-                      </div>
-                      <p className="text-sm text-gray-600 mt-1">
-                        {kas.description}
-                      </p>
-                      <p className="text-sm text-gray-500 mt-2">
-                        Maksimal: {formatCurrency(kas.max_amount)}
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Kas Selection */}
+          <div className="space-y-2">
+            <Label htmlFor="kas">Pilih Kas *</Label>
+            <Select value={selectedKas} onValueChange={setSelectedKas}>
+              <SelectTrigger
+                className={errors.selectedKas ? "border-red-500" : ""}
+              >
+                <SelectValue placeholder="Pilih jenis kas" />
+              </SelectTrigger>
+              <SelectContent>
+                {availableKas.map((kas) => (
+                  <SelectItem key={kas.id} value={kas.id.toString()}>
+                    <div>
+                      <p className="font-medium">{kas.name}</p>
+                      <p className="text-xs text-gray-500">
+                        Bunga: {kas.interest_rate}% | Max:{" "}
+                        {formatCurrency(kas.max_amount)}
                       </p>
                     </div>
-                    {selectedKas === kas.id && (
-                      <div className="ml-4 flex-shrink-0">
-                        <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
-                          <svg
-                            className="w-4 h-4 text-white"
-                            fill="none"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth="2"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                          >
-                            <path d="M5 13l4 4L19 7"></path>
-                          </svg>
-                        </div>
-                      </div>
-                    )}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {errors.selectedKas && (
+              <p className="text-sm text-red-600">{errors.selectedKas}</p>
+            )}
+            {selectedKasData && (
+              <div className="bg-blue-50 p-3 rounded-lg text-sm">
+                <p className="text-blue-900 font-medium">
+                  {selectedKasData.name}
+                </p>
+                <p className="text-blue-700 text-xs mt-1">
+                  {selectedKasData.description}
+                </p>
+                <div className="grid grid-cols-2 gap-2 mt-2 text-xs">
+                  <div>
+                    <span className="text-blue-700">Bunga: </span>
+                    <span className="font-medium">
+                      {selectedKasData.interest_rate}% / tahun
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-blue-700">Maksimal: </span>
+                    <span className="font-medium">
+                      {formatCurrency(selectedKasData.max_amount)}
+                    </span>
                   </div>
                 </div>
-              ))}
-            </div>
+              </div>
+            )}
           </div>
 
-          {selectedKas && (
-            <>
-              {/* Jumlah Pinjaman */}
-              <div className="space-y-2">
-                <Label htmlFor="amount">Jumlah Pinjaman *</Label>
-                <Input
-                  id="amount"
-                  type="number"
-                  placeholder="Masukkan jumlah pinjaman"
-                  value={formData.amount}
-                  onChange={(e) =>
-                    setFormData({ ...formData, amount: e.target.value })
-                  }
-                  min="0"
-                  max={selectedKasOption?.max_amount}
-                  required
-                />
-                {selectedKasOption && (
-                  <p className="text-sm text-gray-500">
-                    Maksimal: {formatCurrency(selectedKasOption.max_amount)}
-                  </p>
+          {/* Principal Amount */}
+          <div className="space-y-2">
+            <Label htmlFor="principalAmount">Jumlah Pinjaman *</Label>
+            <Input
+              id="principalAmount"
+              type="number"
+              value={principalAmount}
+              onChange={(e) => setPrincipalAmount(e.target.value)}
+              placeholder="Contoh: 10000000"
+              className={errors.principalAmount ? "border-red-500" : ""}
+            />
+            {errors.principalAmount && (
+              <p className="text-sm text-red-600">{errors.principalAmount}</p>
+            )}
+          </div>
+
+          {/* Tenure */}
+          <div className="space-y-2">
+            <Label htmlFor="tenureMonths">Jangka Waktu (Bulan) *</Label>
+            <Input
+              id="tenureMonths"
+              type="number"
+              value={tenureMonths}
+              onChange={(e) => setTenureMonths(e.target.value)}
+              placeholder="Contoh: 12"
+              className={errors.tenureMonths ? "border-red-500" : ""}
+            />
+            {errors.tenureMonths && (
+              <p className="text-sm text-red-600">{errors.tenureMonths}</p>
+            )}
+          </div>
+
+          {/* Application Date */}
+          <div className="space-y-2">
+            <Label htmlFor="applicationDate">Tanggal Pengajuan *</Label>
+            <Input
+              id="applicationDate"
+              type="date"
+              value={applicationDate}
+              onChange={(e) => setApplicationDate(e.target.value)}
+              className={errors.applicationDate ? "border-red-500" : ""}
+            />
+            {errors.applicationDate && (
+              <p className="text-sm text-red-600">{errors.applicationDate}</p>
+            )}
+          </div>
+
+          {/* Loan Purpose */}
+          <div className="space-y-2">
+            <Label htmlFor="loanPurpose">Tujuan Pinjaman *</Label>
+            <Textarea
+              id="loanPurpose"
+              value={loanPurpose}
+              onChange={(e) => setLoanPurpose(e.target.value)}
+              placeholder="Jelaskan tujuan pinjaman Anda (minimal 10 karakter)"
+              rows={3}
+              className={errors.loanPurpose ? "border-red-500" : ""}
+            />
+            {errors.loanPurpose && (
+              <p className="text-sm text-red-600">{errors.loanPurpose}</p>
+            )}
+          </div>
+
+          {/* Calculation Preview */}
+          {monthlyPayment > 0 && (
+            <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+              <div className="flex items-center space-x-2 mb-3">
+                <Calculator className="h-4 w-4 text-green-600" />
+                <h4 className="font-medium text-green-900">
+                  Estimasi Pembayaran
+                </h4>
+              </div>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-green-700">Jumlah Pinjaman:</span>
+                  <span className="font-medium">
+                    {formatCurrency(parseFloat(principalAmount))}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-green-700">Jangka Waktu:</span>
+                  <span className="font-medium">{tenureMonths} bulan</span>
+                </div>
+                {selectedKasData && (
+                  <div className="flex justify-between">
+                    <span className="text-green-700">Bunga:</span>
+                    <span className="font-medium">
+                      {selectedKasData.interest_rate}% / tahun
+                    </span>
+                  </div>
                 )}
+                <div className="flex justify-between border-t border-green-300 pt-2">
+                  <span className="text-green-700 font-medium">
+                    Angsuran per Bulan:
+                  </span>
+                  <span className="font-bold text-green-900">
+                    {formatCurrency(monthlyPayment)}
+                  </span>
+                </div>
               </div>
-
-              {/* Tujuan Pinjaman */}
-              <div className="space-y-2">
-                <Label htmlFor="purpose">Tujuan Pinjaman *</Label>
-                <Select
-                  value={formData.purpose}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, purpose: value })
-                  }
-                  required
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Pilih tujuan pinjaman" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="business">Modal Usaha</SelectItem>
-                    <SelectItem value="education">Pendidikan</SelectItem>
-                    <SelectItem value="health">Kesehatan</SelectItem>
-                    <SelectItem value="home_improvement">
-                      Renovasi Rumah
-                    </SelectItem>
-                    <SelectItem value="vehicle">Kendaraan</SelectItem>
-                    <SelectItem value="emergency">Kebutuhan Darurat</SelectItem>
-                    <SelectItem value="other">Lainnya</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Jangka Waktu */}
-              <div className="space-y-2">
-                <Label htmlFor="term">Jangka Waktu (Bulan) *</Label>
-                <Select
-                  value={formData.term}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, term: value })
-                  }
-                  required
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Pilih jangka waktu" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="6">6 Bulan</SelectItem>
-                    <SelectItem value="12">12 Bulan (1 Tahun)</SelectItem>
-                    <SelectItem value="24">24 Bulan (2 Tahun)</SelectItem>
-                    <SelectItem value="36">36 Bulan (3 Tahun)</SelectItem>
-                    <SelectItem value="48">48 Bulan (4 Tahun)</SelectItem>
-                    <SelectItem value="60">60 Bulan (5 Tahun)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Jaminan */}
-              <div className="space-y-2">
-                <Label htmlFor="collateral">Jaminan *</Label>
-                <Select
-                  value={formData.collateral}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, collateral: value })
-                  }
-                  required
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Pilih jenis jaminan" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="certificate">
-                      Sertifikat Tanah/Rumah
-                    </SelectItem>
-                    <SelectItem value="vehicle">BPKB Kendaraan</SelectItem>
-                    <SelectItem value="savings">Simpanan</SelectItem>
-                    <SelectItem value="salary">Potongan Gaji</SelectItem>
-                    <SelectItem value="other">Lainnya</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Keterangan */}
-              <div className="space-y-2">
-                <Label htmlFor="description">Keterangan Tambahan</Label>
-                <Textarea
-                  id="description"
-                  placeholder="Jelaskan detail kebutuhan pinjaman Anda..."
-                  value={formData.description}
-                  onChange={(e) =>
-                    setFormData({ ...formData, description: e.target.value })
-                  }
-                  rows={3}
-                />
-              </div>
-
-              {/* Estimasi Pembayaran */}
-              {formData.amount && formData.term && (
-                <Alert>
-                  <Info className="h-4 w-4" />
-                  <AlertDescription>
-                    <div className="space-y-2">
-                      <p className="font-semibold">Estimasi Pembayaran:</p>
-                      <div className="grid grid-cols-2 gap-2 text-sm">
-                        <div>
-                          <p className="text-gray-600">Angsuran per bulan:</p>
-                          <p className="font-semibold text-blue-600">
-                            {formatCurrency(calculateMonthlyPayment())}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-gray-600">Total pembayaran:</p>
-                          <p className="font-semibold text-blue-600">
-                            {formatCurrency(
-                              calculateMonthlyPayment() *
-                                parseInt(formData.term)
-                            )}
-                          </p>
-                        </div>
-                      </div>
-                      <p className="text-xs text-gray-500 mt-2">
-                        * Estimasi ini bersifat sementara dan dapat berubah
-                        sesuai persetujuan admin
-                      </p>
-                    </div>
-                  </AlertDescription>
-                </Alert>
-              )}
-            </>
+            </div>
           )}
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleClose}
+              disabled={isSubmitting}
+            >
               Batal
             </Button>
             <Button
               type="submit"
-              disabled={!isFormValid()}
-              className="bg-blue-600 hover:bg-blue-700"
+              disabled={isSubmitting}
+              className="min-w-[140px]"
             >
-              Ajukan Pinjaman
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Memproses...
+                </>
+              ) : (
+                <>
+                  <DollarSign className="h-4 w-4 mr-2" />
+                  Ajukan Pinjaman
+                </>
+              )}
             </Button>
           </DialogFooter>
         </form>

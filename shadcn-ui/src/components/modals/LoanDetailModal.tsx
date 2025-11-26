@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -25,33 +25,11 @@ import {
   X,
   Download,
   AlertCircle,
+  Loader2,
+  RefreshCw,
 } from "lucide-react";
-
-interface Loan {
-  id: string;
-  amount: number;
-  purpose: string;
-  term: number;
-  monthlyPayment: number;
-  remainingBalance: number;
-  paidInstallments: number;
-  interestRate: number;
-  startDate: string;
-  endDate: string;
-  status: string;
-  collateral: string;
-  nextPaymentDate: string;
-}
-
-interface PaymentHistory {
-  id: string;
-  date: string;
-  amount: number;
-  principal: number;
-  interest: number;
-  remainingBalance: number;
-  status: string;
-}
+import { Loan, Installment } from "@/lib/api/loans.service";
+import useInstallments from "@/hooks/useInstallments";
 
 interface LoanDetailModalProps {
   loan: Loan | null;
@@ -66,14 +44,39 @@ export function LoanDetailModal({
   onClose,
   onMakePayment,
 }: LoanDetailModalProps) {
+  const [loadingSchedule, setLoadingSchedule] = useState(false);
+  const { schedule, getSchedule, installments, getInstallments } =
+    useInstallments();
+
+  // Load schedule when modal opens
+  useEffect(() => {
+    if (loan && isOpen) {
+      loadScheduleData();
+    }
+  }, [loan, isOpen]);
+
+  const loadScheduleData = async () => {
+    if (!loan) return;
+
+    setLoadingSchedule(true);
+    try {
+      await Promise.all([getSchedule(loan.id), getInstallments(loan.id)]);
+    } catch (err) {
+      console.error("Error loading schedule:", err);
+    } finally {
+      setLoadingSchedule(false);
+    }
+  };
+
   if (!loan) return null;
 
-  const formatCurrency = (amount: number) => {
+  const formatCurrency = (amount: number | string) => {
+    const numAmount = typeof amount === "string" ? parseFloat(amount) : amount;
     return new Intl.NumberFormat("id-ID", {
       style: "currency",
       currency: "IDR",
       minimumFractionDigits: 0,
-    }).format(amount);
+    }).format(numAmount || 0);
   };
 
   const getStatusBadge = (status: string) => {
@@ -86,102 +89,64 @@ export function LoanDetailModal({
         return <Badge className="bg-blue-100 text-blue-800">Lunas</Badge>;
       case "pending":
         return <Badge className="bg-yellow-100 text-yellow-800">Pending</Badge>;
+      case "approved":
+        return <Badge className="bg-blue-100 text-blue-800">Disetujui</Badge>;
+      case "rejected":
+        return <Badge className="bg-red-100 text-red-800">Ditolak</Badge>;
       default:
         return <Badge variant="secondary">{status}</Badge>;
     }
   };
 
-  const getPurposeName = (purpose: string) => {
-    switch (purpose) {
-      case "business":
-        return "Modal Usaha";
-      case "education":
-        return "Pendidikan";
-      case "health":
-        return "Kesehatan";
-      case "home_improvement":
-        return "Renovasi Rumah";
-      case "vehicle":
-        return "Kendaraan";
-      case "emergency":
-        return "Kebutuhan Darurat";
+  const getInstallmentStatusBadge = (status: string) => {
+    switch (status) {
+      case "paid":
+        return <Badge className="bg-green-100 text-green-800">Lunas</Badge>;
+      case "pending":
+        return (
+          <Badge className="bg-yellow-100 text-yellow-800">Belum Bayar</Badge>
+        );
+      case "overdue":
+        return <Badge className="bg-red-100 text-red-800">Terlambat</Badge>;
+      case "partial":
+        return <Badge className="bg-orange-100 text-orange-800">Parsial</Badge>;
       default:
-        return "Lainnya";
+        return <Badge variant="secondary">{status}</Badge>;
     }
   };
-
-  const getCollateralName = (collateral: string) => {
-    switch (collateral) {
-      case "savings":
-        return "Simpanan di Koperasi";
-      case "certificate":
-        return "Sertifikat Tanah/Rumah";
-      case "vehicle":
-        return "BPKB Kendaraan";
-      case "salary":
-        return "Slip Gaji";
-      case "business":
-        return "Surat Izin Usaha";
-      case "guarantor":
-        return "Penjamin Personal";
-      default:
-        return collateral;
-    }
-  };
-
-  // Mock payment history
-  const paymentHistory: PaymentHistory[] = [
-    {
-      id: "1",
-      date: "2024-01-15",
-      amount: 235442,
-      principal: 200000,
-      interest: 35442,
-      remainingBalance: 4800000,
-      status: "paid",
-    },
-    {
-      id: "2",
-      date: "2023-12-15",
-      amount: 235442,
-      principal: 198000,
-      interest: 37442,
-      remainingBalance: 5000000,
-      status: "paid",
-    },
-    {
-      id: "3",
-      date: "2023-11-15",
-      amount: 235442,
-      principal: 196000,
-      interest: 39442,
-      remainingBalance: 5198000,
-      status: "paid",
-    },
-  ];
 
   const calculateProgress = () => {
-    return ((loan.paidInstallments / loan.term) * 100).toFixed(1);
+    const paid = loan.paid_installments || 0;
+    const total = loan.total_installments || loan.tenure_months || 1;
+    return ((paid / total) * 100).toFixed(1);
   };
 
   const calculateRemainingMonths = () => {
-    return loan.term - loan.paidInstallments;
+    const paid = loan.paid_installments || 0;
+    const total = loan.total_installments || loan.tenure_months || 0;
+    return total - paid;
   };
 
-  const isOverdue = () => {
-    const nextPayment = new Date(loan.nextPaymentDate);
-    const today = new Date();
-    return nextPayment < today && loan.status === "active";
-  };
+  const principalAmount =
+    typeof loan.principal_amount === "string"
+      ? parseFloat(loan.principal_amount)
+      : loan.principal_amount;
 
-  const getDaysOverdue = () => {
-    if (!isOverdue()) return 0;
-    const nextPayment = new Date(loan.nextPaymentDate);
-    const today = new Date();
-    return Math.ceil(
-      (today.getTime() - nextPayment.getTime()) / (1000 * 60 * 60 * 24)
-    );
-  };
+  const remainingBalance = loan.remaining_balance
+    ? typeof loan.remaining_balance === "string"
+      ? parseFloat(loan.remaining_balance)
+      : loan.remaining_balance
+    : principalAmount;
+
+  const monthlyPayment =
+    typeof loan.monthly_payment === "string"
+      ? parseFloat(loan.monthly_payment)
+      : loan.monthly_payment;
+
+  // Get paid installments for history
+  const paidInstallments = installments
+    .filter((i) => i.status === "paid")
+    .slice(0, 3);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -194,15 +159,25 @@ export function LoanDetailModal({
               </div>
               <div>
                 <DialogTitle className="text-xl font-bold">
-                  Detail Pinjaman
+                  Detail Pinjaman #{loan.id}
                 </DialogTitle>
                 <DialogDescription className="flex items-center space-x-2">
-                  <span>{getPurposeName(loan.purpose)}</span>
+                  <span>{loan.user?.full_name || "N/A"}</span>
                   {getStatusBadge(loan.status)}
                 </DialogDescription>
               </div>
             </div>
             <div className="flex items-center space-x-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={loadScheduleData}
+                disabled={loadingSchedule}
+              >
+                <RefreshCw
+                  className={`h-4 w-4 ${loadingSchedule ? "animate-spin" : ""}`}
+                />
+              </Button>
               {loan.status === "active" && onMakePayment && (
                 <Button
                   variant="outline"
@@ -214,10 +189,6 @@ export function LoanDetailModal({
                   Bayar Cicilan
                 </Button>
               )}
-              <Button variant="outline" size="sm">
-                <Download className="h-4 w-4 mr-2" />
-                Export
-              </Button>
               <Button variant="ghost" size="sm" onClick={onClose}>
                 <X className="h-4 w-4" />
               </Button>
@@ -226,22 +197,6 @@ export function LoanDetailModal({
         </DialogHeader>
 
         <div className="space-y-6 mt-6">
-          {/* Overdue Alert */}
-          {isOverdue() && (
-            <div className="bg-red-50 border border-red-200 p-4 rounded-lg">
-              <div className="flex items-center space-x-2">
-                <AlertCircle className="h-5 w-5 text-red-600" />
-                <h4 className="font-medium text-red-900">
-                  Pembayaran Terlambat
-                </h4>
-              </div>
-              <p className="text-red-700 text-sm mt-1">
-                Pembayaran Anda sudah terlambat {getDaysOverdue()} hari. Segera
-                lakukan pembayaran untuk menghindari denda.
-              </p>
-            </div>
-          )}
-
           {/* Loan Summary */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <Card>
@@ -253,10 +208,10 @@ export function LoanDetailModal({
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-red-600">
-                  {formatCurrency(loan.remainingBalance)}
+                  {formatCurrency(remainingBalance)}
                 </div>
                 <p className="text-xs text-gray-500 mt-1">
-                  dari {formatCurrency(loan.amount)}
+                  dari {formatCurrency(principalAmount)}
                 </p>
               </CardContent>
             </Card>
@@ -270,7 +225,7 @@ export function LoanDetailModal({
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-blue-600">
-                  {formatCurrency(loan.monthlyPayment)}
+                  {formatCurrency(monthlyPayment)}
                 </div>
                 <p className="text-xs text-gray-500 mt-1">per bulan</p>
               </CardContent>
@@ -288,7 +243,8 @@ export function LoanDetailModal({
                   {calculateProgress()}%
                 </div>
                 <p className="text-xs text-gray-500 mt-1">
-                  {loan.paidInstallments} dari {loan.term} cicilan
+                  {loan.paid_installments || 0} dari {loan.tenure_months}{" "}
+                  cicilan
                 </p>
               </CardContent>
             </Card>
@@ -320,20 +276,39 @@ export function LoanDetailModal({
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <p className="text-sm text-gray-500">Tujuan Pinjaman</p>
-                  <p className="font-medium">{getPurposeName(loan.purpose)}</p>
+                  <p className="text-sm text-gray-500">Anggota</p>
+                  <p className="font-medium">{loan.user?.full_name || "N/A"}</p>
+                  <p className="text-xs text-gray-500">
+                    {loan.user?.employee_id || "N/A"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Kas</p>
+                  <p className="font-medium">
+                    {loan.cash_account?.name || "N/A"}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    {loan.cash_account?.code || "N/A"}
+                  </p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">Jumlah Pinjaman</p>
-                  <p className="font-medium">{formatCurrency(loan.amount)}</p>
+                  <p className="font-medium">
+                    {formatCurrency(principalAmount)}
+                  </p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">Jangka Waktu</p>
-                  <p className="font-medium">{loan.term} bulan</p>
+                  <p className="font-medium">{loan.tenure_months} bulan</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">Suku Bunga</p>
-                  <p className="font-medium">{loan.interestRate}% per tahun</p>
+                  <p className="font-medium">
+                    {typeof loan.interest_rate === "string"
+                      ? parseFloat(loan.interest_rate)
+                      : loan.interest_rate}
+                    % per tahun
+                  </p>
                 </div>
               </CardContent>
             </Card>
@@ -342,37 +317,44 @@ export function LoanDetailModal({
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
                   <Calendar className="h-5 w-5" />
-                  <span>Jadwal Pembayaran</span>
+                  <span>Jadwal & Status</span>
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <p className="text-sm text-gray-500">Tanggal Mulai</p>
+                  <p className="text-sm text-gray-500">Tanggal Pengajuan</p>
                   <p className="font-medium">
-                    {new Date(loan.startDate).toLocaleDateString("id-ID")}
+                    {new Date(loan.application_date).toLocaleDateString(
+                      "id-ID"
+                    )}
                   </p>
                 </div>
+                {loan.disbursement_date && (
+                  <div>
+                    <p className="text-sm text-gray-500">Tanggal Pencairan</p>
+                    <p className="font-medium">
+                      {new Date(loan.disbursement_date).toLocaleDateString(
+                        "id-ID"
+                      )}
+                    </p>
+                  </div>
+                )}
                 <div>
-                  <p className="text-sm text-gray-500">Tanggal Berakhir</p>
-                  <p className="font-medium">
-                    {new Date(loan.endDate).toLocaleDateString("id-ID")}
-                  </p>
+                  <p className="text-sm text-gray-500">Status</p>
+                  <div className="mt-1">{getStatusBadge(loan.status)}</div>
                 </div>
+                {loan.rejection_reason && (
+                  <div>
+                    <p className="text-sm text-gray-500">Alasan Penolakan</p>
+                    <p className="font-medium text-red-600">
+                      {loan.rejection_reason}
+                    </p>
+                  </div>
+                )}
                 <div>
-                  <p className="text-sm text-gray-500">Pembayaran Berikutnya</p>
-                  <p
-                    className={`font-medium ${
-                      isOverdue() ? "text-red-600" : "text-blue-600"
-                    }`}
-                  >
-                    {new Date(loan.nextPaymentDate).toLocaleDateString("id-ID")}
-                    {isOverdue() && " (Terlambat)"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500">Jaminan</p>
-                  <p className="font-medium">
-                    {getCollateralName(loan.collateral)}
+                  <p className="text-sm text-gray-500">Tujuan Pinjaman</p>
+                  <p className="font-medium text-sm">
+                    {loan.loan_purpose || "Tidak ada keterangan"}
                   </p>
                 </div>
               </CardContent>
@@ -399,7 +381,7 @@ export function LoanDetailModal({
                   <div className="text-center">
                     <p className="text-gray-500">Sudah Dibayar</p>
                     <p className="font-medium text-green-600">
-                      {loan.paidInstallments} cicilan
+                      {loan.paid_installments || 0} cicilan
                     </p>
                   </div>
                   <div className="text-center">
@@ -411,7 +393,7 @@ export function LoanDetailModal({
                   <div className="text-center">
                     <p className="text-gray-500">Total Cicilan</p>
                     <p className="font-medium text-blue-600">
-                      {loan.term} cicilan
+                      {loan.tenure_months} cicilan
                     </p>
                   </div>
                 </div>
@@ -419,50 +401,126 @@ export function LoanDetailModal({
             </CardContent>
           </Card>
 
-          {/* Payment History */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <FileText className="h-5 w-5" />
-                <span>Riwayat Pembayaran</span>
-              </CardTitle>
-              <CardDescription>3 pembayaran terakhir</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {paymentHistory.map((payment) => (
-                  <div
-                    key={payment.id}
-                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-                  >
-                    <div className="flex items-center space-x-3">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-green-100">
-                        <DollarSign className="h-4 w-4 text-green-600" />
+          {/* Installment Schedule */}
+          {loadingSchedule ? (
+            <Card>
+              <CardContent className="py-12">
+                <div className="flex items-center justify-center">
+                  <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+                  <span className="ml-3 text-gray-600">Memuat jadwal...</span>
+                </div>
+              </CardContent>
+            </Card>
+          ) : schedule.length > 0 ? (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <FileText className="h-5 w-5" />
+                  <span>Jadwal Angsuran</span>
+                </CardTitle>
+                <CardDescription>
+                  Menampilkan {Math.min(schedule.length, 6)} dari{" "}
+                  {schedule.length} cicilan
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {schedule.slice(0, 6).map((installment) => (
+                    <div
+                      key={installment.id}
+                      className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                    >
+                      <div className="flex items-center space-x-3">
+                        <div className="text-center">
+                          <p className="text-xs text-gray-500">Cicilan</p>
+                          <p className="font-bold text-blue-600">
+                            #{installment.installment_number}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="font-medium">
+                            {formatCurrency(installment.total_amount)}
+                          </p>
+                          <p className="text-sm text-gray-500">
+                            Jatuh tempo:{" "}
+                            {new Date(installment.due_date).toLocaleDateString(
+                              "id-ID"
+                            )}
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-medium">Pembayaran Cicilan</p>
+                      <div className="text-right">
+                        {getInstallmentStatusBadge(installment.status)}
+                        {installment.payment_date && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            Dibayar:{" "}
+                            {new Date(
+                              installment.payment_date
+                            ).toLocaleDateString("id-ID")}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          ) : null}
+
+          {/* Payment History */}
+          {paidInstallments.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <FileText className="h-5 w-5" />
+                  <span>Riwayat Pembayaran</span>
+                </CardTitle>
+                <CardDescription>
+                  {paidInstallments.length} pembayaran terakhir
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {paidInstallments.map((payment) => (
+                    <div
+                      key={payment.id}
+                      className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                    >
+                      <div className="flex items-center space-x-3">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-green-100">
+                          <DollarSign className="h-4 w-4 text-green-600" />
+                        </div>
+                        <div>
+                          <p className="font-medium">
+                            Cicilan #{payment.installment_number}
+                          </p>
+                          <p className="text-sm text-gray-500">
+                            {payment.payment_date
+                              ? new Date(
+                                  payment.payment_date
+                                ).toLocaleDateString("id-ID")
+                              : "N/A"}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-medium text-green-600">
+                          {formatCurrency(payment.total_amount)}
+                        </p>
                         <p className="text-sm text-gray-500">
-                          {new Date(payment.date).toLocaleDateString("id-ID")}
+                          {payment.payment_method || "N/A"}
                         </p>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <p className="font-medium text-green-600">
-                        {formatCurrency(payment.amount)}
-                      </p>
-                      <p className="text-sm text-gray-500">
-                        Pokok: {formatCurrency(payment.principal)} | Bunga:{" "}
-                        {formatCurrency(payment.interest)}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </DialogContent>
     </Dialog>
   );
 }
+
 export default LoanDetailModal;

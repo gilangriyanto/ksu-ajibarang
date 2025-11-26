@@ -59,13 +59,19 @@ export default function MemberSavings() {
   }, [user?.id]);
 
   const loadAllData = async () => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      console.warn("⚠️ No user ID found");
+      return;
+    }
 
     setLoading(true);
     setError(null);
     try {
+      console.log("🔄 Loading member savings for user:", user.id);
       await Promise.all([loadMemberSavings(), loadMemberSummary()]);
+      console.log("✅ Member data loaded successfully");
     } catch (err: any) {
+      console.error("❌ Error loading member data:", err);
       setError(err.message || "Gagal memuat data simpanan");
       toast.error("Gagal memuat data simpanan");
     } finally {
@@ -76,9 +82,15 @@ export default function MemberSavings() {
   const loadMemberSavings = async () => {
     try {
       const response = await savingsService.getAll({ user_id: user?.id });
-      setSavings(response.data || []);
+      console.log("📋 Member savings response:", response);
+
+      // Handle nested data structure
+      const savingsData = response.data?.data || response.data || [];
+      console.log("📋 Parsed savings:", savingsData);
+
+      setSavings(savingsData);
     } catch (err: any) {
-      console.error("Error loading member savings:", err);
+      console.error("❌ Error loading member savings:", err);
       throw new Error("Gagal memuat data simpanan");
     }
   };
@@ -86,9 +98,26 @@ export default function MemberSavings() {
   const loadMemberSummary = async () => {
     try {
       const response = await savingsService.getSummary(user?.id);
-      setSummary(response.data);
+      console.log("📊 Member summary response:", response);
+
+      // Handle nested data structure
+      const summaryData = response.data?.data || response.data;
+      console.log("📊 Parsed summary:", summaryData);
+
+      if (summaryData) {
+        setSummary({
+          total_balance: Number(summaryData.total_balance || 0),
+          total_principal: Number(summaryData.total_principal || 0),
+          total_mandatory: Number(summaryData.total_mandatory || 0),
+          total_voluntary: Number(summaryData.total_voluntary || 0),
+          total_holiday: Number(summaryData.total_holiday || 0),
+          total_deposits: Number(summaryData.total_deposits || 0),
+          active_members: Number(summaryData.active_members || 0),
+        });
+      }
     } catch (err: any) {
-      console.error("Error loading summary:", err);
+      console.error("❌ Error loading summary:", err);
+      // Summary is optional, don't throw
     }
   };
 
@@ -104,12 +133,13 @@ export default function MemberSavings() {
     }
   };
 
-  const formatCurrency = (amount: number) => {
+  const formatCurrency = (amount: number | string) => {
+    const numAmount = typeof amount === "string" ? parseFloat(amount) : amount;
     return new Intl.NumberFormat("id-ID", {
       style: "currency",
       currency: "IDR",
       minimumFractionDigits: 0,
-    }).format(amount);
+    }).format(numAmount || 0);
   };
 
   const getSavingsTypeName = (type: string) => {
@@ -140,20 +170,9 @@ export default function MemberSavings() {
     }
   };
 
-  const getTransactionIcon = (type: string) => {
-    switch (type) {
-      case "deposit":
-        return <TrendingUp className="h-4 w-4 text-green-600" />;
-      case "interest":
-        return <DollarSign className="h-4 w-4 text-blue-600" />;
-      default:
-        return <DollarSign className="h-4 w-4 text-gray-600" />;
-    }
-  };
-
-  // Group savings by type
+  // Group savings by type - support both field names
   const savingsByType = savings.reduce((acc, saving) => {
-    const type = saving.saving_type;
+    const type = saving.savings_type || saving.saving_type || "unknown";
     if (!acc[type]) {
       acc[type] = [];
     }
@@ -169,7 +188,11 @@ export default function MemberSavings() {
         new Date(s.created_at).getFullYear() === new Date().getFullYear();
       return isThisMonth && s.status === "approved";
     })
-    .reduce((sum, s) => sum + s.amount, 0);
+    .reduce((sum, s) => {
+      const amount =
+        typeof s.amount === "string" ? parseFloat(s.amount) : s.amount;
+      return sum + (amount || 0);
+    }, 0);
 
   if (loading) {
     return (
@@ -264,9 +287,19 @@ export default function MemberSavings() {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {Object.entries(savingsByType).map(([type, typeSavings]) => {
+                  // Calculate total balance - handle both final_amount and balance
                   const totalBalance = typeSavings
                     .filter((s) => s.status === "approved")
-                    .reduce((sum, s) => sum + s.balance, 0);
+                    .reduce((sum, s) => {
+                      const balance =
+                        s.final_amount || s.balance || s.amount || 0;
+                      const numBalance =
+                        typeof balance === "string"
+                          ? parseFloat(balance)
+                          : balance;
+                      return sum + numBalance;
+                    }, 0);
+
                   const latestSaving = typeSavings.sort(
                     (a, b) =>
                       new Date(b.updated_at).getTime() -
@@ -296,7 +329,7 @@ export default function MemberSavings() {
                             <span className="text-sm text-gray-600">
                               Total Saldo:
                             </span>
-                            <span className="font-medium">
+                            <span className="font-medium text-green-600">
                               {formatCurrency(totalBalance)}
                             </span>
                           </div>
@@ -319,13 +352,19 @@ export default function MemberSavings() {
                               // Use the latest saving for detail
                               const accountData: SavingsAccount = {
                                 id: latestSaving.id.toString(),
-                                type: latestSaving.saving_type,
+                                type: type,
                                 balance: totalBalance,
-                                monthlyDeposit: 0, // Can be calculated if needed
+                                monthlyDeposit: 0,
                                 openDate: latestSaving.created_at,
                                 lastTransaction: latestSaving.updated_at,
                                 status: latestSaving.status,
-                                interestRate: 0, // Add if available from API
+                                interestRate:
+                                  typeof latestSaving.interest_percentage ===
+                                  "string"
+                                    ? parseFloat(
+                                        latestSaving.interest_percentage
+                                      )
+                                    : latestSaving.interest_percentage || 0,
                                 totalDeposits: totalBalance,
                                 totalWithdrawals: 0,
                               };
@@ -366,47 +405,58 @@ export default function MemberSavings() {
                       new Date(a.created_at).getTime()
                   )
                   .slice(0, 10)
-                  .map((saving) => (
-                    <div
-                      key={saving.id}
-                      className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg"
-                    >
-                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white">
-                        <TrendingUp className="h-4 w-4 text-green-600" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900">
-                          {getSavingsTypeName(saving.saving_type)}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {saving.description || "Setoran simpanan"} •{" "}
-                          {new Date(saving.created_at).toLocaleDateString(
-                            "id-ID"
-                          )}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p
-                          className={`text-sm font-medium ${
-                            saving.status === "approved"
-                              ? "text-green-600"
+                  .map((saving) => {
+                    const amount =
+                      typeof saving.amount === "string"
+                        ? parseFloat(saving.amount)
+                        : saving.amount;
+                    const savingType =
+                      saving.savings_type || saving.saving_type;
+                    const description =
+                      saving.description || saving.notes || "Setoran simpanan";
+
+                    return (
+                      <div
+                        key={saving.id}
+                        className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg"
+                      >
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white">
+                          <TrendingUp className="h-4 w-4 text-green-600" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900">
+                            {getSavingsTypeName(savingType)}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {description} •{" "}
+                            {new Date(saving.created_at).toLocaleDateString(
+                              "id-ID"
+                            )}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p
+                            className={`text-sm font-medium ${
+                              saving.status === "approved"
+                                ? "text-green-600"
+                                : saving.status === "pending"
+                                ? "text-yellow-600"
+                                : "text-red-600"
+                            }`}
+                          >
+                            {formatCurrency(amount)}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {saving.status === "approved"
+                              ? "Disetujui"
                               : saving.status === "pending"
-                              ? "text-yellow-600"
-                              : "text-red-600"
-                          }`}
-                        >
-                          {formatCurrency(saving.amount)}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {saving.status === "approved"
-                            ? "Disetujui"
-                            : saving.status === "pending"
-                            ? "Pending"
-                            : "Ditolak"}
-                        </p>
+                              ? "Pending"
+                              : "Ditolak"}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
               </div>
             )}
           </CardContent>

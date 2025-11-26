@@ -1,227 +1,189 @@
+// =====================================================
+// FIXED: MemberLoans.tsx (Member)
+// =====================================================
+
 import React, { useState } from "react";
 import { MemberLayout } from "@/components/layout/MemberLayout";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  CreditCard,
-  Plus,
-  DollarSign,
-  Calendar,
-  AlertCircle,
-  CheckCircle,
-  Eye,
-  TrendingDown,
-} from "lucide-react";
+import { Plus, Eye, DollarSign, Calendar, RefreshCw } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+
+// ✅ Import the hooks
+import useLoans from "@/hooks/useLoans";
+import useInstallments from "@/hooks/useInstallments";
+import useLoanSimulation from "@/hooks/useLoanSimulation";
+
+// ✅ CRITICAL: Import modal components (named exports)
 import { LoanApplicationModal } from "@/components/modals/LoanApplicationModal";
 import { LoanDetailModal } from "@/components/modals/LoanDetailModal";
 import { LoanPaymentModal } from "@/components/modals/LoanPaymentModal";
 
-interface Loan {
-  id: string;
-  kas_id: number;
-  amount: number;
-  purpose: string;
-  term: number;
-  monthlyPayment: number;
-  remainingBalance: number;
-  paidInstallments: number;
-  interestRate: number;
-  startDate: string;
-  endDate: string;
-  status: string;
-  collateral: string;
-  nextPaymentDate: string;
-}
-
 export default function MemberLoans() {
-  const [isApplicationModalOpen, setIsApplicationModalOpen] = useState(false);
-  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
-  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
-  const [selectedLoan, setSelectedLoan] = useState<Loan | null>(null);
+  const { user } = useAuth();
 
-  // Tambahkan interface ini
-  interface KasOption {
-    id: number;
-    name: string;
-    description: string;
-    interest_rate: number;
-    max_amount: number;
-  }
+  // ✅ Use the hooks (filtered by user_id)
+  const { loans, summary, loading, createLoan, refresh } = useLoans({
+    user_id: user?.id, // Member only sees their own loans
+    autoLoad: true,
+  });
 
-  // Tambahkan data kas yang tersedia untuk member
-  const availableKas: KasOption[] = [
+  const { installments, getInstallments, payInstallment } = useInstallments();
+  const { simulate, simulation } = useLoanSimulation();
+
+  // ✅ Local state for modals
+  const [selectedLoan, setSelectedLoan] = useState(null);
+  const [applicationModal, setApplicationModal] = useState(false);
+  const [detailModal, setDetailModal] = useState(false);
+  const [paymentModal, setPaymentModal] = useState(false);
+
+  // Mock availableKas data - replace with actual API call
+  const availableKas = [
     {
       id: 1,
-      name: "Kas 1 - Pembiayaan Umum",
-      description: "Pinjaman untuk kebutuhan operasional dan pembiayaan umum",
+      name: "Kas Umum",
+      description: "Pinjaman dengan bunga standar untuk kebutuhan umum",
       interest_rate: 12,
       max_amount: 50000000,
     },
     {
       id: 3,
-      name: "Kas 3 - Sebrakan",
-      description:
-        "Pinjaman tanpa bunga untuk kebutuhan khusus (pernikahan, pendidikan, dll)",
+      name: "Kas Sebrakan",
+      description: "Pinjaman tanpa bunga untuk kebutuhan mendesak",
       interest_rate: 0,
-      max_amount: 20000000,
+      max_amount: 10000000,
     },
   ];
 
-  // Mock data - replace with actual API calls
-  const loans: Loan[] = [
-    {
-      id: "1",
-      kas_id: 1,
-      amount: 10000000,
-      purpose: "business",
-      term: 24,
-      monthlyPayment: 500000,
-      remainingBalance: 6000000,
-      paidInstallments: 8,
-      interestRate: 12,
-      startDate: "2023-06-01",
-      endDate: "2025-06-01",
-      status: "active",
-      collateral: "certificate",
-      nextPaymentDate: "2024-02-15",
-    },
-    {
-      id: "2",
-      kas_id: 21,
-      amount: 5000000,
-      purpose: "education",
-      term: 12,
-      monthlyPayment: 450000,
-      remainingBalance: 1800000,
-      paidInstallments: 8,
-      interestRate: 10,
-      startDate: "2023-08-01",
-      endDate: "2024-08-01",
-      status: "active",
-      collateral: "savings",
-      nextPaymentDate: "2024-02-10",
-    },
-    {
-      id: "3",
-      kas_id: 11,
-      amount: 15000000,
-      purpose: "home_improvement",
-      term: 36,
-      monthlyPayment: 520000,
-      remainingBalance: 0,
-      paidInstallments: 36,
-      interestRate: 11,
-      startDate: "2021-01-01",
-      endDate: "2024-01-01",
-      status: "completed",
-      collateral: "vehicle",
-      nextPaymentDate: "2024-01-01",
-    },
-  ];
-
-  const formatCurrency = (amount: number) => {
+  // ✅ Format helpers
+  const formatCurrency = (amount: number | string) => {
+    const numAmount = typeof amount === "string" ? parseFloat(amount) : amount;
     return new Intl.NumberFormat("id-ID", {
       style: "currency",
       currency: "IDR",
       minimumFractionDigits: 0,
-    }).format(amount);
-  };
-
-  const getPurposeName = (purpose: string) => {
-    switch (purpose) {
-      case "business":
-        return "Modal Usaha";
-      case "education":
-        return "Pendidikan";
-      case "health":
-        return "Kesehatan";
-      case "home_improvement":
-        return "Renovasi Rumah";
-      case "vehicle":
-        return "Kendaraan";
-      case "emergency":
-        return "Kebutuhan Darurat";
-      default:
-        return "Lainnya";
-    }
+    }).format(numAmount || 0);
   };
 
   const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "active":
-        return <Badge className="bg-green-100 text-green-800">Aktif</Badge>;
-      case "overdue":
-        return <Badge className="bg-red-100 text-red-800">Terlambat</Badge>;
-      case "completed":
-        return <Badge className="bg-blue-100 text-blue-800">Lunas</Badge>;
-      case "pending":
-        return <Badge className="bg-yellow-100 text-yellow-800">Pending</Badge>;
-      default:
-        return <Badge variant="secondary">{status}</Badge>;
+    const statusMap = {
+      active: { color: "bg-green-100 text-green-800", text: "Aktif" },
+      pending: { color: "bg-yellow-100 text-yellow-800", text: "Pending" },
+      completed: { color: "bg-blue-100 text-blue-800", text: "Lunas" },
+      overdue: { color: "bg-red-100 text-red-800", text: "Terlambat" },
+      rejected: { color: "bg-red-100 text-red-800", text: "Ditolak" },
+    };
+
+    const config = statusMap[status] || {
+      color: "bg-gray-100 text-gray-800",
+      text: status,
+    };
+    return <Badge className={config.color}>{config.text}</Badge>;
+  };
+
+  // ✅ Handle actions
+  const handleApplyLoan = async (formData: any) => {
+    try {
+      if (!user?.id) {
+        console.error("User ID not found");
+        return;
+      }
+
+      await createLoan({
+        user_id: user.id,
+        cash_account_id: formData.cash_account_id,
+        principal_amount: formData.principal_amount,
+        tenure_months: formData.tenure_months,
+        application_date: new Date().toISOString().split("T")[0],
+        loan_purpose: formData.loan_purpose,
+      });
+      setApplicationModal(false);
+      refresh(); // Reload data after apply
+    } catch (err) {
+      console.error("Error applying loan:", err);
     }
   };
 
-  const activeLoans = loans.filter((loan) => loan.status === "active");
-  const totalOutstanding = activeLoans.reduce(
-    (sum, loan) => sum + loan.remainingBalance,
-    0
-  );
-  const totalMonthlyPayment = activeLoans.reduce(
-    (sum, loan) => sum + loan.monthlyPayment,
-    0
-  );
+  // ✅ Handle view detail - FIXED
+  const handleViewDetail = (loan: any) => {
+    console.log("🔍 Opening detail for loan:", loan);
+    setSelectedLoan(loan);
+    setDetailModal(true);
+  };
 
-  const handleLoanApplication = (applicationData: any) => {
-    console.log("Submitting loan application:", applicationData);
-    alert(
-      "Pengajuan pinjaman berhasil dikirim! Silakan tunggu persetujuan dari admin."
+  // ✅ Handle payment click - FIXED
+  const handlePaymentClick = async (loan: any) => {
+    console.log("💰 Opening payment for loan:", loan);
+    setSelectedLoan(loan);
+    // Load installments first to get upcoming installment
+    await getInstallments(loan.id);
+    setPaymentModal(true);
+  };
+
+  // Get next unpaid installment
+  const getUpcomingInstallment = () => {
+    if (!installments || installments.length === 0) return null;
+    return (
+      installments.find(
+        (i) => i.status === "pending" || i.status === "overdue"
+      ) || null
     );
   };
 
-  const handleViewDetails = (loan: Loan) => {
-    setSelectedLoan(loan);
-    setIsDetailModalOpen(true);
+  // ✅ Calculate statistics
+  const activeLoans = loans.filter((loan) => loan.status === "active");
+  const completedLoans = loans.filter((loan) => loan.status === "completed");
+
+  const totalOutstanding = activeLoans.reduce((sum, loan) => {
+    const remaining = loan.remaining_balance || loan.principal_amount;
+    const amount =
+      typeof remaining === "string" ? parseFloat(remaining) : remaining;
+    return sum + (amount || 0);
+  }, 0);
+
+  const totalMonthlyPayment = activeLoans.reduce((sum, loan) => {
+    const monthly = loan.monthly_payment || 0;
+    const amount = typeof monthly === "string" ? parseFloat(monthly) : monthly;
+    return sum + (amount || 0);
+  }, 0);
+
+  // ✅ Calculate progress
+  const calculateProgress = (loan: any) => {
+    const paid = loan.paid_installments || 0;
+    const total = loan.total_installments || loan.tenure_months || 1;
+    return ((paid / total) * 100).toFixed(1);
   };
 
-  const handleMakePayment = (loan: Loan) => {
-    setSelectedLoan(loan);
-    setIsPaymentModalOpen(true);
-  };
+  // ✅ Loading state
+  if (loading && loans.length === 0) {
+    return (
+      <MemberLayout>
+        <div className="flex items-center justify-center h-64">
+          <RefreshCw className="h-8 w-8 animate-spin text-gray-400" />
+        </div>
+      </MemberLayout>
+    );
+  }
 
-  const handlePayment = (paymentData: any) => {
-    console.log("Processing payment:", paymentData);
-    alert("Pembayaran berhasil diproses!");
-  };
-
-  const calculateProgress = (loan: Loan) => {
-    return ((loan.paidInstallments / loan.term) * 100).toFixed(1);
-  };
-
+  // ✅ Render UI
   return (
     <MemberLayout>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Pinjaman Saya</h1>
-            <p className="text-gray-600 mt-1">
-              Kelola pinjaman dan pembayaran Anda
-            </p>
+            <h1 className="text-2xl font-bold">Pinjaman Saya</h1>
+            <p className="text-gray-600">Kelola pinjaman dan pembayaran Anda</p>
           </div>
           <Button
-            onClick={() => setIsApplicationModalOpen(true)}
-            className="bg-blue-600 hover:bg-blue-700"
+            onClick={() => {
+              console.log("➕ Opening loan application modal");
+              setApplicationModal(true);
+            }}
           >
             <Plus className="h-4 w-4 mr-2" />
-            Ajukan Pinjaman Baru
+            Ajukan Pinjaman
           </Button>
         </div>
 
@@ -229,16 +191,16 @@ export default function MemberLoans() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600 flex items-center">
+              <CardTitle className="text-sm flex items-center">
                 <DollarSign className="h-4 w-4 mr-2" />
                 Total Pinjaman Aktif
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-red-600">
-                {formatCurrency(totalOutstanding)}
+                {formatCurrency(summary?.total_outstanding || totalOutstanding)}
               </div>
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-gray-500">
                 {activeLoans.length} pinjaman aktif
               </p>
             </CardContent>
@@ -246,7 +208,7 @@ export default function MemberLoans() {
 
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600 flex items-center">
+              <CardTitle className="text-sm flex items-center">
                 <Calendar className="h-4 w-4 mr-2" />
                 Angsuran Bulanan
               </CardTitle>
@@ -255,61 +217,59 @@ export default function MemberLoans() {
               <div className="text-2xl font-bold text-orange-600">
                 {formatCurrency(totalMonthlyPayment)}
               </div>
-              <p className="text-xs text-gray-500 mt-1">Total per bulan</p>
+              <p className="text-xs text-gray-500">Total per bulan</p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600 flex items-center">
-                <TrendingDown className="h-4 w-4 mr-2" />
-                Pinjaman Selesai
-              </CardTitle>
+              <CardTitle className="text-sm">Pinjaman Selesai</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-green-600">
-                {loans.filter((loan) => loan.status === "completed").length}
+                {completedLoans.length}
               </div>
-              <p className="text-xs text-gray-500 mt-1">Pinjaman lunas</p>
+              <p className="text-xs text-gray-500">Pinjaman lunas</p>
             </CardContent>
           </Card>
         </div>
 
-        {/* Loans */}
-        <Tabs defaultValue="active" className="space-y-6">
-          <TabsList>
-            <TabsTrigger value="active">Pinjaman Aktif</TabsTrigger>
-            <TabsTrigger value="completed">Pinjaman Lunas</TabsTrigger>
-            <TabsTrigger value="all">Semua Pinjaman</TabsTrigger>
-          </TabsList>
+        {/* Active Loans */}
+        <div className="space-y-4">
+          <h2 className="text-xl font-semibold">Pinjaman Aktif</h2>
 
-          <TabsContent value="active" className="space-y-4">
-            {activeLoans.map((loan) => (
+          {activeLoans.length === 0 ? (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <p className="text-gray-500">
+                  Anda belum memiliki pinjaman aktif
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            activeLoans.map((loan) => (
               <Card key={loan.id} className="hover:shadow-md transition-shadow">
                 <CardHeader>
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-100">
-                        <CreditCard className="h-6 w-6 text-blue-600" />
-                      </div>
-                      <div>
-                        <CardTitle className="text-lg">
-                          Pinjaman {getPurposeName(loan.purpose)}
-                        </CardTitle>
-                        <div className="flex items-center space-x-2 mt-1">
-                          {getStatusBadge(loan.status)}
-                          <span className="text-sm text-gray-500">
-                            Progress: {calculateProgress(loan)}%
-                          </span>
-                        </div>
+                    <div>
+                      <CardTitle className="text-lg">
+                        Pinjaman #{loan.id}
+                      </CardTitle>
+                      <div className="flex items-center space-x-2 mt-1">
+                        {getStatusBadge(loan.status)}
+                        <span className="text-sm text-gray-500">
+                          Progress: {calculateProgress(loan)}%
+                        </span>
                       </div>
                     </div>
                     <div className="text-right">
                       <div className="text-2xl font-bold text-red-600">
-                        {formatCurrency(loan.remainingBalance)}
+                        {formatCurrency(
+                          loan.remaining_balance || loan.principal_amount
+                        )}
                       </div>
                       <p className="text-sm text-gray-500">
-                        dari {formatCurrency(loan.amount)}
+                        dari {formatCurrency(loan.principal_amount)}
                       </p>
                     </div>
                   </div>
@@ -319,9 +279,9 @@ export default function MemberLoans() {
                     {/* Progress Bar */}
                     <div className="w-full bg-gray-200 rounded-full h-2">
                       <div
-                        className="bg-green-600 h-2 rounded-full transition-all duration-300"
+                        className="bg-green-600 h-2 rounded-full transition-all"
                         style={{ width: `${calculateProgress(loan)}%` }}
-                      ></div>
+                      />
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -330,30 +290,24 @@ export default function MemberLoans() {
                           Angsuran Bulanan
                         </p>
                         <p className="font-medium">
-                          {formatCurrency(loan.monthlyPayment)}
+                          {formatCurrency(loan.monthly_payment)}
                         </p>
                       </div>
                       <div>
-                        <p className="text-sm text-gray-500">
-                          Jatuh Tempo Berikutnya
-                        </p>
+                        <p className="text-sm text-gray-500">Tenor</p>
                         <p className="font-medium">
-                          {new Date(loan.nextPaymentDate).toLocaleDateString(
-                            "id-ID"
-                          )}
+                          {loan.tenure_months} bulan
                         </p>
                       </div>
                       <div>
-                        <p className="text-sm text-gray-500">Cicilan Tersisa</p>
-                        <p className="font-medium">
-                          {loan.term - loan.paidInstallments} dari {loan.term}
-                        </p>
+                        <p className="text-sm text-gray-500">Bunga</p>
+                        <p className="font-medium">{loan.interest_rate}%</p>
                       </div>
                       <div className="flex space-x-2">
                         <Button
-                          variant="outline"
                           size="sm"
-                          onClick={() => handleViewDetails(loan)}
+                          variant="outline"
+                          onClick={() => handleViewDetail(loan)}
                           className="flex-1"
                         >
                           <Eye className="h-4 w-4 mr-2" />
@@ -361,7 +315,7 @@ export default function MemberLoans() {
                         </Button>
                         <Button
                           size="sm"
-                          onClick={() => handleMakePayment(loan)}
+                          onClick={() => handlePaymentClick(loan)}
                           className="flex-1 bg-green-600 hover:bg-green-700"
                         >
                           <DollarSign className="h-4 w-4 mr-2" />
@@ -372,40 +326,85 @@ export default function MemberLoans() {
                   </div>
                 </CardContent>
               </Card>
-            ))}
-          </TabsContent>
+            ))
+          )}
+        </div>
 
-          {/* Other tab contents would be similar */}
-        </Tabs>
-
-        {/* Modals */}
-        <LoanApplicationModal
-          isOpen={isApplicationModalOpen}
-          onClose={() => setIsApplicationModalOpen(false)}
-          onSubmit={handleLoanApplication}
-          availableKas={availableKas}
-        />
-
-        <LoanDetailModal
-          loan={selectedLoan}
-          isOpen={isDetailModalOpen}
-          onClose={() => {
-            setIsDetailModalOpen(false);
-            setSelectedLoan(null);
-          }}
-          onMakePayment={handleMakePayment}
-        />
-
-        <LoanPaymentModal
-          loan={selectedLoan}
-          isOpen={isPaymentModalOpen}
-          onClose={() => {
-            setIsPaymentModalOpen(false);
-            setSelectedLoan(null);
-          }}
-          onSubmit={handlePayment}
-        />
+        {/* Pending Applications */}
+        {loans.filter((l) => l.status === "pending").length > 0 && (
+          <div className="space-y-4">
+            <h2 className="text-xl font-semibold">Pengajuan Pending</h2>
+            {loans
+              .filter((l) => l.status === "pending")
+              .map((loan) => (
+                <Card key={loan.id}>
+                  <CardContent className="py-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium">Pinjaman #{loan.id}</p>
+                        <p className="text-sm text-gray-500">
+                          {formatCurrency(loan.principal_amount)} •{" "}
+                          {loan.tenure_months} bulan
+                        </p>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        {getStatusBadge(loan.status)}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleViewDetail(loan)}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+          </div>
+        )}
       </div>
+
+      {/* ✅ CRITICAL FIX: Render modal components at the bottom */}
+      <LoanApplicationModal
+        isOpen={applicationModal}
+        onClose={() => setApplicationModal(false)}
+        onSubmit={handleApplyLoan}
+        userId={user?.id || 0}
+        availableKas={availableKas}
+      />
+
+      <LoanDetailModal
+        loan={selectedLoan}
+        isOpen={detailModal}
+        onClose={() => {
+          setDetailModal(false);
+          setSelectedLoan(null);
+        }}
+      />
+
+      <LoanPaymentModal
+        loan={selectedLoan}
+        isOpen={paymentModal}
+        onClose={() => {
+          setPaymentModal(false);
+          setSelectedLoan(null);
+        }}
+        onSuccess={async () => {
+          console.log("🔄 Payment successful, refreshing data...");
+
+          // Reload loans data
+          await refresh();
+
+          // Reload installments for the loan
+          if (selectedLoan) {
+            await getInstallments(selectedLoan.id);
+          }
+
+          console.log("✅ Data refreshed successfully");
+        }}
+        upcomingInstallment={getUpcomingInstallment()}
+      />
     </MemberLayout>
   );
 }

@@ -1,274 +1,334 @@
-import { useState, useEffect } from 'react';
-import { supabase, Loan, LoanPayment, generateJournalEntry } from '@/lib/supabase';
+import { useState, useEffect, useCallback } from "react";
+import loansService, {
+  Loan,
+  LoanSummary,
+  CreateLoanData,
+  UpdateLoanData,
+  ApproveLoanData,
+} from "@/lib/api/loans.service";
+import { toast } from "sonner";
 
-export const useLoans = () => {
+interface UseLoansOptions {
+  all?: boolean;
+  user_id?: number;
+  status?: string;
+  cash_account_id?: number;
+  autoLoad?: boolean; // Auto load on mount
+}
+
+export const useLoans = (options: UseLoansOptions = {}) => {
   const [loans, setLoans] = useState<Loan[]>([]);
-  const [payments, setPayments] = useState<LoanPayment[]>([]);
+  const [summary, setSummary] = useState<LoanSummary | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch all loans
-  const fetchLoans = async () => {
+  /**
+   * Load all loans with filters
+   */
+  const loadLoans = useCallback(async () => {
+    setLoading(true);
+    setError(null);
     try {
-      setLoading(true);
-      setError(null);
+      console.log("🔄 Loading loans with options:", options);
 
-      const { data, error } = await supabase
-        .from('app_1c0eac5202_loans')
-        .select('*')
-        .order('created_at', { ascending: false });
+      const response = await loansService.getAll({
+        all: options.all,
+        user_id: options.user_id,
+        status: options.status,
+        cash_account_id: options.cash_account_id,
+      });
 
-      if (error) {
-        console.error('Error fetching loans:', error);
-        throw error;
-      }
+      console.log("📋 Loans API response:", response);
 
-      setLoans(data || []);
-    } catch (err) {
-      console.error('Fetch loans error:', err);
-      setError(err instanceof Error ? err.message : 'Failed to fetch loans');
+      // Handle nested response structure
+      const loansData = response.data?.data || response.data || [];
+
+      console.log("📋 Parsed loans:", loansData.length);
+
+      setLoans(loansData);
+
+      return loansData;
+    } catch (err: any) {
+      console.error("❌ Error loading loans:", err);
+      const errorMsg =
+        err.data?.message || err.message || "Gagal memuat data pinjaman";
+      setError(errorMsg);
+      toast.error(errorMsg);
+      throw err;
     } finally {
       setLoading(false);
     }
-  };
+  }, [options.all, options.user_id, options.status, options.cash_account_id]);
 
-  // Fetch all loan payments
-  const fetchPayments = async () => {
+  /**
+   * Load loan summary/statistics
+   */
+  const loadSummary = useCallback(async () => {
     try {
-      setLoading(true);
-      setError(null);
+      console.log("📊 Loading loan summary for user:", options.user_id);
 
-      const { data, error } = await supabase
-        .from('app_1c0eac5202_loan_payments')
-        .select('*')
-        .order('payment_date', { ascending: false });
+      const response = await loansService.getSummary(options.user_id);
+      console.log("📊 Summary response:", response);
 
-      if (error) {
-        console.error('Error fetching payments:', error);
-        throw error;
+      // Handle nested response
+      const summaryData = response.data?.data || response.data;
+
+      if (summaryData) {
+        // Convert to numbers
+        const cleanSummary: LoanSummary = {
+          total_loans: Number(summaryData.total_loans || 0),
+          active_loans: Number(summaryData.active_loans || 0),
+          completed_loans: Number(summaryData.completed_loans || 0),
+          total_principal: Number(summaryData.total_principal || 0),
+          total_outstanding: Number(summaryData.total_outstanding || 0),
+          total_paid: Number(summaryData.total_paid || 0),
+          overdue_count: Number(summaryData.overdue_count || 0),
+          overdue_amount: Number(summaryData.overdue_amount || 0),
+        };
+
+        console.log("📊 Cleaned summary:", cleanSummary);
+        setSummary(cleanSummary);
+
+        return cleanSummary;
       }
+    } catch (err: any) {
+      console.error("❌ Error loading summary:", err);
+      // Summary is optional, don't throw
+    }
+  }, [options.user_id]);
 
-      setPayments(data || []);
-    } catch (err) {
-      console.error('Fetch payments error:', err);
-      setError(err instanceof Error ? err.message : 'Failed to fetch payments');
+  /**
+   * Get single loan by ID
+   */
+  const getLoanById = useCallback(async (id: number) => {
+    setLoading(true);
+    try {
+      console.log("🔍 Loading loan detail:", id);
+
+      const response = await loansService.getById(id);
+      const loanData = response.data?.data || response.data;
+
+      console.log("✅ Loan detail loaded:", loanData);
+
+      return loanData;
+    } catch (err: any) {
+      console.error("❌ Error loading loan detail:", err);
+      toast.error("Gagal memuat detail pinjaman");
+      throw err;
     } finally {
       setLoading(false);
     }
-  };
-
-  // Create a new loan application
-  const createLoan = async (loanData: {
-    member_id: string;
-    loan_amount: number;
-    interest_rate: number;
-    term_months: number;
-    application_date?: string;
-  }) => {
-    try {
-      console.log('Creating loan:', loanData);
-
-      // Generate unique loan ID
-      const timestamp = Date.now();
-      const loanId = `L-${timestamp}-${Math.random().toString(36).substr(2, 9)}`;
-
-      // Calculate monthly payment using simple interest
-      const monthlyInterestRate = loanData.interest_rate / 100 / 12;
-      const monthlyPayment = loanData.loan_amount * 
-        (monthlyInterestRate * Math.pow(1 + monthlyInterestRate, loanData.term_months)) /
-        (Math.pow(1 + monthlyInterestRate, loanData.term_months) - 1);
-
-      const newLoanData = {
-        loan_id: loanId,
-        member_id: loanData.member_id,
-        loan_amount: loanData.loan_amount,
-        interest_rate: loanData.interest_rate,
-        term_months: loanData.term_months,
-        monthly_payment: Math.round(monthlyPayment),
-        remaining_balance: loanData.loan_amount,
-        status: 'pending' as const,
-        application_date: loanData.application_date || new Date().toISOString().split('T')[0],
-        disbursement_date: new Date().toISOString().split('T')[0],
-      };
-
-      const { data: newLoan, error: loanError } = await supabase
-        .from('app_1c0eac5202_loans')
-        .insert([newLoanData])
-        .select()
-        .single();
-
-      if (loanError) {
-        console.error('Error creating loan:', loanError);
-        throw loanError;
-      }
-
-      setLoans(prev => [newLoan, ...prev]);
-
-      // Create journal entry for loan disbursement
-      try {
-        await generateJournalEntry('loan_disbursement', {
-          loan_id: loanId,
-          loan_amount: loanData.loan_amount,
-          transaction_date: new Date().toISOString().split('T')[0]
-        });
-      } catch (journalError) {
-        console.warn('Journal entry creation failed:', journalError);
-      }
-
-      console.log('Loan created successfully:', newLoan);
-      return newLoan;
-    } catch (err) {
-      console.error('Create loan error:', err);
-      throw new Error(err instanceof Error ? err.message : 'Failed to create loan');
-    }
-  };
-
-  // Process a loan payment
-  const processPayment = async (paymentData: {
-    loan_id: string;
-    member_id: string;
-    payment_amount: number;
-    payment_method: string;
-  }) => {
-    try {
-      console.log('Processing loan payment:', paymentData);
-
-      // Find the loan
-      const loan = loans.find(l => l.loan_id === paymentData.loan_id);
-      if (!loan) {
-        throw new Error('Loan not found');
-      }
-
-      if (loan.remaining_balance <= 0) {
-        throw new Error('Loan is already paid off');
-      }
-
-      // Generate unique payment ID
-      const timestamp = Date.now();
-      const paymentId = `LP-${timestamp}-${Math.random().toString(36).substr(2, 9)}`;
-
-      // Calculate interest and principal portions (simplified)
-      const monthlyInterestRate = loan.interest_rate / 100 / 12;
-      const interestAmount = Math.round(loan.remaining_balance * monthlyInterestRate);
-      const principalAmount = Math.min(
-        paymentData.payment_amount - interestAmount,
-        loan.remaining_balance
-      );
-      const newRemainingBalance = Math.max(0, loan.remaining_balance - principalAmount);
-
-      const paymentRecord = {
-        payment_id: paymentId,
-        loan_id: paymentData.loan_id,
-        member_id: paymentData.member_id,
-        payment_amount: paymentData.payment_amount,
-        principal_amount: principalAmount,
-        interest_amount: interestAmount,
-        remaining_balance: newRemainingBalance,
-        payment_date: new Date().toISOString().split('T')[0],
-        payment_method: paymentData.payment_method,
-      };
-
-      const { data: newPayment, error: paymentError } = await supabase
-        .from('app_1c0eac5202_loan_payments')
-        .insert([paymentRecord])
-        .select()
-        .single();
-
-      if (paymentError) {
-        console.error('Error creating payment:', paymentError);
-        throw paymentError;
-      }
-
-      // Update loan balance and status
-      const newStatus = newRemainingBalance === 0 ? 'paid_off' : 'active';
-      
-      const { error: updateError } = await supabase
-        .from('app_1c0eac5202_loans')
-        .update({ 
-          remaining_balance: newRemainingBalance,
-          status: newStatus,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', loan.id);
-
-      if (updateError) {
-        console.error('Error updating loan:', updateError);
-        throw updateError;
-      }
-
-      // Update local state
-      setLoans(prev => 
-        prev.map(l => l.id === loan.id ? { 
-          ...l, 
-          remaining_balance: newRemainingBalance,
-          status: newStatus
-        } : l)
-      );
-      setPayments(prev => [newPayment, ...prev]);
-
-      // Create journal entry
-      try {
-        await generateJournalEntry('loan_payment', {
-          loan_id: paymentData.loan_id,
-          payment_amount: paymentData.payment_amount,
-          transaction_date: new Date().toISOString().split('T')[0]
-        });
-      } catch (journalError) {
-        console.warn('Journal entry creation failed:', journalError);
-      }
-
-      console.log('Payment processed successfully:', newPayment);
-      return newPayment;
-    } catch (err) {
-      console.error('Process payment error:', err);
-      throw new Error(err instanceof Error ? err.message : 'Failed to process payment');
-    }
-  };
-
-  // Get loans by member
-  const getLoansByMember = (memberId: string) => {
-    return loans.filter(loan => loan.member_id === memberId);
-  };
-
-  // Get active loans by member
-  const getActiveLoansByMember = (memberId: string) => {
-    return loans.filter(loan => 
-      loan.member_id === memberId && 
-      (loan.status === 'active' || loan.status === 'approved')
-    );
-  };
-
-  // Get payment history for a loan
-  const getPaymentHistory = (loanId: string) => {
-    return payments.filter(payment => payment.loan_id === loanId);
-  };
-
-  // Get total outstanding balance for a member
-  const getTotalOutstanding = (memberId: string): number => {
-    return loans
-      .filter(loan => loan.member_id === memberId && loan.status === 'active')
-      .reduce((total, loan) => total + (loan.remaining_balance || 0), 0);
-  };
-
-  useEffect(() => {
-    fetchLoans();
-    fetchPayments();
   }, []);
 
+  /**
+   * Create new loan application
+   */
+  const createLoan = useCallback(
+    async (data: CreateLoanData) => {
+      setLoading(true);
+      try {
+        console.log("📤 Creating loan:", data);
+
+        const response = await loansService.create(data);
+
+        console.log("✅ Loan created:", response);
+
+        toast.success("Pengajuan pinjaman berhasil dibuat");
+
+        // Reload loans
+        await loadLoans();
+
+        return response.data;
+      } catch (err: any) {
+        console.error("❌ Error creating loan:", err);
+
+        const errorMsg =
+          err.data?.message ||
+          err.message ||
+          "Gagal membuat pengajuan pinjaman";
+        toast.error(errorMsg);
+
+        throw err;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [loadLoans]
+  );
+
+  /**
+   * Update loan application
+   */
+  const updateLoan = useCallback(
+    async (id: number, data: UpdateLoanData) => {
+      setLoading(true);
+      try {
+        console.log("📤 Updating loan:", id, data);
+
+        const response = await loansService.update(id, data);
+
+        console.log("✅ Loan updated:", response);
+
+        toast.success("Data pinjaman berhasil diperbarui");
+
+        // Reload loans
+        await loadLoans();
+
+        return response.data;
+      } catch (err: any) {
+        console.error("❌ Error updating loan:", err);
+
+        const errorMsg =
+          err.data?.message || err.message || "Gagal memperbarui pinjaman";
+        toast.error(errorMsg);
+
+        throw err;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [loadLoans]
+  );
+
+  /**
+   * Delete loan application
+   */
+  const deleteLoan = useCallback(
+    async (id: number) => {
+      setLoading(true);
+      try {
+        console.log("🗑️ Deleting loan:", id);
+
+        await loansService.delete(id);
+
+        console.log("✅ Loan deleted");
+
+        toast.success("Pengajuan pinjaman berhasil dihapus");
+
+        // Reload loans
+        await loadLoans();
+      } catch (err: any) {
+        console.error("❌ Error deleting loan:", err);
+
+        const errorMsg =
+          err.data?.message || err.message || "Gagal menghapus pinjaman";
+        toast.error(errorMsg);
+
+        throw err;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [loadLoans]
+  );
+
+  /**
+   * Approve loan
+   */
+  const approveLoan = useCallback(
+    async (id: number, disbursementDate: string, notes?: string) => {
+      setLoading(true);
+      try {
+        console.log("✅ Approving loan:", id);
+
+        const data: ApproveLoanData = {
+          status: "approved",
+          disbursement_date: disbursementDate,
+        };
+
+        await loansService.approve(id, data);
+
+        console.log("✅ Loan approved");
+
+        toast.success("Pinjaman berhasil disetujui");
+
+        // Reload loans and summary
+        await Promise.all([loadLoans(), loadSummary()]);
+      } catch (err: any) {
+        console.error("❌ Error approving loan:", err);
+
+        const errorMsg =
+          err.data?.message || err.message || "Gagal menyetujui pinjaman";
+        toast.error(errorMsg);
+
+        throw err;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [loadLoans, loadSummary]
+  );
+
+  /**
+   * Reject loan
+   */
+  const rejectLoan = useCallback(
+    async (id: number, rejectionReason: string) => {
+      setLoading(true);
+      try {
+        console.log("❌ Rejecting loan:", id);
+
+        const data: ApproveLoanData = {
+          status: "rejected",
+          rejection_reason: rejectionReason,
+        };
+
+        await loansService.approve(id, data);
+
+        console.log("✅ Loan rejected");
+
+        toast.success("Pinjaman berhasil ditolak");
+
+        // Reload loans and summary
+        await Promise.all([loadLoans(), loadSummary()]);
+      } catch (err: any) {
+        console.error("❌ Error rejecting loan:", err);
+
+        const errorMsg =
+          err.data?.message || err.message || "Gagal menolak pinjaman";
+        toast.error(errorMsg);
+
+        throw err;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [loadLoans, loadSummary]
+  );
+
+  /**
+   * Refresh all data
+   */
+  const refresh = useCallback(async () => {
+    await Promise.all([loadLoans(), loadSummary()]);
+  }, [loadLoans, loadSummary]);
+
+  // Auto-load on mount if enabled
+  useEffect(() => {
+    if (options.autoLoad !== false) {
+      loadLoans();
+      loadSummary();
+    }
+  }, [options.autoLoad, loadLoans, loadSummary]);
+
   return {
+    // State
     loans,
-    payments,
+    summary,
     loading,
     error,
+
+    // Actions
+    loadLoans,
+    loadSummary,
+    getLoanById,
     createLoan,
-    processPayment,
-    getLoansByMember,
-    getActiveLoansByMember,
-    getPaymentHistory,
-    getTotalOutstanding,
-    refetch: () => {
-      fetchLoans();
-      fetchPayments();
-    },
+    updateLoan,
+    deleteLoan,
+    approveLoan,
+    rejectLoan,
+    refresh,
   };
 };
+
+export default useLoans;

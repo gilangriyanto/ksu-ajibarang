@@ -1,215 +1,550 @@
-import React, { useState } from 'react';
-import { ManagerLayout } from '@/components/layout/ManagerLayout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
-  Plus, 
-  Edit, 
-  Trash2, 
+import React, { useState, useEffect } from "react";
+import { ManagerLayout } from "@/components/layout/ManagerLayout";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Plus,
+  Edit,
+  Trash2,
   Eye,
   Search,
-  Filter,
   Download,
   Building,
   CreditCard,
   Wallet,
   TrendingUp,
-  AlertCircle
-} from 'lucide-react';
+  AlertCircle,
+  Loader2,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
+import {
+  chartOfAccountsService,
+  type ChartOfAccount,
+  type CreateCOARequest,
+} from "@/lib/api/chartOfAccounts.service";
+import { toast } from "sonner";
 
-// Modal Components
-const AddAccountModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) => {
+// =====================================================
+// MODAL: Add/Edit Account
+// =====================================================
+const AccountFormModal = ({
+  isOpen,
+  onClose,
+  onSuccess,
+  account,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onSuccess: () => void;
+  account?: ChartOfAccount | null;
+}) => {
+  const [formData, setFormData] = useState<CreateCOARequest>({
+    code: "",
+    name: "",
+    category: "assets",
+    account_type: "",
+    is_debit: true,
+    is_active: true,
+    description: "",
+  });
+  const [loading, setLoading] = useState(false);
+
+  // Populate form when editing
+  useEffect(() => {
+    if (account) {
+      setFormData({
+        code: account.code,
+        name: account.name,
+        category: account.category,
+        account_type: account.account_type,
+        is_debit: account.is_debit,
+        is_active: account.is_active,
+        description: account.description || "",
+      });
+    } else {
+      setFormData({
+        code: "",
+        name: "",
+        category: "assets",
+        account_type: "",
+        is_debit: true,
+        is_active: true,
+        description: "",
+      });
+    }
+  }, [account]);
+
+  const handleSubmit = async () => {
+    try {
+      setLoading(true);
+
+      if (account) {
+        // Update existing
+        await chartOfAccountsService.update(account.id, formData);
+        toast.success("Akun berhasil diupdate");
+      } else {
+        // Create new
+        await chartOfAccountsService.create(formData);
+        toast.success("Akun berhasil ditambahkan");
+      }
+
+      onSuccess();
+      onClose();
+    } catch (error: any) {
+      console.error("Error saving account:", error);
+      toast.error(error.message || "Gagal menyimpan akun");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[525px]">
         <DialogHeader>
-          <DialogTitle>Tambah Akun Baru</DialogTitle>
+          <DialogTitle>
+            {account ? "Edit Akun" : "Tambah Akun Baru"}
+          </DialogTitle>
           <DialogDescription>
-            Masukkan informasi akun baru untuk chart of accounts.
+            {account
+              ? "Update informasi akun"
+              : "Masukkan informasi akun baru untuk chart of accounts"}
           </DialogDescription>
         </DialogHeader>
-        <div className="grid gap-4 py-4">
+        <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto">
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="account-code" className="text-right">Kode Akun</Label>
-            <Input id="account-code" className="col-span-3" placeholder="1-1001" />
+            <Label htmlFor="account-code" className="text-right">
+              Kode Akun *
+            </Label>
+            <Input
+              id="account-code"
+              className="col-span-3"
+              placeholder="1-101"
+              value={formData.code}
+              onChange={(e) =>
+                setFormData({ ...formData, code: e.target.value })
+              }
+            />
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="account-name" className="text-right">Nama Akun</Label>
-            <Input id="account-name" className="col-span-3" placeholder="Kas" />
+            <Label htmlFor="account-name" className="text-right">
+              Nama Akun *
+            </Label>
+            <Input
+              id="account-name"
+              className="col-span-3"
+              placeholder="Kas Umum"
+              value={formData.name}
+              onChange={(e) =>
+                setFormData({ ...formData, name: e.target.value })
+              }
+            />
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="account-type" className="text-right">Jenis Akun</Label>
-            <Select>
+            <Label htmlFor="category" className="text-right">
+              Kategori *
+            </Label>
+            <Select
+              value={formData.category}
+              onValueChange={(value: any) =>
+                setFormData({ ...formData, category: value })
+              }
+            >
               <SelectTrigger className="col-span-3">
-                <SelectValue placeholder="Pilih jenis akun" />
+                <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="asset">Aktiva</SelectItem>
-                <SelectItem value="liability">Pasiva</SelectItem>
-                <SelectItem value="equity">Modal</SelectItem>
-                <SelectItem value="revenue">Pendapatan</SelectItem>
-                <SelectItem value="expense">Beban</SelectItem>
+                <SelectItem value="assets">Assets (Aktiva)</SelectItem>
+                <SelectItem value="liabilities">
+                  Liabilities (Kewajiban)
+                </SelectItem>
+                <SelectItem value="equity">Equity (Modal)</SelectItem>
+                <SelectItem value="revenue">Revenue (Pendapatan)</SelectItem>
+                <SelectItem value="expenses">Expenses (Beban)</SelectItem>
               </SelectContent>
             </Select>
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="account-category" className="text-right">Kategori</Label>
-            <Select>
+            <Label htmlFor="account-type" className="text-right">
+              Tipe Akun *
+            </Label>
+            <Input
+              id="account-type"
+              className="col-span-3"
+              placeholder="Cash, Bank, Receivables, dll"
+              value={formData.account_type}
+              onChange={(e) =>
+                setFormData({ ...formData, account_type: e.target.value })
+              }
+            />
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="is-debit" className="text-right">
+              Posisi Normal *
+            </Label>
+            <Select
+              value={formData.is_debit.toString()}
+              onValueChange={(value) =>
+                setFormData({ ...formData, is_debit: value === "true" })
+              }
+            >
               <SelectTrigger className="col-span-3">
-                <SelectValue placeholder="Pilih kategori" />
+                <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="current">Lancar</SelectItem>
-                <SelectItem value="non-current">Tidak Lancar</SelectItem>
-                <SelectItem value="operating">Operasional</SelectItem>
-                <SelectItem value="non-operating">Non-Operasional</SelectItem>
+                <SelectItem value="true">Debit</SelectItem>
+                <SelectItem value="false">Credit</SelectItem>
               </SelectContent>
             </Select>
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="initial-balance" className="text-right">Saldo Awal</Label>
-            <Input id="initial-balance" type="number" className="col-span-3" placeholder="0" />
+            <Label htmlFor="is-active" className="text-right">
+              Status *
+            </Label>
+            <Select
+              value={formData.is_active?.toString() || "true"}
+              onValueChange={(value) =>
+                setFormData({ ...formData, is_active: value === "true" })
+              }
+            >
+              <SelectTrigger className="col-span-3">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="true">Aktif</SelectItem>
+                <SelectItem value="false">Tidak Aktif</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="description" className="text-right">
+              Deskripsi
+            </Label>
+            <Textarea
+              id="description"
+              className="col-span-3"
+              placeholder="Deskripsi akun (opsional)"
+              value={formData.description}
+              onChange={(e) =>
+                setFormData({ ...formData, description: e.target.value })
+              }
+              rows={3}
+            />
           </div>
         </div>
         <div className="flex justify-end space-x-2">
-          <Button variant="outline" onClick={onClose}>Batal</Button>
-          <Button onClick={onClose}>Tambah Akun</Button>
+          <Button variant="outline" onClick={onClose} disabled={loading}>
+            Batal
+          </Button>
+          <Button
+            onClick={handleSubmit}
+            disabled={
+              loading ||
+              !formData.code ||
+              !formData.name ||
+              !formData.account_type
+            }
+          >
+            {loading ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                Menyimpan...
+              </>
+            ) : account ? (
+              "Update Akun"
+            ) : (
+              "Tambah Akun"
+            )}
+          </Button>
         </div>
       </DialogContent>
     </Dialog>
   );
 };
 
+// =====================================================
+// MODAL: View Detail
+// =====================================================
+const ViewAccountModal = ({
+  isOpen,
+  onClose,
+  account,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  account: ChartOfAccount | null;
+}) => {
+  if (!account) return null;
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-[525px]">
+        <DialogHeader>
+          <DialogTitle>Detail Akun</DialogTitle>
+          <DialogDescription>
+            Informasi lengkap akun {account.code}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-4 py-4">
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <Label className="font-medium text-gray-600">Kode:</Label>
+              <p className="text-lg font-mono font-bold">{account.code}</p>
+            </div>
+            <div className="col-span-2">
+              <Label className="font-medium text-gray-600">Nama:</Label>
+              <p className="text-lg font-medium">{account.name}</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label className="font-medium text-gray-600">Kategori:</Label>
+              <p className="capitalize">{account.category}</p>
+            </div>
+            <div>
+              <Label className="font-medium text-gray-600">Tipe:</Label>
+              <p>{account.account_type}</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label className="font-medium text-gray-600">
+                Posisi Normal:
+              </Label>
+              <Badge
+                className={
+                  account.is_debit
+                    ? "bg-blue-100 text-blue-800"
+                    : "bg-green-100 text-green-800"
+                }
+              >
+                {account.is_debit ? "Debit" : "Credit"}
+              </Badge>
+            </div>
+            <div>
+              <Label className="font-medium text-gray-600">Status:</Label>
+              <Badge
+                className={
+                  account.is_active
+                    ? "bg-green-100 text-green-800"
+                    : "bg-gray-100 text-gray-800"
+                }
+              >
+                {account.is_active ? "Aktif" : "Tidak Aktif"}
+              </Badge>
+            </div>
+          </div>
+          {account.description && (
+            <div>
+              <Label className="font-medium text-gray-600">Deskripsi:</Label>
+              <p className="text-sm text-gray-700 mt-1">
+                {account.description}
+              </p>
+            </div>
+          )}
+          <div className="grid grid-cols-2 gap-4 text-xs text-gray-500">
+            <div>
+              <Label className="font-medium">Created:</Label>
+              <p>{new Date(account.created_at).toLocaleDateString("id-ID")}</p>
+            </div>
+            <div>
+              <Label className="font-medium">Updated:</Label>
+              <p>{new Date(account.updated_at).toLocaleDateString("id-ID")}</p>
+            </div>
+          </div>
+        </div>
+        <div className="flex justify-end">
+          <Button variant="outline" onClick={onClose}>
+            Tutup
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+// =====================================================
+// MAIN COMPONENT
+// =====================================================
 export default function AccountManagement() {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [addAccountModal, setAddAccountModal] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState('all');
-
-  // Mock data - Chart of Accounts
-  const accounts = [
-    {
-      id: '1',
-      code: '1-1001',
-      name: 'Kas',
-      type: 'asset',
-      category: 'current',
-      balance: 50000000,
-      status: 'active'
-    },
-    {
-      id: '2',
-      code: '1-1002',
-      name: 'Bank BCA',
-      type: 'asset',
-      category: 'current',
-      balance: 125000000,
-      status: 'active'
-    },
-    {
-      id: '3',
-      code: '1-1101',
-      name: 'Piutang Anggota',
-      type: 'asset',
-      category: 'current',
-      balance: 85000000,
-      status: 'active'
-    },
-    {
-      id: '4',
-      code: '1-2001',
-      name: 'Gedung Kantor',
-      type: 'asset',
-      category: 'non-current',
-      balance: 500000000,
-      status: 'active'
-    },
-    {
-      id: '5',
-      code: '2-1001',
-      name: 'Utang Usaha',
-      type: 'liability',
-      category: 'current',
-      balance: 25000000,
-      status: 'active'
-    },
-    {
-      id: '6',
-      code: '3-1001',
-      name: 'Modal Koperasi',
-      type: 'equity',
-      category: 'current',
-      balance: 200000000,
-      status: 'active'
-    },
-    {
-      id: '7',
-      code: '4-1001',
-      name: 'Pendapatan Jasa',
-      type: 'revenue',
-      category: 'operating',
-      balance: 45000000,
-      status: 'active'
-    },
-    {
-      id: '8',
-      code: '5-1001',
-      name: 'Beban Operasional',
-      type: 'expense',
-      category: 'operating',
-      balance: 15000000,
-      status: 'active'
-    }
-  ];
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('id-ID', {
-      style: 'currency',
-      currency: 'IDR',
-      minimumFractionDigits: 0
-    }).format(amount);
-  };
-
-  const getAccountTypeLabel = (type: string) => {
-    const types = {
-      asset: 'Aktiva',
-      liability: 'Pasiva',
-      equity: 'Modal',
-      revenue: 'Pendapatan',
-      expense: 'Beban'
-    };
-    return types[type as keyof typeof types] || type;
-  };
-
-  const getAccountTypeColor = (type: string) => {
-    const colors = {
-      asset: 'bg-blue-100 text-blue-800',
-      liability: 'bg-red-100 text-red-800',
-      equity: 'bg-green-100 text-green-800',
-      revenue: 'bg-purple-100 text-purple-800',
-      expense: 'bg-orange-100 text-orange-800'
-    };
-    return colors[type as keyof typeof colors] || 'bg-gray-100 text-gray-800';
-  };
-
-  const filteredAccounts = accounts.filter(account => {
-    const matchesSearch = account.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         account.code.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = selectedCategory === 'all' || account.type === selectedCategory;
-    return matchesSearch && matchesCategory;
+  const [searchTerm, setSearchTerm] = useState("");
+  const [searchQuery, setSearchQuery] = useState(""); // For API search
+  const [selectedCategory, setSelectedCategory] = useState("all");
+  const [formModal, setFormModal] = useState(false);
+  const [viewAccountModal, setViewAccountModal] = useState(false);
+  const [selectedAccount, setSelectedAccount] = useState<ChartOfAccount | null>(
+    null
+  );
+  const [editAccount, setEditAccount] = useState<ChartOfAccount | null>(null);
+  const [accounts, setAccounts] = useState<ChartOfAccount[]>([]);
+  const [summary, setSummary] = useState({
+    assets: 0,
+    liabilities: 0,
+    equity: 0,
+    revenue: 0,
+    expenses: 0,
   });
+  const [loading, setLoading] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [perPage] = useState(15);
 
-  const accountSummary = {
-    totalAssets: accounts.filter(a => a.type === 'asset').reduce((sum, a) => sum + a.balance, 0),
-    totalLiabilities: accounts.filter(a => a.type === 'liability').reduce((sum, a) => sum + a.balance, 0),
-    totalEquity: accounts.filter(a => a.type === 'equity').reduce((sum, a) => sum + a.balance, 0),
-    totalRevenue: accounts.filter(a => a.type === 'revenue').reduce((sum, a) => sum + a.balance, 0),
-    totalExpense: accounts.filter(a => a.type === 'expense').reduce((sum, a) => sum + a.balance, 0)
+  // Debounce search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearchQuery(searchTerm);
+      setCurrentPage(1); // Reset to first page on search
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Fetch accounts with server-side filtering
+  const fetchAccounts = async () => {
+    try {
+      setLoading(true);
+      const params: any = {
+        page: currentPage,
+        per_page: perPage,
+      };
+
+      if (searchQuery) params.search = searchQuery;
+      if (selectedCategory !== "all") params.category = selectedCategory;
+
+      const data = await chartOfAccountsService.getAll(params);
+      setAccounts(data);
+
+      // Note: Backend should return meta with total pages
+      // For now, we'll assume it's in the response
+    } catch (error) {
+      console.error("Error fetching accounts:", error);
+      toast.error("Gagal memuat data akun");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch summary
+  const fetchSummary = async () => {
+    try {
+      const data = await chartOfAccountsService.getSummary();
+      setSummary(data);
+    } catch (error) {
+      console.error("Error fetching summary:", error);
+    }
+  };
+
+  useEffect(() => {
+    fetchAccounts();
+  }, [currentPage, searchQuery, selectedCategory]);
+
+  useEffect(() => {
+    fetchSummary();
+  }, []);
+
+  const getAccountTypeLabel = (category: string) => {
+    const labels: Record<string, string> = {
+      assets: "Aktiva",
+      liabilities: "Kewajiban",
+      equity: "Modal",
+      revenue: "Pendapatan",
+      expenses: "Beban",
+    };
+    return labels[category] || category;
+  };
+
+  const getAccountTypeColor = (category: string) => {
+    const colors: Record<string, string> = {
+      assets: "bg-blue-100 text-blue-800",
+      liabilities: "bg-red-100 text-red-800",
+      equity: "bg-green-100 text-green-800",
+      revenue: "bg-purple-100 text-purple-800",
+      expenses: "bg-orange-100 text-orange-800",
+    };
+    return colors[category] || "bg-gray-100 text-gray-800";
+  };
+
+  const handleViewAccount = (account: ChartOfAccount) => {
+    setSelectedAccount(account);
+    setViewAccountModal(true);
+  };
+
+  const handleEditAccount = (account: ChartOfAccount) => {
+    setEditAccount(account);
+    setFormModal(true);
+  };
+
+  const handleAddNew = () => {
+    setEditAccount(null);
+    setFormModal(true);
+  };
+
+  const handleDeleteAccount = async (id: number) => {
+    if (!confirm("Apakah Anda yakin ingin menghapus akun ini?")) return;
+
+    try {
+      await chartOfAccountsService.delete(id);
+      toast.success("Akun berhasil dihapus");
+      fetchAccounts();
+      fetchSummary();
+    } catch (error: any) {
+      console.error("Error deleting account:", error);
+      toast.error(error.message || "Gagal menghapus akun");
+    }
+  };
+
+  const handleDownloadReport = () => {
+    const csvContent = `Kode,Nama,Kategori,Tipe,Posisi Normal,Status\n${accounts
+      .map(
+        (acc) =>
+          `${acc.code},${acc.name},${acc.category},${acc.account_type},${
+            acc.is_debit ? "Debit" : "Credit"
+          },${acc.is_active ? "Aktif" : "Tidak Aktif"}`
+      )
+      .join("\n")}`;
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute(
+      "download",
+      `chart-of-accounts-${new Date().toISOString().split("T")[0]}.csv`
+    );
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleSuccess = () => {
+    fetchAccounts();
+    fetchSummary();
   };
 
   return (
@@ -218,27 +553,31 @@ export default function AccountManagement() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Manajemen Akun</h1>
-            <p className="text-gray-600 mt-1">Kelola chart of accounts dan struktur akuntansi</p>
+            <h1 className="text-3xl font-bold text-gray-900">
+              Chart of Accounts
+            </h1>
+            <p className="text-gray-600 mt-1">Kelola bagan akun koperasi</p>
           </div>
-          <Button 
+          <Button
             className="bg-blue-600 hover:bg-blue-700"
-            onClick={() => setAddAccountModal(true)}
+            onClick={handleAddNew}
           >
             <Plus className="w-4 h-4 mr-2" />
             Tambah Akun
           </Button>
         </div>
 
-        {/* Account Summary */}
+        {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
           <Card>
             <CardContent className="p-6">
               <div className="flex items-center">
                 <Building className="h-8 w-8 text-blue-600" />
                 <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600">Total Aktiva</p>
-                  <p className="text-2xl font-bold text-blue-600">{formatCurrency(accountSummary.totalAssets)}</p>
+                  <p className="text-sm font-medium text-gray-600">Assets</p>
+                  <p className="text-2xl font-bold text-blue-600">
+                    {summary.assets}
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -248,8 +587,12 @@ export default function AccountManagement() {
               <div className="flex items-center">
                 <CreditCard className="h-8 w-8 text-red-600" />
                 <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600">Total Pasiva</p>
-                  <p className="text-2xl font-bold text-red-600">{formatCurrency(accountSummary.totalLiabilities)}</p>
+                  <p className="text-sm font-medium text-gray-600">
+                    Liabilities
+                  </p>
+                  <p className="text-2xl font-bold text-red-600">
+                    {summary.liabilities}
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -259,8 +602,10 @@ export default function AccountManagement() {
               <div className="flex items-center">
                 <Wallet className="h-8 w-8 text-green-600" />
                 <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600">Total Modal</p>
-                  <p className="text-2xl font-bold text-green-600">{formatCurrency(accountSummary.totalEquity)}</p>
+                  <p className="text-sm font-medium text-gray-600">Equity</p>
+                  <p className="text-2xl font-bold text-green-600">
+                    {summary.equity}
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -270,8 +615,10 @@ export default function AccountManagement() {
               <div className="flex items-center">
                 <TrendingUp className="h-8 w-8 text-purple-600" />
                 <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600">Pendapatan</p>
-                  <p className="text-2xl font-bold text-purple-600">{formatCurrency(accountSummary.totalRevenue)}</p>
+                  <p className="text-sm font-medium text-gray-600">Revenue</p>
+                  <p className="text-2xl font-bold text-purple-600">
+                    {summary.revenue}
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -281,8 +628,10 @@ export default function AccountManagement() {
               <div className="flex items-center">
                 <AlertCircle className="h-8 w-8 text-orange-600" />
                 <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600">Beban</p>
-                  <p className="text-2xl font-bold text-orange-600">{formatCurrency(accountSummary.totalExpense)}</p>
+                  <p className="text-sm font-medium text-gray-600">Expenses</p>
+                  <p className="text-2xl font-bold text-orange-600">
+                    {summary.expenses}
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -300,7 +649,7 @@ export default function AccountManagement() {
                 <div className="relative">
                   <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                   <Input
-                    placeholder="Cari kode atau nama akun..."
+                    placeholder="Cari kode, nama, atau tipe akun..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="pl-10"
@@ -308,20 +657,27 @@ export default function AccountManagement() {
                 </div>
               </div>
               <div className="flex gap-2">
-                <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                <Select
+                  value={selectedCategory}
+                  onValueChange={setSelectedCategory}
+                >
                   <SelectTrigger className="w-48">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">Semua Jenis</SelectItem>
-                    <SelectItem value="asset">Aktiva</SelectItem>
-                    <SelectItem value="liability">Pasiva</SelectItem>
-                    <SelectItem value="equity">Modal</SelectItem>
-                    <SelectItem value="revenue">Pendapatan</SelectItem>
-                    <SelectItem value="expense">Beban</SelectItem>
+                    <SelectItem value="all">Semua Kategori</SelectItem>
+                    <SelectItem value="assets">Assets</SelectItem>
+                    <SelectItem value="liabilities">Liabilities</SelectItem>
+                    <SelectItem value="equity">Equity</SelectItem>
+                    <SelectItem value="revenue">Revenue</SelectItem>
+                    <SelectItem value="expenses">Expenses</SelectItem>
                   </SelectContent>
                 </Select>
-                <Button variant="outline">
+                <Button
+                  variant="outline"
+                  onClick={handleDownloadReport}
+                  disabled={accounts.length === 0}
+                >
                   <Download className="w-4 h-4 mr-2" />
                   Export
                 </Button>
@@ -333,95 +689,184 @@ export default function AccountManagement() {
         {/* Accounts Table */}
         <Card>
           <CardHeader>
-            <CardTitle>Chart of Accounts</CardTitle>
+            <CardTitle>Daftar Akun</CardTitle>
             <CardDescription>
-              Menampilkan {filteredAccounts.length} dari {accounts.length} akun
+              Menampilkan {accounts.length} akun
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-3 px-4 font-medium text-gray-600">Kode Akun</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-600">Nama Akun</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-600">Jenis</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-600">Kategori</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-600">Saldo</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-600">Status</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-600">Aksi</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredAccounts.map((account) => (
-                    <tr key={account.id} className="border-b hover:bg-gray-50">
-                      <td className="py-3 px-4 font-mono font-medium">{account.code}</td>
-                      <td className="py-3 px-4 font-medium text-gray-900">{account.name}</td>
-                      <td className="py-3 px-4">
-                        <Badge className={getAccountTypeColor(account.type)}>
-                          {getAccountTypeLabel(account.type)}
-                        </Badge>
-                      </td>
-                      <td className="py-3 px-4 capitalize">{account.category}</td>
-                      <td className="py-3 px-4 font-medium">
-                        {formatCurrency(account.balance)}
-                      </td>
-                      <td className="py-3 px-4">
-                        <Badge className={account.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}>
-                          {account.status === 'active' ? 'Aktif' : 'Tidak Aktif'}
-                        </Badge>
-                      </td>
-                      <td className="py-3 px-4">
-                        <div className="flex space-x-2">
-                          <Button size="sm" variant="outline">
-                            <Eye className="w-4 h-4" />
-                          </Button>
-                          <Button size="sm" variant="outline">
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                          <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700">
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
+            {loading ? (
+              <div className="flex justify-center items-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+                <span className="ml-2 text-gray-600">Memuat data...</span>
+              </div>
+            ) : (
+              <>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left py-3 px-4 font-medium text-gray-600">
+                          Kode
+                        </th>
+                        <th className="text-left py-3 px-4 font-medium text-gray-600">
+                          Nama Akun
+                        </th>
+                        <th className="text-left py-3 px-4 font-medium text-gray-600">
+                          Kategori
+                        </th>
+                        <th className="text-left py-3 px-4 font-medium text-gray-600">
+                          Tipe
+                        </th>
+                        <th className="text-left py-3 px-4 font-medium text-gray-600">
+                          Posisi
+                        </th>
+                        <th className="text-left py-3 px-4 font-medium text-gray-600">
+                          Status
+                        </th>
+                        <th className="text-left py-3 px-4 font-medium text-gray-600">
+                          Aksi
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {accounts.map((account) => (
+                        <tr
+                          key={account.id}
+                          className="border-b hover:bg-gray-50"
+                        >
+                          <td className="py-3 px-4 font-mono font-medium">
+                            {account.code}
+                          </td>
+                          <td className="py-3 px-4 font-medium text-gray-900">
+                            {account.name}
+                          </td>
+                          <td className="py-3 px-4">
+                            <Badge
+                              className={getAccountTypeColor(account.category)}
+                            >
+                              {getAccountTypeLabel(account.category)}
+                            </Badge>
+                          </td>
+                          <td className="py-3 px-4 text-sm">
+                            {account.account_type}
+                          </td>
+                          <td className="py-3 px-4">
+                            <Badge
+                              className={
+                                account.is_debit
+                                  ? "bg-blue-100 text-blue-800"
+                                  : "bg-green-100 text-green-800"
+                              }
+                            >
+                              {account.is_debit ? "Debit" : "Credit"}
+                            </Badge>
+                          </td>
+                          <td className="py-3 px-4">
+                            <Badge
+                              className={
+                                account.is_active
+                                  ? "bg-green-100 text-green-800"
+                                  : "bg-gray-100 text-gray-800"
+                              }
+                            >
+                              {account.is_active ? "Aktif" : "Tidak Aktif"}
+                            </Badge>
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="flex space-x-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleViewAccount(account)}
+                              >
+                                <Eye className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleEditAccount(account)}
+                              >
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="text-red-600 hover:text-red-700"
+                                onClick={() => handleDeleteAccount(account.id)}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
 
-        {/* Balance Check */}
-        <Card className="border-blue-200 bg-blue-50">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="font-medium text-blue-800">Keseimbangan Neraca</h3>
-                <p className="text-sm text-blue-700">
-                  Aktiva: {formatCurrency(accountSummary.totalAssets)} | 
-                  Pasiva + Modal: {formatCurrency(accountSummary.totalLiabilities + accountSummary.totalEquity)}
-                </p>
-              </div>
-              <div className="text-right">
-                <p className="text-sm text-blue-600">Selisih:</p>
-                <p className={`font-bold ${
-                  accountSummary.totalAssets === (accountSummary.totalLiabilities + accountSummary.totalEquity) 
-                    ? 'text-green-600' 
-                    : 'text-red-600'
-                }`}>
-                  {formatCurrency(accountSummary.totalAssets - (accountSummary.totalLiabilities + accountSummary.totalEquity))}
-                </p>
-              </div>
-            </div>
+                  {accounts.length === 0 && !loading && (
+                    <div className="text-center py-8">
+                      <AlertCircle className="mx-auto h-12 w-12 text-gray-400" />
+                      <h3 className="mt-2 text-sm font-medium text-gray-900">
+                        Belum ada data
+                      </h3>
+                      <p className="mt-1 text-sm text-gray-500">
+                        {searchQuery || selectedCategory !== "all"
+                          ? "Tidak ada akun yang sesuai dengan filter"
+                          : "Belum ada akun yang terdaftar"}
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Pagination */}
+                {accounts.length > 0 && (
+                  <div className="flex items-center justify-between mt-4">
+                    <div className="text-sm text-gray-600">
+                      Halaman {currentPage} dari {totalPages || 1}
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          setCurrentPage((p) => Math.max(1, p - 1))
+                        }
+                        disabled={currentPage === 1}
+                      >
+                        <ChevronLeft className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage((p) => p + 1)}
+                        disabled={accounts.length < perPage}
+                      >
+                        <ChevronRight className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
           </CardContent>
         </Card>
       </div>
 
       {/* Modals */}
-      <AddAccountModal 
-        isOpen={addAccountModal} 
-        onClose={() => setAddAccountModal(false)}
+      <AccountFormModal
+        isOpen={formModal}
+        onClose={() => {
+          setFormModal(false);
+          setEditAccount(null);
+        }}
+        onSuccess={handleSuccess}
+        account={editAccount}
+      />
+      <ViewAccountModal
+        isOpen={viewAccountModal}
+        onClose={() => setViewAccountModal(false)}
+        account={selectedAccount}
       />
     </ManagerLayout>
   );

@@ -1,6 +1,5 @@
 // src/lib/api/chartOfAccounts.service.ts
-
-const BASE_URL = "https://ksp.gascpns.id/api";
+import apiClient, { ApiResponse } from "./api-client";
 
 // =====================================================
 // TYPES
@@ -27,22 +26,6 @@ export interface COASummary {
   expenses: number;
 }
 
-export interface COAMeta {
-  current_page: number;
-  per_page: number;
-  total: number;
-  last_page: number;
-  from: number;
-  to: number;
-}
-
-export interface COAResponse {
-  success: boolean;
-  message: string;
-  data: ChartOfAccount[];
-  meta?: COAMeta;
-}
-
 export interface CreateCOARequest {
   code: string;
   name: string;
@@ -54,36 +37,13 @@ export interface CreateCOARequest {
 }
 
 // =====================================================
-// HELPER FUNCTIONS
-// =====================================================
-
-const getHeaders = () => {
-  const token = localStorage.getItem("token");
-  return {
-    "Content-Type": "application/json",
-    ...(token && { Authorization: `Bearer ${token}` }),
-  };
-};
-
-const handleResponse = async (response: Response) => {
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({
-      message: "Request failed",
-    }));
-    throw new Error(error.message || `HTTP ${response.status}`);
-  }
-
-  const result = await response.json();
-  return result.data;
-};
-
-// =====================================================
 // SERVICE
 // =====================================================
 
-export const chartOfAccountsService = {
+const chartOfAccountsService = {
   /**
    * Get all chart of accounts
+   * GET /chart-of-accounts
    */
   getAll: async (params?: {
     page?: number;
@@ -97,151 +57,121 @@ export const chartOfAccountsService = {
     sort_order?: "asc" | "desc";
     all?: boolean;
   }): Promise<ChartOfAccount[]> => {
-    const queryParams = new URLSearchParams();
-
-    if (params?.page) queryParams.append("page", params.page.toString());
-    if (params?.per_page)
-      queryParams.append("per_page", params.per_page.toString());
-    if (params?.category) queryParams.append("category", params.category);
-    if (params?.account_type)
-      queryParams.append("account_type", params.account_type);
-    if (params?.is_debit !== undefined)
-      queryParams.append("is_debit", params.is_debit.toString());
-    if (params?.is_active !== undefined)
-      queryParams.append("is_active", params.is_active.toString());
-    if (params?.search) queryParams.append("search", params.search);
-    if (params?.sort_by) queryParams.append("sort_by", params.sort_by);
-    if (params?.sort_order) queryParams.append("sort_order", params.sort_order);
-    if (params?.all) queryParams.append("all", "true");
-
-    const url = queryParams.toString()
-      ? `${BASE_URL}/chart-of-accounts?${queryParams}`
-      : `${BASE_URL}/chart-of-accounts`;
-
-    const response = await fetch(url, {
-      headers: getHeaders(),
-    });
-
-    return handleResponse(response);
+    const response = await apiClient.get<ApiResponse<ChartOfAccount[]>>(
+      "/chart-of-accounts",
+      { params }
+    );
+    return response.data.data;
   },
 
   /**
-   * Get COA by category (assets)
+   * Get COA by category
+   * GET /chart-of-accounts?category={category}
    */
   getByCategory: async (
     category: "assets" | "liabilities" | "equity" | "revenue" | "expenses"
   ): Promise<ChartOfAccount[]> => {
-    const response = await fetch(
-      `${BASE_URL}/chart-of-accounts?category=${category}`,
-      { headers: getHeaders() }
+    const response = await apiClient.get<ApiResponse<ChartOfAccount[]>>(
+      "/chart-of-accounts",
+      { params: { category } }
     );
-
-    return handleResponse(response);
+    return response.data.data;
   },
 
   /**
-   * Get COA by account type (Cash, Bank, etc)
+   * Get COA by account type
+   * GET /chart-of-accounts?account_type={type}
    */
   getByAccountType: async (accountType: string): Promise<ChartOfAccount[]> => {
-    const response = await fetch(
-      `${BASE_URL}/chart-of-accounts?account_type=${accountType}`,
-      { headers: getHeaders() }
+    const response = await apiClient.get<ApiResponse<ChartOfAccount[]>>(
+      "/chart-of-accounts",
+      { params: { account_type: accountType } }
     );
-
-    return handleResponse(response);
+    return response.data.data;
   },
 
   /**
    * Get COA by debit/credit
+   * GET /chart-of-accounts?is_debit={boolean}
    */
   getByDebitCredit: async (isDebit: boolean): Promise<ChartOfAccount[]> => {
-    const response = await fetch(
-      `${BASE_URL}/chart-of-accounts?is_debit=${isDebit}`,
-      { headers: getHeaders() }
+    const response = await apiClient.get<ApiResponse<ChartOfAccount[]>>(
+      "/chart-of-accounts",
+      { params: { is_debit: isDebit } }
     );
-
-    return handleResponse(response);
+    return response.data.data;
   },
 
   /**
    * Get COA category revenue (special endpoint)
+   * GET /chart-of-accounts/category/revenue
    */
   getRevenueCategory: async (): Promise<ChartOfAccount[]> => {
-    const response = await fetch(
-      `${BASE_URL}/chart-of-accounts/category/revenue`,
-      { headers: getHeaders() }
+    const response = await apiClient.get<ApiResponse<ChartOfAccount[]>>(
+      "/chart-of-accounts/category/revenue"
     );
-
-    return handleResponse(response);
+    return response.data.data;
   },
 
   /**
    * Get COA summary
+   * GET /chart-of-accounts/summary
    */
   getSummary: async (): Promise<COASummary> => {
-    const response = await fetch(`${BASE_URL}/chart-of-accounts/summary`, {
-      headers: getHeaders(),
-    });
-
-    return handleResponse(response);
+    const response = await apiClient.get<ApiResponse<COASummary>>(
+      "/chart-of-accounts/summary"
+    );
+    return response.data.data;
   },
 
   /**
    * Get single COA by ID
+   * GET /chart-of-accounts/{id}
    */
   getById: async (id: number): Promise<ChartOfAccount> => {
-    const response = await fetch(`${BASE_URL}/chart-of-accounts/${id}`, {
-      headers: getHeaders(),
-    });
-
-    return handleResponse(response);
+    const response = await apiClient.get<ApiResponse<ChartOfAccount>>(
+      `/chart-of-accounts/${id}`
+    );
+    return response.data.data;
   },
 
   /**
    * Create new COA
+   * POST /chart-of-accounts
    */
   create: async (data: CreateCOARequest): Promise<ChartOfAccount> => {
-    const response = await fetch(`${BASE_URL}/chart-of-accounts`, {
-      method: "POST",
-      headers: getHeaders(),
-      body: JSON.stringify(data),
-    });
-
-    return handleResponse(response);
+    const response = await apiClient.post<ApiResponse<ChartOfAccount>>(
+      "/chart-of-accounts",
+      data
+    );
+    return response.data.data;
   },
 
   /**
    * Update COA
+   * PUT /chart-of-accounts/{id}
    */
   update: async (
     id: number,
     data: Partial<CreateCOARequest>
   ): Promise<ChartOfAccount> => {
-    const response = await fetch(`${BASE_URL}/chart-of-accounts/${id}`, {
-      method: "PUT",
-      headers: getHeaders(),
-      body: JSON.stringify(data),
-    });
-
-    return handleResponse(response);
+    const response = await apiClient.put<ApiResponse<ChartOfAccount>>(
+      `/chart-of-accounts/${id}`,
+      data
+    );
+    return response.data.data;
   },
 
   /**
    * Delete COA
+   * DELETE /chart-of-accounts/{id}
    */
   delete: async (id: number): Promise<void> => {
-    const response = await fetch(`${BASE_URL}/chart-of-accounts/${id}`, {
-      method: "DELETE",
-      headers: getHeaders(),
-    });
-
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({
-        message: "Delete failed",
-      }));
-      throw new Error(error.message || `HTTP ${response.status}`);
-    }
+    await apiClient.delete(`/chart-of-accounts/${id}`);
   },
 };
+
+// Named exports for types
+export type { ChartOfAccount, COASummary, CreateCOARequest };
 
 export default chartOfAccountsService;

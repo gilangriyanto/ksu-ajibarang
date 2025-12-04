@@ -42,12 +42,14 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
-import {
-  chartOfAccountsService,
-  type ChartOfAccount,
-  type CreateCOARequest,
-} from "@/lib/api/chartOfAccounts.service";
+import chartOfAccountsService from "@/lib/api/chartOfAccounts.service";
 import { toast } from "sonner";
+
+// Import types separately
+import type {
+  ChartOfAccount,
+  CreateCOARequest,
+} from "@/lib/api/chartOfAccounts.service";
 
 // =====================================================
 // MODAL: Add/Edit Account

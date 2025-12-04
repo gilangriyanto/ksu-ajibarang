@@ -1,7 +1,5 @@
 // src/lib/api/serviceAllowance.service.ts
-// Standalone service - no external dependencies
-
-const BASE_URL = "https://ksp.gascpns.id/api";
+import apiClient, { ApiResponse } from "./api-client";
 
 // =====================================================
 // TYPES
@@ -12,22 +10,19 @@ export interface ServiceAllowance {
   user_id: number;
   period_month: number;
   period_year: number;
-  base_amount: string;
-  savings_bonus: string;
-  loan_bonus: string;
-  total_amount: string;
-  status: "paid" | "pending";
+  received_amount: string;
+  installment_paid: string;
+  remaining_amount: string;
+  status: "processed" | "pending";
   payment_date: string | null;
+  distributed_by: number | null;
   notes: string | null;
-  distributed_by: {
-    id: number;
-    full_name: string;
-  };
   created_at: string;
-  updated_at: string;
-  period_display: string;
-  status_name: string;
-  user: {
+  updated_at?: string;
+  // Computed fields
+  period_display?: string;
+  status_name?: string;
+  user?: {
     id: number;
     full_name: string;
     employee_id: string;
@@ -35,119 +30,175 @@ export interface ServiceAllowance {
   };
 }
 
-export interface DistributeRequest {
+export interface CreateAllowanceRequest {
+  user_id: number;
   period_month: number;
   period_year: number;
-  base_amount: number;
-  savings_rate: number;
-  loan_rate: number;
+  received_amount: number;
+  notes?: string;
 }
 
-// =====================================================
-// HELPER FUNCTIONS
-// =====================================================
-
-const getHeaders = () => {
-  const token = localStorage.getItem("token");
-  return {
-    "Content-Type": "application/json",
-    ...(token && { Authorization: `Bearer ${token}` }),
+export interface PreviewCalculation {
+  member: {
+    id: number;
+    full_name: string;
+    employee_id: string;
   };
-};
+  period: string;
+  received_amount: number;
+  installments: Array<{
+    id: number;
+    loan_number: string;
+    installment_number: number;
+    amount: number;
+    due_date: string;
+  }>;
+  calculation: {
+    total_installments_due: number;
+    will_be_paid_from_allowance: number;
+    remaining_for_member: number;
+    member_must_pay: number;
+    scenario: "sufficient" | "insufficient" | "exact";
+    message: string;
+  };
+}
 
-const handleResponse = async (response: Response) => {
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({
-      message: "Request failed",
-    }));
-    throw new Error(error.message || `HTTP ${response.status}`);
-  }
+export interface PeriodSummary {
+  period: string;
+  total_members: number;
+  total_received: number;
+  total_paid_for_installments: number;
+  total_remaining_for_members: number;
+  processed_count: number;
+  pending_count: number;
+}
 
-  const result = await response.json();
-  return result.data;
-};
+export interface MemberHistory {
+  user: {
+    id: number;
+    full_name: string;
+    employee_id: string;
+  };
+  year: number;
+  total_received: number;
+  total_remaining: number;
+  allowances: Array<{
+    id: number;
+    period: string;
+    received_amount: number;
+    installment_paid: number;
+    remaining_amount: number;
+    status: string;
+    status_name: string;
+    payment_date: string | null;
+  }>;
+}
+
+export interface AllowanceResponse {
+  service_allowance: ServiceAllowance;
+  summary: {
+    received_from_hospital: number;
+    used_for_installments: number;
+    returned_to_member: number;
+    remaining_installment_due: number;
+    installments_paid_count: number;
+    message: string;
+  };
+}
 
 // =====================================================
 // SERVICE
 // =====================================================
 
-export const serviceAllowanceService = {
+const serviceAllowanceService = {
   /**
-   * Get all service allowances
+   * Create/Input service allowance for a member
+   * POST /service-allowances
+   */
+  create: async (data: CreateAllowanceRequest): Promise<AllowanceResponse> => {
+    const response = await apiClient.post<ApiResponse<AllowanceResponse>>(
+      "/service-allowances",
+      data
+    );
+    return response.data.data;
+  },
+
+  /**
+   * Preview calculation before creating allowance
+   * POST /service-allowances/preview
+   */
+  previewCalculation: async (data: {
+    user_id: number;
+    period_month: number;
+    period_year: number;
+    received_amount: number;
+  }): Promise<PreviewCalculation> => {
+    const response = await apiClient.post<ApiResponse<PreviewCalculation>>(
+      "/service-allowances/preview",
+      data
+    );
+    return response.data.data;
+  },
+
+  /**
+   * Get all service allowances with filters
+   * GET /service-allowances
    */
   getAll: async (params?: {
     user_id?: number;
     month?: number;
     year?: number;
     status?: string;
+    per_page?: number;
+    page?: number;
   }): Promise<ServiceAllowance[]> => {
-    const queryParams = new URLSearchParams();
-    queryParams.append("all", "true");
-
-    if (params?.user_id)
-      queryParams.append("user_id", params.user_id.toString());
-    if (params?.month) queryParams.append("month", params.month.toString());
-    if (params?.year) queryParams.append("year", params.year.toString());
-    if (params?.status) queryParams.append("status", params.status);
-
-    const response = await fetch(
-      `${BASE_URL}/service-allowances?${queryParams}`,
-      { headers: getHeaders() }
+    const response = await apiClient.get<ApiResponse<ServiceAllowance[]>>(
+      "/service-allowances",
+      { params }
     );
-
-    return handleResponse(response);
+    return response.data.data;
   },
 
   /**
    * Get single allowance by ID
+   * GET /service-allowances/{id}
    */
   getById: async (id: number): Promise<ServiceAllowance> => {
-    const response = await fetch(`${BASE_URL}/service-allowances/${id}`, {
-      headers: getHeaders(),
-    });
-
-    return handleResponse(response);
-  },
-
-  /**
-   * Distribute allowance to all active members
-   */
-  distribute: async (data: DistributeRequest): Promise<any> => {
-    const response = await fetch(`${BASE_URL}/service-allowances/distribute`, {
-      method: "POST",
-      headers: getHeaders(),
-      body: JSON.stringify(data),
-    });
-
-    return handleResponse(response);
-  },
-
-  /**
-   * Mark allowance as paid
-   */
-  markAsPaid: async (id: number, notes?: string): Promise<ServiceAllowance> => {
-    const response = await fetch(
-      `${BASE_URL}/service-allowances/${id}/mark-as-paid`,
-      {
-        method: "POST",
-        headers: getHeaders(),
-        body: JSON.stringify({ notes: notes || "" }),
-      }
+    const response = await apiClient.get<ApiResponse<ServiceAllowance>>(
+      `/service-allowances/${id}`
     );
-
-    return handleResponse(response);
+    return response.data.data;
   },
 
   /**
    * Get period summary
+   * GET /service-allowances/period-summary
    */
-  getPeriodSummary: async (month: number, year: number): Promise<any> => {
-    const response = await fetch(
-      `${BASE_URL}/service-allowances/period-summary?month=${month}&year=${year}`,
-      { headers: getHeaders() }
+  getPeriodSummary: async (
+    month: number,
+    year: number
+  ): Promise<PeriodSummary> => {
+    const response = await apiClient.get<ApiResponse<PeriodSummary>>(
+      "/service-allowances/period-summary",
+      { params: { month, year } }
     );
+    return response.data.data;
+  },
 
-    return handleResponse(response);
+  /**
+   * Get member history
+   * GET /service-allowances/member/{user_id}/history
+   */
+  getMemberHistory: async (
+    userId: number,
+    year?: number
+  ): Promise<MemberHistory> => {
+    const params = year ? { year } : undefined;
+    const response = await apiClient.get<ApiResponse<MemberHistory>>(
+      `/service-allowances/member/${userId}/history`,
+      { params }
+    );
+    return response.data.data;
   },
 };
 

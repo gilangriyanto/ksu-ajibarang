@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { ManagerLayout } from "@/components/layout/ManagerLayout";
 import {
   Card,
@@ -26,6 +26,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Plus,
   Search,
@@ -34,23 +35,25 @@ import {
   DollarSign,
   Calculator,
   TrendingUp,
-  Upload,
-  FileSpreadsheet,
   CheckCircle,
   AlertCircle,
   Loader2,
+  Info,
 } from "lucide-react";
-import { useMembers } from "@/hooks/useMembers";
-import {
-  serviceAllowanceService,
-  type ServiceAllowance,
-} from "@/lib/api/serviceAllowance.service";
+import memberService from "@/lib/api/member.service";
+import serviceAllowanceService from "@/lib/api/serviceAllowance.service";
 import { toast } from "sonner";
 
+// Import types separately
+import type {
+  ServiceAllowance,
+  PreviewCalculation,
+} from "@/lib/api/serviceAllowance.service";
+
 // =====================================================
-// MODAL: Distribute Service Allowance
+// MODAL: Input Service Allowance
 // =====================================================
-const DistributeAllowanceModal = ({
+const InputAllowanceModal = ({
   isOpen,
   onClose,
   onSuccess,
@@ -59,51 +62,143 @@ const DistributeAllowanceModal = ({
   onClose: () => void;
   onSuccess: () => void;
 }) => {
+  const [selectedMember, setSelectedMember] = useState("");
   const [selectedMonth, setSelectedMonth] = useState(
     new Date().toISOString().slice(0, 7)
   );
-  const [baseAmount, setBaseAmount] = useState("50000");
-  const [savingsRate, setSavingsRate] = useState("1.0");
-  const [loanRate, setLoanRate] = useState("10.0");
+  const [receivedAmount, setReceivedAmount] = useState("500000");
+  const [notes, setNotes] = useState("");
+  const [members, setMembers] = useState<any[]>([]);
+  const [preview, setPreview] = useState<PreviewCalculation | null>(null);
   const [loading, setLoading] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
 
-  const handleDistribute = async () => {
+  // Fetch members
+  useEffect(() => {
+    const fetchMembers = async () => {
+      try {
+        const data = await memberService.getMembers({
+          all: true,
+          status: "active",
+        });
+        setMembers(Array.isArray(data) ? data : []);
+      } catch (error) {
+        console.error("Error fetching members:", error);
+        toast.error("Gagal memuat data anggota");
+      }
+    };
+
+    if (isOpen) {
+      fetchMembers();
+    }
+  }, [isOpen]);
+
+  // Preview calculation
+  const handlePreview = async () => {
+    if (!selectedMember || !receivedAmount) {
+      toast.error("Pilih anggota dan masukkan jumlah yang diterima");
+      return;
+    }
+
     try {
       setLoading(true);
       const [year, month] = selectedMonth.split("-").map(Number);
 
-      await serviceAllowanceService.distribute({
+      const previewData = await serviceAllowanceService.previewCalculation({
+        user_id: parseInt(selectedMember),
         period_month: month,
         period_year: year,
-        base_amount: parseFloat(baseAmount),
-        savings_rate: parseFloat(savingsRate),
-        loan_rate: parseFloat(loanRate),
+        received_amount: parseFloat(receivedAmount),
       });
 
-      toast.success("Berhasil mendistribusikan jasa pelayanan");
-      onSuccess();
-      onClose();
+      setPreview(previewData);
+      setShowPreview(true);
     } catch (error: any) {
-      console.error("Error distributing:", error);
-      toast.error(error.message || "Gagal mendistribusikan jasa pelayanan");
+      console.error("Error preview:", error);
+      toast.error(error.message || "Gagal membuat preview");
     } finally {
       setLoading(false);
     }
   };
 
+  // Submit allowance
+  const handleSubmit = async () => {
+    if (!selectedMember || !receivedAmount) {
+      toast.error("Lengkapi semua data");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const [year, month] = selectedMonth.split("-").map(Number);
+
+      const result = await serviceAllowanceService.create({
+        user_id: parseInt(selectedMember),
+        period_month: month,
+        period_year: year,
+        received_amount: parseFloat(receivedAmount),
+        notes: notes || undefined,
+      });
+
+      toast.success(
+        result.summary.message || "Jasa pelayanan berhasil diproses"
+      );
+      onSuccess();
+      onClose();
+
+      // Reset form
+      setSelectedMember("");
+      setReceivedAmount("500000");
+      setNotes("");
+      setPreview(null);
+      setShowPreview(false);
+    } catch (error: any) {
+      console.error("Error submitting:", error);
+      toast.error(error.message || "Gagal memproses jasa pelayanan");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat("id-ID", {
+      style: "currency",
+      currency: "IDR",
+      minimumFractionDigits: 0,
+    }).format(amount);
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[525px]">
+      <DialogContent className="sm:max-w-[625px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Distribusi Jasa Pelayanan</DialogTitle>
+          <DialogTitle>Input Jasa Pelayanan</DialogTitle>
           <DialogDescription>
-            Distribusikan jasa pelayanan ke semua anggota aktif
+            Masukkan data jasa pelayanan untuk anggota
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
           <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="member" className="text-right">
+              Anggota <span className="text-red-500">*</span>
+            </Label>
+            <Select value={selectedMember} onValueChange={setSelectedMember}>
+              <SelectTrigger className="col-span-3">
+                <SelectValue placeholder="Pilih anggota" />
+              </SelectTrigger>
+              <SelectContent>
+                {members.map((member) => (
+                  <SelectItem key={member.id} value={member.id.toString()}>
+                    {member.full_name} ({member.employee_id})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="period" className="text-right">
-              Periode
+              Periode <span className="text-red-500">*</span>
             </Label>
             <Input
               id="period"
@@ -113,67 +208,133 @@ const DistributeAllowanceModal = ({
               onChange={(e) => setSelectedMonth(e.target.value)}
             />
           </div>
+
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="base-amount" className="text-right">
-              Base Amount
+            <Label htmlFor="received-amount" className="text-right">
+              Jumlah Diterima <span className="text-red-500">*</span>
             </Label>
             <Input
-              id="base-amount"
+              id="received-amount"
               type="number"
               className="col-span-3"
-              placeholder="50000"
-              value={baseAmount}
-              onChange={(e) => setBaseAmount(e.target.value)}
+              placeholder="500000"
+              value={receivedAmount}
+              onChange={(e) => setReceivedAmount(e.target.value)}
             />
           </div>
+
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="savings-rate" className="text-right">
-              Savings Rate (%)
+            <Label htmlFor="notes" className="text-right">
+              Catatan
             </Label>
-            <Input
-              id="savings-rate"
-              type="number"
-              step="0.1"
+            <Textarea
+              id="notes"
               className="col-span-3"
-              placeholder="1.0"
-              value={savingsRate}
-              onChange={(e) => setSavingsRate(e.target.value)}
+              placeholder="Catatan tambahan (opsional)"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={3}
             />
           </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="loan-rate" className="text-right">
-              Loan Rate (%)
-            </Label>
-            <Input
-              id="loan-rate"
-              type="number"
-              step="0.1"
-              className="col-span-3"
-              placeholder="10.0"
-              value={loanRate}
-              onChange={(e) => setLoanRate(e.target.value)}
-            />
+
+          {/* Preview Button */}
+          <div className="flex justify-center">
+            <Button
+              variant="outline"
+              onClick={handlePreview}
+              disabled={loading || !selectedMember || !receivedAmount}
+            >
+              <Info className="h-4 w-4 mr-2" />
+              Preview Perhitungan
+            </Button>
           </div>
+
+          {/* Preview Result */}
+          {showPreview && preview && (
+            <Alert className="border-blue-200 bg-blue-50">
+              <AlertCircle className="h-4 w-4 text-blue-600" />
+              <AlertDescription>
+                <div className="space-y-2">
+                  <p className="font-medium text-blue-900">
+                    {preview.member.full_name} - {preview.period}
+                  </p>
+                  <div className="text-sm space-y-1">
+                    <p>
+                      Jumlah diterima: {formatCurrency(preview.received_amount)}
+                    </p>
+                    <p>
+                      Cicilan yang jatuh tempo:{" "}
+                      {formatCurrency(
+                        preview.calculation.total_installments_due
+                      )}
+                    </p>
+                    <p>
+                      Akan dibayar dari jasa:{" "}
+                      {formatCurrency(
+                        preview.calculation.will_be_paid_from_allowance
+                      )}
+                    </p>
+                    <p className="font-medium">
+                      {preview.calculation.scenario === "sufficient" ? (
+                        <span className="text-green-600">
+                          Sisa untuk member:{" "}
+                          {formatCurrency(
+                            preview.calculation.remaining_for_member
+                          )}
+                        </span>
+                      ) : (
+                        <span className="text-orange-600">
+                          Member harus bayar:{" "}
+                          {formatCurrency(preview.calculation.member_must_pay)}
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                  <p className="text-sm italic text-blue-700 mt-2">
+                    {preview.calculation.message}
+                  </p>
+                  {preview.installments.length > 0 && (
+                    <div className="mt-3 text-xs">
+                      <p className="font-medium mb-1">
+                        Cicilan yang akan dibayar:
+                      </p>
+                      <ul className="list-disc list-inside space-y-1">
+                        {preview.installments.map((inst) => (
+                          <li key={inst.id}>
+                            {inst.loan_number} - Cicilan #
+                            {inst.installment_number}:{" "}
+                            {formatCurrency(inst.amount)}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              </AlertDescription>
+            </Alert>
+          )}
+
           <Alert>
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
-              Sistem akan otomatis menghitung bonus berdasarkan simpanan dan
-              pinjaman masing-masing anggota
+              Sistem akan otomatis memotong cicilan pinjaman yang jatuh tempo
+              dari jasa pelayanan yang diterima
             </AlertDescription>
           </Alert>
         </div>
+
         <div className="flex justify-end space-x-2">
           <Button variant="outline" onClick={onClose} disabled={loading}>
             Batal
           </Button>
-          <Button onClick={handleDistribute} disabled={loading}>
+          <Button onClick={handleSubmit} disabled={loading || !selectedMember}>
             {loading ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                Mendistribusikan...
+                Memproses...
               </>
             ) : (
-              "Distribusikan Sekarang"
+              "Proses Sekarang"
             )}
           </Button>
         </div>
@@ -205,74 +366,76 @@ const ViewAllowanceModal = ({
     }).format(numAmount);
   };
 
-  const totalBonus =
-    parseFloat(allowance.savings_bonus) + parseFloat(allowance.loan_bonus);
-
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[625px]">
         <DialogHeader>
           <DialogTitle>Detail Jasa Pelayanan</DialogTitle>
           <DialogDescription>
-            Rincian jasa pelayanan untuk {allowance.user.full_name}
+            Rincian jasa pelayanan untuk {allowance.user?.full_name}
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label className="font-medium">Periode:</Label>
-              <p className="text-lg">{allowance.period_display}</p>
+              <p className="text-lg">
+                {new Date(
+                  allowance.period_year,
+                  allowance.period_month - 1
+                ).toLocaleDateString("id-ID", {
+                  year: "numeric",
+                  month: "long",
+                })}
+              </p>
             </div>
             <div>
               <Label className="font-medium">ID Anggota:</Label>
-              <p>{allowance.user.employee_id}</p>
+              <p>{allowance.user?.employee_id}</p>
             </div>
           </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label className="font-medium">Nama Anggota:</Label>
-              <p>{allowance.user.full_name}</p>
+              <p>{allowance.user?.full_name}</p>
             </div>
             <div>
               <Label className="font-medium">Status:</Label>
               <Badge
                 className={
-                  allowance.status === "paid"
+                  allowance.status === "processed"
                     ? "bg-green-100 text-green-800"
                     : "bg-yellow-100 text-yellow-800"
                 }
               >
-                {allowance.status_name}
+                {allowance.status === "processed"
+                  ? "Sudah Diproses"
+                  : "Pending"}
               </Badge>
             </div>
           </div>
 
           <div className="border rounded-lg p-4 bg-gray-50">
-            <h3 className="font-medium mb-3">Rincian Perhitungan:</h3>
+            <h3 className="font-medium mb-3">Rincian:</h3>
             <div className="space-y-2">
               <div className="flex justify-between">
-                <span>Base Amount:</span>
+                <span>Jumlah Diterima dari RS:</span>
                 <span className="font-medium text-blue-600">
-                  {formatCurrency(allowance.base_amount)}
+                  {formatCurrency(allowance.received_amount)}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span>Bonus Simpanan:</span>
-                <span className="font-medium text-green-600">
-                  +{formatCurrency(allowance.savings_bonus)}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span>Bonus Pinjaman:</span>
-                <span className="font-medium text-green-600">
-                  +{formatCurrency(allowance.loan_bonus)}
+                <span>Digunakan untuk Cicilan:</span>
+                <span className="font-medium text-orange-600">
+                  -{formatCurrency(allowance.installment_paid)}
                 </span>
               </div>
               <hr className="my-2" />
               <div className="flex justify-between text-lg font-bold">
-                <span>Total Diterima:</span>
-                <span className="text-blue-600">
-                  {formatCurrency(allowance.total_amount)}
+                <span>Sisa untuk Member:</span>
+                <span className="text-green-600">
+                  {formatCurrency(allowance.remaining_amount)}
                 </span>
               </div>
             </div>
@@ -303,35 +466,48 @@ export default function PayrollManagement() {
   const [selectedMonth, setSelectedMonth] = useState(
     new Date().toISOString().slice(0, 7)
   );
-  const [distributeModal, setDistributeModal] = useState(false);
+  const [inputModal, setInputModal] = useState(false);
   const [viewModal, setViewModal] = useState(false);
   const [selectedAllowance, setSelectedAllowance] =
     useState<ServiceAllowance | null>(null);
   const [allowances, setAllowances] = useState<ServiceAllowance[]>([]);
+  const [summary, setSummary] = useState<any>(null);
   const [loading, setLoading] = useState(false);
 
-  const { getMemberById } = useMembers();
-
-  // Fetch allowances
-  const fetchAllowances = async () => {
+  // Fetch allowances and summary
+  const fetchData = async () => {
     try {
       setLoading(true);
       const [year, month] = selectedMonth.split("-").map(Number);
-      const data = await serviceAllowanceService.getAll({
+
+      // Fetch allowances
+      const allowanceData = await serviceAllowanceService.getAll({
         month,
         year,
       });
-      setAllowances(data);
+      setAllowances(allowanceData);
+
+      // Fetch summary
+      try {
+        const summaryData = await serviceAllowanceService.getPeriodSummary(
+          month,
+          year
+        );
+        setSummary(summaryData);
+      } catch (summaryError) {
+        console.log("No summary data for this period");
+        setSummary(null);
+      }
     } catch (error) {
-      console.error("Error fetching allowances:", error);
-      toast.error("Gagal memuat data jasa pelayanan");
+      console.error("Error fetching data:", error);
+      toast.error("Gagal memuat data");
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchAllowances();
+    fetchData();
   }, [selectedMonth]);
 
   const formatCurrency = (amount: string | number) => {
@@ -344,10 +520,10 @@ export default function PayrollManagement() {
   };
 
   const getStatusBadge = (status: string) => {
-    return status === "paid" ? (
-      <Badge className="bg-green-100 text-green-800">Sudah Dibayar</Badge>
+    return status === "processed" ? (
+      <Badge className="bg-green-100 text-green-800">Sudah Diproses</Badge>
     ) : (
-      <Badge className="bg-yellow-100 text-yellow-800">Belum Dibayar</Badge>
+      <Badge className="bg-yellow-100 text-yellow-800">Pending</Badge>
     );
   };
 
@@ -356,46 +532,31 @@ export default function PayrollManagement() {
     setViewModal(true);
   };
 
-  const handleMarkAsPaid = async (id: number) => {
-    try {
-      await serviceAllowanceService.markAsPaid(id, "Pembayaran jasa pelayanan");
-      toast.success("Status pembayaran berhasil diupdate");
-      fetchAllowances();
-    } catch (error: any) {
-      console.error("Error marking as paid:", error);
-      toast.error(error.message || "Gagal mengubah status pembayaran");
-    }
-  };
-
   const handleDownloadReport = (reportType: string) => {
     const currentDate = new Date().toISOString().split("T")[0];
     let csvContent = "";
 
     switch (reportType) {
       case "monthly":
-        csvContent = `Laporan Jasa Pelayanan Bulanan\nPeriode: ${selectedMonth}\nTanggal: ${currentDate}\n\nID,Nama,Employee ID,Base Amount,Bonus Simpanan,Bonus Pinjaman,Total,Status\n`;
+        csvContent = `Laporan Jasa Pelayanan Bulanan\nPeriode: ${selectedMonth}\nTanggal: ${currentDate}\n\nID,Nama,Employee ID,Jumlah Diterima,Cicilan Dibayar,Sisa untuk Member,Status\n`;
         filteredAllowances.forEach((allowance) => {
-          csvContent += `${allowance.id},${allowance.user.full_name},${allowance.user.employee_id},${allowance.base_amount},${allowance.savings_bonus},${allowance.loan_bonus},${allowance.total_amount},${allowance.status}\n`;
+          csvContent += `${allowance.id},${allowance.user?.full_name},${allowance.user?.employee_id},${allowance.received_amount},${allowance.installment_paid},${allowance.remaining_amount},${allowance.status}\n`;
         });
         break;
       case "summary":
-        const totalBase = filteredAllowances.reduce(
-          (sum, a) => sum + parseFloat(a.base_amount),
+        const totalReceived = filteredAllowances.reduce(
+          (sum, a) => sum + parseFloat(a.received_amount),
           0
         );
-        const totalSavingsBonus = filteredAllowances.reduce(
-          (sum, a) => sum + parseFloat(a.savings_bonus),
+        const totalInstallment = filteredAllowances.reduce(
+          (sum, a) => sum + parseFloat(a.installment_paid),
           0
         );
-        const totalLoanBonus = filteredAllowances.reduce(
-          (sum, a) => sum + parseFloat(a.loan_bonus),
+        const totalRemaining = filteredAllowances.reduce(
+          (sum, a) => sum + parseFloat(a.remaining_amount),
           0
         );
-        const totalAmount = filteredAllowances.reduce(
-          (sum, a) => sum + parseFloat(a.total_amount),
-          0
-        );
-        csvContent = `Ringkasan Jasa Pelayanan\nTanggal: ${currentDate}\n\nTotal Base Amount,${totalBase}\nTotal Bonus Simpanan,${totalSavingsBonus}\nTotal Bonus Pinjaman,${totalLoanBonus}\nTotal Dibayarkan,${totalAmount}\nJumlah Anggota,${filteredAllowances.length}`;
+        csvContent = `Ringkasan Jasa Pelayanan\nTanggal: ${currentDate}\n\nTotal Diterima dari RS,${totalReceived}\nTotal Cicilan Dibayar,${totalInstallment}\nTotal Sisa untuk Member,${totalRemaining}\nJumlah Anggota,${filteredAllowances.length}`;
         break;
     }
 
@@ -414,26 +575,26 @@ export default function PayrollManagement() {
   const filteredAllowances = allowances.filter((allowance) => {
     const searchLower = searchTerm.toLowerCase();
     return (
-      allowance.user.full_name.toLowerCase().includes(searchLower) ||
-      allowance.user.employee_id.toLowerCase().includes(searchLower)
+      allowance.user?.full_name.toLowerCase().includes(searchLower) ||
+      allowance.user?.employee_id.toLowerCase().includes(searchLower)
     );
   });
 
   // Calculate statistics
-  const totalBase = filteredAllowances.reduce(
-    (sum, a) => sum + parseFloat(a.base_amount),
+  const totalReceived = filteredAllowances.reduce(
+    (sum, a) => sum + parseFloat(a.received_amount),
     0
   );
-  const totalBonus = filteredAllowances.reduce(
-    (sum, a) => sum + parseFloat(a.savings_bonus) + parseFloat(a.loan_bonus),
+  const totalInstallment = filteredAllowances.reduce(
+    (sum, a) => sum + parseFloat(a.installment_paid),
     0
   );
-  const totalAmount = filteredAllowances.reduce(
-    (sum, a) => sum + parseFloat(a.total_amount),
+  const totalRemaining = filteredAllowances.reduce(
+    (sum, a) => sum + parseFloat(a.remaining_amount),
     0
   );
-  const paidCount = filteredAllowances.filter(
-    (a) => a.status === "paid"
+  const processedCount = filteredAllowances.filter(
+    (a) => a.status === "processed"
   ).length;
 
   return (
@@ -445,17 +606,15 @@ export default function PayrollManagement() {
             <h1 className="text-3xl font-bold text-gray-900">
               Manajemen Jasa Pelayanan
             </h1>
-            <p className="text-gray-600 mt-1">
-              Kelola jasa pelayanan anggota aktif
-            </p>
+            <p className="text-gray-600 mt-1">Kelola jasa pelayanan anggota</p>
           </div>
           <div className="flex space-x-2">
             <Button
               className="bg-green-600 hover:bg-green-700"
-              onClick={() => setDistributeModal(true)}
+              onClick={() => setInputModal(true)}
             >
               <Plus className="w-4 h-4 mr-2" />
-              Distribusi Jasa Pelayanan
+              Input Jasa Pelayanan
             </Button>
           </div>
         </div>
@@ -468,40 +627,10 @@ export default function PayrollManagement() {
                 <DollarSign className="h-8 w-8 text-blue-600" />
                 <div className="ml-4">
                   <p className="text-sm font-medium text-gray-600">
-                    Total Base Amount
-                  </p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {formatCurrency(totalBase)}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center">
-                <TrendingUp className="h-8 w-8 text-green-600" />
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600">
-                    Total Bonus
-                  </p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {formatCurrency(totalBonus)}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center">
-                <Calculator className="h-8 w-8 text-purple-600" />
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600">
                     Total Diterima
                   </p>
                   <p className="text-2xl font-bold text-gray-900">
-                    {formatCurrency(totalAmount)}
+                    {formatCurrency(totalReceived)}
                   </p>
                 </div>
               </div>
@@ -510,13 +639,43 @@ export default function PayrollManagement() {
           <Card>
             <CardContent className="p-6">
               <div className="flex items-center">
-                <CheckCircle className="h-8 w-8 text-orange-600" />
+                <TrendingUp className="h-8 w-8 text-orange-600" />
                 <div className="ml-4">
                   <p className="text-sm font-medium text-gray-600">
-                    Sudah Dibayar
+                    Cicilan Dibayar
                   </p>
                   <p className="text-2xl font-bold text-gray-900">
-                    {paidCount}/{filteredAllowances.length}
+                    {formatCurrency(totalInstallment)}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center">
+                <Calculator className="h-8 w-8 text-green-600" />
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-gray-600">
+                    Sisa untuk Member
+                  </p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {formatCurrency(totalRemaining)}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center">
+                <CheckCircle className="h-8 w-8 text-purple-600" />
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-gray-600">
+                    Sudah Diproses
+                  </p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {processedCount}/{filteredAllowances.length}
                   </p>
                 </div>
               </div>
@@ -558,8 +717,7 @@ export default function PayrollManagement() {
           <CardHeader>
             <CardTitle>Daftar Jasa Pelayanan</CardTitle>
             <CardDescription>
-              Menampilkan {filteredAllowances.length} data jasa pelayanan untuk
-              periode{" "}
+              Menampilkan {filteredAllowances.length} data untuk periode{" "}
               {new Date(selectedMonth).toLocaleDateString("id-ID", {
                 year: "numeric",
                 month: "long",
@@ -581,13 +739,13 @@ export default function PayrollManagement() {
                         Anggota
                       </th>
                       <th className="text-left py-3 px-4 font-medium text-gray-600">
-                        Base Amount
+                        Diterima
                       </th>
                       <th className="text-left py-3 px-4 font-medium text-gray-600">
-                        Total Bonus
+                        Cicilan Dibayar
                       </th>
                       <th className="text-left py-3 px-4 font-medium text-gray-600">
-                        Total Diterima
+                        Sisa
                       </th>
                       <th className="text-left py-3 px-4 font-medium text-gray-600">
                         Status
@@ -598,61 +756,44 @@ export default function PayrollManagement() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredAllowances.map((allowance) => {
-                      const totalBonus =
-                        parseFloat(allowance.savings_bonus) +
-                        parseFloat(allowance.loan_bonus);
-
-                      return (
-                        <tr
-                          key={allowance.id}
-                          className="border-b hover:bg-gray-50"
-                        >
-                          <td className="py-3 px-4">
-                            <div>
-                              <p className="font-medium text-gray-900">
-                                {allowance.user.full_name}
-                              </p>
-                              <p className="text-sm text-gray-500">
-                                ID: {allowance.user.employee_id}
-                              </p>
-                            </div>
-                          </td>
-                          <td className="py-3 px-4 font-medium text-blue-600">
-                            {formatCurrency(allowance.base_amount)}
-                          </td>
-                          <td className="py-3 px-4 font-medium text-green-600">
-                            {formatCurrency(totalBonus)}
-                          </td>
-                          <td className="py-3 px-4 font-medium text-purple-600">
-                            {formatCurrency(allowance.total_amount)}
-                          </td>
-                          <td className="py-3 px-4">
-                            {getStatusBadge(allowance.status)}
-                          </td>
-                          <td className="py-3 px-4">
-                            <div className="flex space-x-2">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleViewAllowance(allowance)}
-                              >
-                                <Eye className="w-4 h-4" />
-                              </Button>
-                              {allowance.status === "pending" && (
-                                <Button
-                                  size="sm"
-                                  className="bg-green-600 hover:bg-green-700"
-                                  onClick={() => handleMarkAsPaid(allowance.id)}
-                                >
-                                  <CheckCircle className="w-4 h-4" />
-                                </Button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
+                    {filteredAllowances.map((allowance) => (
+                      <tr
+                        key={allowance.id}
+                        className="border-b hover:bg-gray-50"
+                      >
+                        <td className="py-3 px-4">
+                          <div>
+                            <p className="font-medium text-gray-900">
+                              {allowance.user?.full_name}
+                            </p>
+                            <p className="text-sm text-gray-500">
+                              ID: {allowance.user?.employee_id}
+                            </p>
+                          </div>
+                        </td>
+                        <td className="py-3 px-4 font-medium text-blue-600">
+                          {formatCurrency(allowance.received_amount)}
+                        </td>
+                        <td className="py-3 px-4 font-medium text-orange-600">
+                          {formatCurrency(allowance.installment_paid)}
+                        </td>
+                        <td className="py-3 px-4 font-medium text-green-600">
+                          {formatCurrency(allowance.remaining_amount)}
+                        </td>
+                        <td className="py-3 px-4">
+                          {getStatusBadge(allowance.status)}
+                        </td>
+                        <td className="py-3 px-4">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleViewAllowance(allowance)}
+                          >
+                            <Eye className="w-4 h-4" />
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
 
@@ -675,10 +816,8 @@ export default function PayrollManagement() {
         {/* Reports Section */}
         <Card>
           <CardHeader>
-            <CardTitle>Laporan Jasa Pelayanan</CardTitle>
-            <CardDescription>
-              Unduh berbagai laporan jasa pelayanan
-            </CardDescription>
+            <CardTitle>Laporan</CardTitle>
+            <CardDescription>Unduh laporan jasa pelayanan</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -706,10 +845,10 @@ export default function PayrollManagement() {
       </div>
 
       {/* Modals */}
-      <DistributeAllowanceModal
-        isOpen={distributeModal}
-        onClose={() => setDistributeModal(false)}
-        onSuccess={fetchAllowances}
+      <InputAllowanceModal
+        isOpen={inputModal}
+        onClose={() => setInputModal(false)}
+        onSuccess={fetchData}
       />
       <ViewAllowanceModal
         isOpen={viewModal}

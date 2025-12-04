@@ -4,6 +4,20 @@ import axios, {
   InternalAxiosRequestConfig,
 } from "axios";
 
+// ==================== TYPES ====================
+// Add this interface for API response structure
+export interface ApiResponse<T = any> {
+  success: boolean;
+  message?: string;
+  data: T;
+  meta?: {
+    current_page?: number;
+    last_page?: number;
+    per_page?: number;
+    total?: number;
+  };
+}
+
 // Create axios instance
 const apiClient = axios.create({
   baseURL: "https://ksp.gascpns.id/api",

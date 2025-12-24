@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { getRedirectPath } from "@/utils/loginRedirect";
 import {
   Card,
   CardContent,
@@ -25,7 +26,10 @@ export default function Login() {
   // Redirect if already logged in
   useEffect(() => {
     if (user) {
-      const redirectPath = user.role === "manager" ? "/manager" : "/member";
+      // ✅ Use smart redirect based on role and kas_id
+      const redirectPath = getRedirectPath(user);
+      console.log("🔄 Auto-redirecting to:", redirectPath);
+      console.log("👤 User info:", { role: user.role, kas_id: user.kas_id });
       navigate(redirectPath, { replace: true });
     }
   }, [user, navigate]);
@@ -40,7 +44,7 @@ export default function Login() {
       if (!success) {
         setError("Email atau password salah");
       }
-      // Navigation will be handled by the login function
+      // Navigation will be handled by useEffect after login success
     } catch (err) {
       setError("Terjadi kesalahan saat login");
     } finally {
@@ -67,6 +71,7 @@ export default function Login() {
       if (!success) {
         setError("Demo login gagal");
       }
+      // Navigation will be handled by useEffect after login success
     } catch (err) {
       setError("Terjadi kesalahan saat demo login");
     } finally {

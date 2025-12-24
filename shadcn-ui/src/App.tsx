@@ -1,8 +1,9 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
 import { ManagerLayout } from "@/components/layout/ManagerLayout";
 import NotFound from "./pages/NotFound";
@@ -25,7 +26,7 @@ import IncomeStatement from "./pages/manager/IncomeStatement";
 import Reports from "./pages/manager/Reports";
 import Settings from "./pages/manager/Settings";
 
-// Kas Pages (NEW!)
+// Kas Pages
 import KasDashboard from "./pages/kas/KasDashboard";
 import KasLoanManagement from "./pages/kas/KasLoanManagement";
 import KasSavings from "./pages/kas/KasSavings";
@@ -40,39 +41,197 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <Routes>
+            {/* Public Routes */}
             <Route path="/" element={<Login />} />
             <Route path="/login" element={<Login />} />
 
-            {/* Member Routes */}
-            <Route path="/member" element={<MemberDashboard />} />
-            <Route path="/member/profile" element={<MemberProfile />} />
-            <Route path="/member/savings" element={<MemberSavings />} />
-            <Route path="/member/loans" element={<MemberLoans />} />
-            <Route path="/member/payroll" element={<PayrollView />} />
-
-            {/* Manager Routes */}
-            <Route path="/manager" element={<ManagerDashboard />} />
-            <Route path="/manager/members" element={<MemberManagement />} />
-            <Route path="/manager/savings" element={<Savings />} />
-            <Route path="/manager/loans" element={<LoanManagement />} />
-            <Route path="/manager/payroll" element={<PayrollManagement />} />
-            <Route path="/manager/accounting" element={<Accounting />} />
-            <Route path="/manager/accounts" element={<AccountManagement />} />
-            <Route path="/manager/assets" element={<AssetManagement />} />
-            <Route path="/manager/balance-sheet" element={<BalanceSheet />} />
-            <Route path="/manager/reports" element={<Reports />} />
-            <Route path="/manager/settings" element={<Settings />} />
+            {/* Member Routes - Only for role "anggota" */}
             <Route
-              path="/manager/income-statement"
-              element={<IncomeStatement />}
+              path="/member"
+              element={
+                <ProtectedRoute allowedRoles={["anggota", "member"]}>
+                  <MemberDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/member/profile"
+              element={
+                <ProtectedRoute allowedRoles={["anggota", "member"]}>
+                  <MemberProfile />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/member/savings"
+              element={
+                <ProtectedRoute allowedRoles={["anggota", "member"]}>
+                  <MemberSavings />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/member/loans"
+              element={
+                <ProtectedRoute allowedRoles={["anggota", "member"]}>
+                  <MemberLoans />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/member/payroll"
+              element={
+                <ProtectedRoute allowedRoles={["anggota", "member"]}>
+                  <PayrollView />
+                </ProtectedRoute>
+              }
             />
 
-            {/* Kas Routes (NEW!) - Dynamic untuk semua kas */}
-            <Route path="/kas/:kasId" element={<KasDashboard />} />
-            <Route path="/kas/:kasId/loans" element={<KasLoanManagement />} />
-            <Route path="/kas/:kasId/savings" element={<KasSavings />} />
-            <Route path="/kas/:kasId/accounting" element={<KasAccounting />} />
+            {/* Manager Routes - Only for manager WITHOUT kas_id */}
+            <Route
+              path="/manager"
+              element={
+                <ProtectedRoute allowedRoles={["manager", "admin"]}>
+                  <ManagerDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/manager/members"
+              element={
+                <ProtectedRoute allowedRoles={["manager", "admin"]}>
+                  <MemberManagement />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/manager/savings"
+              element={
+                <ProtectedRoute allowedRoles={["manager", "admin"]}>
+                  <Savings />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/manager/loans"
+              element={
+                <ProtectedRoute allowedRoles={["manager", "admin"]}>
+                  <LoanManagement />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/manager/payroll"
+              element={
+                <ProtectedRoute allowedRoles={["manager", "admin"]}>
+                  <PayrollManagement />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/manager/accounting"
+              element={
+                <ProtectedRoute allowedRoles={["manager", "admin"]}>
+                  <Accounting />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/manager/accounts"
+              element={
+                <ProtectedRoute allowedRoles={["manager", "admin"]}>
+                  <AccountManagement />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/manager/assets"
+              element={
+                <ProtectedRoute allowedRoles={["manager", "admin"]}>
+                  <AssetManagement />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/manager/balance-sheet"
+              element={
+                <ProtectedRoute allowedRoles={["manager", "admin"]}>
+                  <BalanceSheet />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/manager/reports"
+              element={
+                <ProtectedRoute allowedRoles={["manager", "admin"]}>
+                  <Reports />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/manager/settings"
+              element={
+                <ProtectedRoute allowedRoles={["manager", "admin"]}>
+                  <Settings />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/manager/income-statement"
+              element={
+                <ProtectedRoute allowedRoles={["manager", "admin"]}>
+                  <IncomeStatement />
+                </ProtectedRoute>
+              }
+            />
 
+            {/* Kas Routes - Only for manager WITH kas_id */}
+            <Route
+              path="/kas/:kasId"
+              element={
+                <ProtectedRoute
+                  allowedRoles={["manager", "admin"]}
+                  requireKasId={true}
+                >
+                  <KasDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/kas/:kasId/loans"
+              element={
+                <ProtectedRoute
+                  allowedRoles={["manager", "admin"]}
+                  requireKasId={true}
+                >
+                  <KasLoanManagement />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/kas/:kasId/savings"
+              element={
+                <ProtectedRoute
+                  allowedRoles={["manager", "admin"]}
+                  requireKasId={true}
+                >
+                  <KasSavings />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/kas/:kasId/accounting"
+              element={
+                <ProtectedRoute
+                  allowedRoles={["manager", "admin"]}
+                  requireKasId={true}
+                >
+                  <KasAccounting />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* 404 Not Found */}
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>

@@ -1,80 +1,81 @@
-import React, { useState } from 'react';
-import { ManagerLayout } from '@/components/layout/ManagerLayout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { 
+import React, { useState } from "react";
+import { ManagerLayout } from "@/components/layout/ManagerLayout";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Download,
   Printer,
-  Calendar,
   Building,
   CreditCard,
-  Wallet,
-  TrendingUp,
   AlertCircle,
-  CheckCircle
-} from 'lucide-react';
+  CheckCircle,
+  Loader2,
+  RefreshCw,
+} from "lucide-react";
+import { useBalanceSheet } from "@/hooks/useBalanceSheet";
+import { BalanceSheetItem } from "@/utils/balanceSheetTransformer";
 
 export default function BalanceSheet() {
-  const [selectedPeriod, setSelectedPeriod] = useState('2024-01');
-  const [comparisonPeriod, setComparisonPeriod] = useState('2023-12');
+  // Get current date and set default periods
+  const currentDate = new Date();
+  const currentYear = currentDate.getFullYear();
+  const currentMonth = String(currentDate.getMonth() + 1).padStart(2, "0");
 
-  // Mock data for balance sheet
-  const balanceSheetData = {
-    period: '2024-01-31',
-    comparisonPeriod: '2023-12-31',
-    assets: {
-      currentAssets: [
-        { code: '1-1001', name: 'Kas', current: 50000000, previous: 45000000 },
-        { code: '1-1002', name: 'Bank BCA', current: 125000000, previous: 110000000 },
-        { code: '1-1003', name: 'Bank Mandiri', current: 75000000, previous: 80000000 },
-        { code: '1-1101', name: 'Piutang Anggota', current: 85000000, previous: 90000000 },
-        { code: '1-1201', name: 'Persediaan ATK', current: 5000000, previous: 4500000 }
-      ],
-      nonCurrentAssets: [
-        { code: '1-2001', name: 'Gedung Kantor', current: 500000000, previous: 500000000 },
-        { code: '1-2002', name: 'Akm. Penyusutan Gedung', current: -50000000, previous: -47000000 },
-        { code: '1-2101', name: 'Kendaraan', current: 200000000, previous: 200000000 },
-        { code: '1-2102', name: 'Akm. Penyusutan Kendaraan', current: -50000000, previous: -45000000 },
-        { code: '1-2201', name: 'Peralatan Kantor', current: 75000000, previous: 75000000 },
-        { code: '1-2202', name: 'Akm. Penyusutan Peralatan', current: -15000000, previous: -12000000 }
-      ]
-    },
-    liabilities: {
-      currentLiabilities: [
-        { code: '2-1001', name: 'Utang Usaha', current: 25000000, previous: 30000000 },
-        { code: '2-1002', name: 'Utang Gaji', current: 15000000, previous: 12000000 },
-        { code: '2-1003', name: 'Utang Pajak', current: 8000000, previous: 10000000 }
-      ],
-      nonCurrentLiabilities: [
-        { code: '2-2001', name: 'Simpanan Wajib Anggota', current: 150000000, previous: 140000000 },
-        { code: '2-2002', name: 'Simpanan Sukarela Anggota', current: 200000000, previous: 180000000 },
-        { code: '2-2003', name: 'Simpanan Berjangka', current: 100000000, previous: 95000000 }
-      ]
-    },
-    equity: [
-      { code: '3-1001', name: 'Modal Dasar Koperasi', current: 200000000, previous: 200000000 },
-      { code: '3-1002', name: 'Cadangan Umum', current: 50000000, previous: 45000000 },
-      { code: '3-1003', name: 'Cadangan Khusus', current: 25000000, previous: 20000000 },
-      { code: '3-1004', name: 'SHU Tahun Berjalan', current: 35000000, previous: 28000000 }
-    ]
-  };
+  const [selectedPeriod, setSelectedPeriod] = useState(
+    `${currentYear}-${currentMonth}-31`
+  );
+  const [comparisonPeriod, setComparisonPeriod] = useState(() => {
+    const prevMonth = new Date(
+      currentDate.getFullYear(),
+      currentDate.getMonth() - 1,
+      1
+    );
+    const lastDay = new Date(
+      prevMonth.getFullYear(),
+      prevMonth.getMonth() + 1,
+      0
+    ).getDate();
+    return `${prevMonth.getFullYear()}-${String(
+      prevMonth.getMonth() + 1
+    ).padStart(2, "0")}-${lastDay}`;
+  });
+
+  // Use the custom hook
+  const {
+    balanceSheetData,
+    isLoading,
+    error,
+    totalCurrentAssets,
+    totalNonCurrentAssets,
+    totalAssets,
+    totalCurrentLiabilities,
+    totalNonCurrentLiabilities,
+    totalLiabilities,
+    totalEquity,
+    totalLiabilitiesAndEquity,
+    isBalanced,
+    refetch,
+  } = useBalanceSheet(selectedPeriod, comparisonPeriod);
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('id-ID', {
-      style: 'currency',
-      currency: 'IDR',
-      minimumFractionDigits: 0
+    return new Intl.NumberFormat("id-ID", {
+      style: "currency",
+      currency: "IDR",
+      minimumFractionDigits: 0,
     }).format(amount);
-  };
-
-  const calculateTotal = (items: any[]) => {
-    return items.reduce((sum, item) => sum + item.current, 0);
-  };
-
-  const calculatePreviousTotal = (items: any[]) => {
-    return items.reduce((sum, item) => sum + item.previous, 0);
   };
 
   const getVariance = (current: number, previous: number) => {
@@ -83,18 +84,77 @@ export default function BalanceSheet() {
     return { amount: variance, percentage };
   };
 
-  const totalCurrentAssets = calculateTotal(balanceSheetData.assets.currentAssets);
-  const totalNonCurrentAssets = calculateTotal(balanceSheetData.assets.nonCurrentAssets);
-  const totalAssets = totalCurrentAssets + totalNonCurrentAssets;
+  const handlePrint = () => {
+    window.print();
+  };
 
-  const totalCurrentLiabilities = calculateTotal(balanceSheetData.liabilities.currentLiabilities);
-  const totalNonCurrentLiabilities = calculateTotal(balanceSheetData.liabilities.nonCurrentLiabilities);
-  const totalLiabilities = totalCurrentLiabilities + totalNonCurrentLiabilities;
+  const handleExportPDF = () => {
+    // TODO: Implement PDF export
+    alert("Export PDF akan segera tersedia");
+  };
 
-  const totalEquity = calculateTotal(balanceSheetData.equity);
-  const totalLiabilitiesAndEquity = totalLiabilities + totalEquity;
+  const renderAccountItem = (item: BalanceSheetItem) => {
+    const variance = getVariance(item.current, item.previous);
+    return (
+      <div key={item.code} className="flex justify-between items-center py-1">
+        <div>
+          <span className="text-sm text-gray-600">{item.code}</span>
+          <p className="font-medium">{item.name}</p>
+        </div>
+        <div className="text-right">
+          <p className="font-medium">{formatCurrency(item.current)}</p>
+          <p
+            className={`text-xs ${
+              variance.amount >= 0 ? "text-green-600" : "text-red-600"
+            }`}
+          >
+            {variance.amount >= 0 ? "+" : ""}
+            {formatCurrency(variance.amount)}
+          </p>
+        </div>
+      </div>
+    );
+  };
 
-  const isBalanced = totalAssets === totalLiabilitiesAndEquity;
+  if (isLoading) {
+    return (
+      <ManagerLayout>
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center">
+            <Loader2 className="w-12 h-12 animate-spin text-blue-600 mx-auto mb-4" />
+            <p className="text-gray-600">Memuat data neraca...</p>
+          </div>
+        </div>
+      </ManagerLayout>
+    );
+  }
+
+  if (error) {
+    return (
+      <ManagerLayout>
+        <div className="flex items-center justify-center h-96">
+          <Card className="max-w-md">
+            <CardContent className="pt-6">
+              <div className="text-center">
+                <AlertCircle className="w-12 h-12 text-red-600 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  Gagal Memuat Data
+                </h3>
+                <p className="text-gray-600 mb-4">{error}</p>
+                <Button
+                  onClick={() => refetch()}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Coba Lagi
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </ManagerLayout>
+    );
+  }
 
   return (
     <ManagerLayout>
@@ -102,15 +162,22 @@ export default function BalanceSheet() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Neraca (Balance Sheet)</h1>
-            <p className="text-gray-600 mt-1">Laporan posisi keuangan koperasi</p>
+            <h1 className="text-3xl font-bold text-gray-900">
+              Neraca (Balance Sheet)
+            </h1>
+            <p className="text-gray-600 mt-1">
+              Laporan posisi keuangan koperasi
+            </p>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline">
+            <Button variant="outline" onClick={handlePrint}>
               <Printer className="w-4 h-4 mr-2" />
               Print
             </Button>
-            <Button className="bg-blue-600 hover:bg-blue-700">
+            <Button
+              className="bg-blue-600 hover:bg-blue-700"
+              onClick={handleExportPDF}
+            >
               <Download className="w-4 h-4 mr-2" />
               Export PDF
             </Button>
@@ -128,15 +195,50 @@ export default function BalanceSheet() {
                 <label className="text-sm font-medium text-gray-700 mb-2 block">
                   Periode Utama
                 </label>
-                <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
+                <Select
+                  value={selectedPeriod}
+                  onValueChange={setSelectedPeriod}
+                >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="2024-01">Januari 2024</SelectItem>
-                    <SelectItem value="2023-12">Desember 2023</SelectItem>
-                    <SelectItem value="2023-11">November 2023</SelectItem>
-                    <SelectItem value="2023-10">Oktober 2023</SelectItem>
+                    <SelectItem value={`${currentYear}-01-31`}>
+                      Januari {currentYear}
+                    </SelectItem>
+                    <SelectItem value={`${currentYear}-02-28`}>
+                      Februari {currentYear}
+                    </SelectItem>
+                    <SelectItem value={`${currentYear}-03-31`}>
+                      Maret {currentYear}
+                    </SelectItem>
+                    <SelectItem value={`${currentYear}-04-30`}>
+                      April {currentYear}
+                    </SelectItem>
+                    <SelectItem value={`${currentYear}-05-31`}>
+                      Mei {currentYear}
+                    </SelectItem>
+                    <SelectItem value={`${currentYear}-06-30`}>
+                      Juni {currentYear}
+                    </SelectItem>
+                    <SelectItem value={`${currentYear}-07-31`}>
+                      Juli {currentYear}
+                    </SelectItem>
+                    <SelectItem value={`${currentYear}-08-31`}>
+                      Agustus {currentYear}
+                    </SelectItem>
+                    <SelectItem value={`${currentYear}-09-30`}>
+                      September {currentYear}
+                    </SelectItem>
+                    <SelectItem value={`${currentYear}-10-31`}>
+                      Oktober {currentYear}
+                    </SelectItem>
+                    <SelectItem value={`${currentYear}-11-30`}>
+                      November {currentYear}
+                    </SelectItem>
+                    <SelectItem value={`${currentYear}-12-31`}>
+                      Desember {currentYear}
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -144,15 +246,26 @@ export default function BalanceSheet() {
                 <label className="text-sm font-medium text-gray-700 mb-2 block">
                   Periode Pembanding
                 </label>
-                <Select value={comparisonPeriod} onValueChange={setComparisonPeriod}>
+                <Select
+                  value={comparisonPeriod}
+                  onValueChange={setComparisonPeriod}
+                >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="2023-12">Desember 2023</SelectItem>
-                    <SelectItem value="2023-11">November 2023</SelectItem>
-                    <SelectItem value="2023-10">Oktober 2023</SelectItem>
-                    <SelectItem value="2023-09">September 2023</SelectItem>
+                    <SelectItem value={`${currentYear - 1}-12-31`}>
+                      Desember {currentYear - 1}
+                    </SelectItem>
+                    <SelectItem value={`${currentYear - 1}-11-30`}>
+                      November {currentYear - 1}
+                    </SelectItem>
+                    <SelectItem value={`${currentYear - 1}-10-31`}>
+                      Oktober {currentYear - 1}
+                    </SelectItem>
+                    <SelectItem value={`${currentYear - 1}-09-30`}>
+                      September {currentYear - 1}
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -161,7 +274,13 @@ export default function BalanceSheet() {
         </Card>
 
         {/* Balance Check */}
-        <Card className={`border-2 ${isBalanced ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}`}>
+        <Card
+          className={`border-2 ${
+            isBalanced
+              ? "border-green-200 bg-green-50"
+              : "border-red-200 bg-red-50"
+          }`}
+        >
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
@@ -171,12 +290,20 @@ export default function BalanceSheet() {
                   <AlertCircle className="h-6 w-6 text-red-600" />
                 )}
                 <div>
-                  <h3 className={`font-medium ${isBalanced ? 'text-green-800' : 'text-red-800'}`}>
-                    Status Neraca: {isBalanced ? 'Seimbang' : 'Tidak Seimbang'}
+                  <h3
+                    className={`font-medium ${
+                      isBalanced ? "text-green-800" : "text-red-800"
+                    }`}
+                  >
+                    Status Neraca: {isBalanced ? "Seimbang" : "Tidak Seimbang"}
                   </h3>
-                  <p className={`text-sm ${isBalanced ? 'text-green-700' : 'text-red-700'}`}>
-                    Total Aktiva: {formatCurrency(totalAssets)} | 
-                    Total Pasiva + Modal: {formatCurrency(totalLiabilitiesAndEquity)}
+                  <p
+                    className={`text-sm ${
+                      isBalanced ? "text-green-700" : "text-red-700"
+                    }`}
+                  >
+                    Total Aktiva: {formatCurrency(totalAssets)} | Total Pasiva +
+                    Modal: {formatCurrency(totalLiabilitiesAndEquity)}
                   </p>
                 </div>
               </div>
@@ -184,7 +311,9 @@ export default function BalanceSheet() {
                 <div className="text-right">
                   <p className="text-sm text-red-600">Selisih:</p>
                   <p className="font-bold text-red-600">
-                    {formatCurrency(Math.abs(totalAssets - totalLiabilitiesAndEquity))}
+                    {formatCurrency(
+                      Math.abs(totalAssets - totalLiabilitiesAndEquity)
+                    )}
                   </p>
                 </div>
               )}
@@ -206,25 +335,13 @@ export default function BalanceSheet() {
               <div className="space-y-6">
                 {/* Current Assets */}
                 <div>
-                  <h4 className="font-semibold text-gray-900 mb-3">Aktiva Lancar</h4>
+                  <h4 className="font-semibold text-gray-900 mb-3">
+                    Aktiva Lancar
+                  </h4>
                   <div className="space-y-2">
-                    {balanceSheetData.assets.currentAssets.map((asset) => {
-                      const variance = getVariance(asset.current, asset.previous);
-                      return (
-                        <div key={asset.code} className="flex justify-between items-center py-1">
-                          <div>
-                            <span className="text-sm text-gray-600">{asset.code}</span>
-                            <p className="font-medium">{asset.name}</p>
-                          </div>
-                          <div className="text-right">
-                            <p className="font-medium">{formatCurrency(asset.current)}</p>
-                            <p className={`text-xs ${variance.amount >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                              {variance.amount >= 0 ? '+' : ''}{formatCurrency(variance.amount)}
-                            </p>
-                          </div>
-                        </div>
-                      );
-                    })}
+                    {balanceSheetData?.assets.currentAssets.map(
+                      renderAccountItem
+                    )}
                   </div>
                   <div className="border-t pt-2 mt-3">
                     <div className="flex justify-between items-center font-semibold">
@@ -236,25 +353,13 @@ export default function BalanceSheet() {
 
                 {/* Non-Current Assets */}
                 <div>
-                  <h4 className="font-semibold text-gray-900 mb-3">Aktiva Tidak Lancar</h4>
+                  <h4 className="font-semibold text-gray-900 mb-3">
+                    Aktiva Tidak Lancar
+                  </h4>
                   <div className="space-y-2">
-                    {balanceSheetData.assets.nonCurrentAssets.map((asset) => {
-                      const variance = getVariance(asset.current, asset.previous);
-                      return (
-                        <div key={asset.code} className="flex justify-between items-center py-1">
-                          <div>
-                            <span className="text-sm text-gray-600">{asset.code}</span>
-                            <p className="font-medium">{asset.name}</p>
-                          </div>
-                          <div className="text-right">
-                            <p className="font-medium">{formatCurrency(asset.current)}</p>
-                            <p className={`text-xs ${variance.amount >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                              {variance.amount >= 0 ? '+' : ''}{formatCurrency(variance.amount)}
-                            </p>
-                          </div>
-                        </div>
-                      );
-                    })}
+                    {balanceSheetData?.assets.nonCurrentAssets.map(
+                      renderAccountItem
+                    )}
                   </div>
                   <div className="border-t pt-2 mt-3">
                     <div className="flex justify-between items-center font-semibold">
@@ -287,25 +392,13 @@ export default function BalanceSheet() {
               <div className="space-y-6">
                 {/* Current Liabilities */}
                 <div>
-                  <h4 className="font-semibold text-gray-900 mb-3">Kewajiban Lancar</h4>
+                  <h4 className="font-semibold text-gray-900 mb-3">
+                    Kewajiban Lancar
+                  </h4>
                   <div className="space-y-2">
-                    {balanceSheetData.liabilities.currentLiabilities.map((liability) => {
-                      const variance = getVariance(liability.current, liability.previous);
-                      return (
-                        <div key={liability.code} className="flex justify-between items-center py-1">
-                          <div>
-                            <span className="text-sm text-gray-600">{liability.code}</span>
-                            <p className="font-medium">{liability.name}</p>
-                          </div>
-                          <div className="text-right">
-                            <p className="font-medium">{formatCurrency(liability.current)}</p>
-                            <p className={`text-xs ${variance.amount >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                              {variance.amount >= 0 ? '+' : ''}{formatCurrency(variance.amount)}
-                            </p>
-                          </div>
-                        </div>
-                      );
-                    })}
+                    {balanceSheetData?.liabilities.currentLiabilities.map(
+                      renderAccountItem
+                    )}
                   </div>
                   <div className="border-t pt-2 mt-3">
                     <div className="flex justify-between items-center font-semibold">
@@ -317,25 +410,13 @@ export default function BalanceSheet() {
 
                 {/* Non-Current Liabilities */}
                 <div>
-                  <h4 className="font-semibold text-gray-900 mb-3">Kewajiban Jangka Panjang</h4>
+                  <h4 className="font-semibold text-gray-900 mb-3">
+                    Kewajiban Jangka Panjang
+                  </h4>
                   <div className="space-y-2">
-                    {balanceSheetData.liabilities.nonCurrentLiabilities.map((liability) => {
-                      const variance = getVariance(liability.current, liability.previous);
-                      return (
-                        <div key={liability.code} className="flex justify-between items-center py-1">
-                          <div>
-                            <span className="text-sm text-gray-600">{liability.code}</span>
-                            <p className="font-medium">{liability.name}</p>
-                          </div>
-                          <div className="text-right">
-                            <p className="font-medium">{formatCurrency(liability.current)}</p>
-                            <p className={`text-xs ${variance.amount >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                              {variance.amount >= 0 ? '+' : ''}{formatCurrency(variance.amount)}
-                            </p>
-                          </div>
-                        </div>
-                      );
-                    })}
+                    {balanceSheetData?.liabilities.nonCurrentLiabilities.map(
+                      renderAccountItem
+                    )}
                   </div>
                   <div className="border-t pt-2 mt-3">
                     <div className="flex justify-between items-center font-semibold">
@@ -349,23 +430,7 @@ export default function BalanceSheet() {
                 <div>
                   <h4 className="font-semibold text-gray-900 mb-3">Modal</h4>
                   <div className="space-y-2">
-                    {balanceSheetData.equity.map((equity) => {
-                      const variance = getVariance(equity.current, equity.previous);
-                      return (
-                        <div key={equity.code} className="flex justify-between items-center py-1">
-                          <div>
-                            <span className="text-sm text-gray-600">{equity.code}</span>
-                            <p className="font-medium">{equity.name}</p>
-                          </div>
-                          <div className="text-right">
-                            <p className="font-medium">{formatCurrency(equity.current)}</p>
-                            <p className={`text-xs ${variance.amount >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                              {variance.amount >= 0 ? '+' : ''}{formatCurrency(variance.amount)}
-                            </p>
-                          </div>
-                        </div>
-                      );
-                    })}
+                    {balanceSheetData?.equity.map(renderAccountItem)}
                   </div>
                   <div className="border-t pt-2 mt-3">
                     <div className="flex justify-between items-center font-semibold">
@@ -398,30 +463,48 @@ export default function BalanceSheet() {
               <div className="text-center">
                 <p className="text-sm text-gray-600">Current Ratio</p>
                 <p className="text-2xl font-bold text-blue-600">
-                  {(totalCurrentAssets / totalCurrentLiabilities).toFixed(2)}
+                  {totalCurrentLiabilities > 0
+                    ? (totalCurrentAssets / totalCurrentLiabilities).toFixed(2)
+                    : "0.00"}
                 </p>
-                <p className="text-xs text-gray-500">Aktiva Lancar / Kewajiban Lancar</p>
+                <p className="text-xs text-gray-500">
+                  Aktiva Lancar / Kewajiban Lancar
+                </p>
               </div>
               <div className="text-center">
                 <p className="text-sm text-gray-600">Debt to Equity Ratio</p>
                 <p className="text-2xl font-bold text-orange-600">
-                  {(totalLiabilities / totalEquity).toFixed(2)}
+                  {totalEquity > 0
+                    ? (totalLiabilities / totalEquity).toFixed(2)
+                    : "0.00"}
                 </p>
-                <p className="text-xs text-gray-500">Total Kewajiban / Total Modal</p>
+                <p className="text-xs text-gray-500">
+                  Total Kewajiban / Total Modal
+                </p>
               </div>
               <div className="text-center">
                 <p className="text-sm text-gray-600">Equity Ratio</p>
                 <p className="text-2xl font-bold text-green-600">
-                  {((totalEquity / totalAssets) * 100).toFixed(1)}%
+                  {totalAssets > 0
+                    ? ((totalEquity / totalAssets) * 100).toFixed(1)
+                    : "0.0"}
+                  %
                 </p>
-                <p className="text-xs text-gray-500">Total Modal / Total Aktiva</p>
+                <p className="text-xs text-gray-500">
+                  Total Modal / Total Aktiva
+                </p>
               </div>
               <div className="text-center">
-                <p className="text-sm text-gray-600">Asset Growth</p>
+                <p className="text-sm text-gray-600">Debt Ratio</p>
                 <p className="text-2xl font-bold text-purple-600">
-                  {((totalAssets - 950000000) / 950000000 * 100).toFixed(1)}%
+                  {totalAssets > 0
+                    ? ((totalLiabilities / totalAssets) * 100).toFixed(1)
+                    : "0.0"}
+                  %
                 </p>
-                <p className="text-xs text-gray-500">Pertumbuhan dari periode sebelumnya</p>
+                <p className="text-xs text-gray-500">
+                  Total Kewajiban / Total Aktiva
+                </p>
               </div>
             </div>
           </CardContent>

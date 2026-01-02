@@ -20,6 +20,7 @@ import {
   TrendingUp,
   DollarSign,
   CheckSquare,
+  Wallet, // ✅ NEW for Manajemen Kas
 } from "lucide-react";
 
 interface NavItem {
@@ -54,7 +55,6 @@ const memberNavigation: NavItem[] = [
     children: [
       { title: "Overview", href: "/member/savings", icon: PiggyBank },
       { title: "Setoran", href: "/member/savings-deposit", icon: TrendingUp },
-      // { title: 'Riwayat', href: '/member/savings-history', icon: BookOpen },
     ],
   },
   {
@@ -74,6 +74,23 @@ const managerNavigation: NavItem[] = [
     title: "Manajemen Anggota",
     href: "/manager/members",
     icon: Users,
+  },
+  // ✅ NEW: Manajemen Kas Menu
+  {
+    title: "Manajemen Kas",
+    icon: Wallet,
+    children: [
+      { 
+        title: "Daftar Kas", 
+        href: "/manager/kas", 
+        icon: Wallet 
+      },
+      { 
+        title: "Pengelola Kas", 
+        href: "/manager/cash-managers", 
+        icon: Users 
+      },
+    ],
   },
   {
     title: "Manajemen Pinjaman",

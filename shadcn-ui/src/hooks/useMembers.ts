@@ -1,4 +1,6 @@
 // src/hooks/useMembers.ts
+// FINAL VERSION - Complete and correct field mapping
+
 import { useState, useEffect, useCallback } from 'react';
 import { memberService, type Member, type MemberListParams, type MemberStatistics, type UpdateMemberRequest } from '@/lib/api';
 
@@ -64,24 +66,41 @@ export function useMembers(params?: MemberListParams): UseMembersReturn {
     await Promise.all([fetchMembers(), fetchStatistics()]);
   }, [fetchMembers, fetchStatistics]);
 
-  // Create new member
+  /**
+   * Create new member
+   * Maps frontend field names to backend expected names
+   */
   const addMember = useCallback(async (memberData: any): Promise<Member> => {
     try {
-      const newMember = await memberService.createMember({
+      // Prepare payload with exact backend field names
+      const payload = {
         full_name: memberData.name,
         employee_id: memberData.member_id,
         email: memberData.email || undefined,
-        password: 'Password123!', // Default password, user should change later
-        password_confirmation: 'Password123!',
+        password: 'Password123!', // Default password
+        password_confirmation: 'Password123!', // Required by backend validation
         phone_number: memberData.phone || undefined,
         address: memberData.address || undefined,
+        work_unit: memberData.work_unit || undefined,
+        position: memberData.position || undefined,
         status: 'active',
-        joined_date: memberData.join_date
-      });
+        joined_at: memberData.join_date // ✅ Correct field name (not joined_date)
+      };
+
+      console.log('📤 Sending member data to backend:', payload);
+
+      const newMember = await memberService.createMember(payload);
+
+      console.log('✅ Member created successfully:', newMember);
+      console.log('🔐 Login credentials:');
+      console.log('   Email:', payload.email || 'N/A');
+      console.log('   Password: Password123!');
       
       await refetch();
       return newMember;
-    } catch (err) {
+    } catch (err: any) {
+      console.error('❌ Error creating member:', err);
+      console.error('Error response:', err.response?.data);
       throw err instanceof Error ? err : new Error('Gagal menambahkan anggota');
     }
   }, [refetch]);

@@ -89,6 +89,52 @@ export interface LoanSimulation {
   }>;
 }
 
+// ✅ NEW: Eligibility Check Types
+export interface LoanEligibility {
+  user: {
+    id: number;
+    full_name: string;
+    employee_id: string;
+    email: string;
+  };
+  loan_summary: {
+    active_loans_count: number;
+    max_loans_allowed: number;
+    remaining_slots: number;
+    total_principal_borrowed: number;
+    total_remaining_principal: number;
+    total_monthly_installment: number;
+    active_loans: Array<{
+      loan_number: string;
+      cash_account: string;
+      principal_amount: number;
+      remaining_principal: number;
+      monthly_installment: number;
+      status: string;
+    }>;
+  };
+  available_cash_accounts: Array<{
+    id: number;
+    code: string;
+    name: string;
+    type: string;
+    type_name: string;
+    can_apply: boolean;
+    reason: string | null;
+    current_interest_rate: number | null;
+  }>;
+  check_result?: {
+    cash_account: {
+      id: number;
+      code: string;
+      name: string;
+      type: string;
+    };
+    can_apply: boolean;
+    reason: string | null;
+  };
+}
+
 export interface CreateLoanData {
   user_id: number;
   cash_account_id: number;
@@ -255,6 +301,105 @@ const loansService = {
   }) => {
     const response = await apiClient.post("/loans/simulate", data);
     return response.data;
+  },
+
+  // ✅ NEW: Check loan eligibility (Problem 3 - Loan Limit)
+  /**
+   * Check if user can apply for loan in specific cash account
+   * Returns available cash accounts and loan limit status
+   */
+  checkEligibility: async (data: {
+    user_id: number;
+    cash_account_id?: number;
+  }): Promise<{ data: LoanEligibility }> => {
+    const response = await apiClient.post("/loans/check-eligibility", data);
+    return response.data;
+  },
+
+  // ==================== HELPER METHODS ====================
+
+  /**
+   * Helper: Format currency to IDR
+   */
+  formatCurrency: (amount: number | string): string => {
+    const numAmount = typeof amount === "string" ? parseFloat(amount) : amount;
+    return new Intl.NumberFormat("id-ID", {
+      style: "currency",
+      currency: "IDR",
+      minimumFractionDigits: 0,
+    }).format(numAmount);
+  },
+
+  /**
+   * Helper: Get status badge color
+   */
+  getStatusColor: (
+    status: string
+  ): "default" | "secondary" | "destructive" | "outline" => {
+    const colors: Record<
+      string,
+      "default" | "secondary" | "destructive" | "outline"
+    > = {
+      pending: "outline",
+      approved: "default",
+      rejected: "destructive",
+      active: "default",
+      completed: "secondary",
+      overdue: "destructive",
+    };
+    return colors[status] || "default";
+  },
+
+  /**
+   * Helper: Get status label in Indonesian
+   */
+  getStatusLabel: (status: string): string => {
+    const labels: Record<string, string> = {
+      pending: "Menunggu Persetujuan",
+      approved: "Disetujui",
+      rejected: "Ditolak",
+      active: "Aktif",
+      completed: "Lunas",
+      overdue: "Terlambat",
+    };
+    return labels[status] || status;
+  },
+
+  /**
+   * Helper: Parse numeric value (handles string/number)
+   */
+  parseAmount: (amount: string | number): number => {
+    return typeof amount === "string" ? parseFloat(amount) : amount;
+  },
+
+  /**
+   * Helper: Calculate total from installments
+   */
+  calculateTotal: (
+    principal: string | number,
+    interest: string | number
+  ): number => {
+    const p = loansService.parseAmount(principal);
+    const i = loansService.parseAmount(interest);
+    return p + i;
+  },
+
+  /**
+   * Helper: Check if loan is overdue
+   */
+  isOverdue: (dueDate: string): boolean => {
+    return new Date(dueDate) < new Date();
+  },
+
+  /**
+   * Helper: Get days until due
+   */
+  getDaysUntilDue: (dueDate: string): number => {
+    const today = new Date();
+    const due = new Date(dueDate);
+    const diffTime = due.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays;
   },
 };
 

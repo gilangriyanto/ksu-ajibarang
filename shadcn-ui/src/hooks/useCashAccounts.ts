@@ -1,424 +1,436 @@
-import { useState, useEffect } from "react";
+// hooks/useCashAccounts.ts
+// FINAL VERSION - Merged best features from both versions
+// Complete with interest rates, managers, and proper error handling
+
+import { useState, useEffect, useCallback } from "react";
 import cashAccountsService, {
   CashAccount,
   CashAccountSummary,
-  InterestRatesData,
-  CurrentRate,
+  Manager,
   CreateCashAccountData,
   UpdateCashAccountData,
   AssignManagerData,
-  CreateInterestRateData,
-  UpdateInterestRateData,
-} from "@/lib/api/cashAccounts.service";
+} from "@/lib/api/cash-accounts.service";
 import { toast } from "sonner";
 
 interface UseCashAccountsOptions {
+  type?: string;
+  is_active?: boolean;
   autoLoad?: boolean;
   all?: boolean;
 }
 
-export default function useCashAccounts(options: UseCashAccountsOptions = {}) {
+export const useCashAccounts = (options: UseCashAccountsOptions = {}) => {
   const { autoLoad = true, all = false } = options;
 
   const [cashAccounts, setCashAccounts] = useState<CashAccount[]>([]);
   const [summary, setSummary] = useState<CashAccountSummary | null>(null);
-  const [currentRates, setCurrentRates] = useState<CurrentRate[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Load data on mount
-  useEffect(() => {
-    if (autoLoad) {
-      loadCashAccounts();
-      loadSummary();
-      loadCurrentRates();
-    }
-  }, [autoLoad]);
-
   /**
-   * Load all cash accounts
+   * Load all cash accounts with filters
    */
-  const loadCashAccounts = async () => {
+  const loadCashAccounts = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await cashAccountsService.getAll({ all });
-      console.log("✅ Cash accounts loaded:", response);
+      console.log("🔄 Loading cash accounts with options:", options);
 
+      const response = await cashAccountsService.getAll({
+        type: options.type,
+        is_active: options.is_active,
+        all,
+      });
+
+      console.log("📋 Cash Accounts API response:", response);
+
+      // Handle both response structures
+      let accountsData: CashAccount[] = [];
+      
       if (response.success && Array.isArray(response.data)) {
-        setCashAccounts(response.data);
-      } else {
-        throw new Error(response.message || "Failed to load cash accounts");
+        accountsData = response.data;
+      } else if (Array.isArray(response.data)) {
+        accountsData = response.data;
+      } else if (response.data?.data && Array.isArray(response.data.data)) {
+        accountsData = response.data.data;
       }
+
+      console.log("📋 Parsed cash accounts:", accountsData.length);
+
+      setCashAccounts(accountsData);
+
+      return accountsData;
     } catch (err: any) {
       console.error("❌ Error loading cash accounts:", err);
-      const errorMessage =
+      
+      // Handle 403 specially (no access)
+      if (err.response?.status === 403) {
+        const errorMsg = "Anda tidak memiliki akses ke data kas";
+        setError(errorMsg);
+        toast.error(errorMsg);
+        setCashAccounts([]);
+        return [];
+      }
+      
+      const errorMsg =
         err.response?.data?.message ||
         err.message ||
-        "Failed to load cash accounts";
-      setError(errorMessage);
-      toast.error(errorMessage);
+        "Gagal memuat data kas";
+      setError(errorMsg);
+      toast.error(errorMsg);
+      throw err;
     } finally {
       setLoading(false);
     }
-  };
+  }, [options.type, options.is_active, all]);
 
   /**
    * Load cash accounts summary
    */
-  const loadSummary = async () => {
+  const loadSummary = useCallback(async () => {
     try {
-      const response = await cashAccountsService.getSummary();
-      console.log("✅ Summary loaded:", response);
+      console.log("📊 Loading cash accounts summary");
 
-      if (response.success && response.data) {
-        setSummary(response.data);
+      const response = await cashAccountsService.getSummary();
+      console.log("📊 Summary response:", response);
+
+      const summaryData = response.success ? response.data : response.data;
+
+      if (summaryData) {
+        setSummary(summaryData);
+        return summaryData;
       }
     } catch (err: any) {
       console.error("❌ Error loading summary:", err);
+      // Summary is optional, don't throw
     }
-  };
+  }, []);
 
   /**
-   * Load current rates for all accounts
+   * Get single cash account by ID
    */
-  const loadCurrentRates = async () => {
+  const getCashAccountById = useCallback(async (id: number) => {
+    setLoading(true);
+    setError(null);
     try {
-      const response = await cashAccountsService.getCurrentRates();
-      console.log("✅ Current rates loaded:", response);
+      console.log("🔍 Loading cash account detail:", id);
 
-      if (response.success && Array.isArray(response.data)) {
-        setCurrentRates(response.data);
-      }
-    } catch (err: any) {
-      console.error("❌ Error loading current rates:", err);
-    }
-  };
-
-  /**
-   * Get cash account by ID
-   */
-  const getCashAccountById = async (id: number) => {
-    try {
       const response = await cashAccountsService.getById(id);
-      console.log("✅ Cash account loaded:", response);
+      const accountData = response.success ? response.data : response.data;
 
-      if (response.success && response.data) {
-        return response.data;
-      }
-      throw new Error(response.message || "Failed to load cash account");
+      console.log("✅ Cash account detail loaded:", accountData);
+
+      return accountData;
     } catch (err: any) {
-      console.error("❌ Error loading cash account:", err);
-      toast.error(
-        err.response?.data?.message ||
-          err.message ||
-          "Failed to load cash account"
-      );
+      console.error("❌ Error loading cash account detail:", err);
+      
+      if (err.response?.status === 403) {
+        toast.error("Anda tidak memiliki akses ke kas ini");
+      } else if (err.response?.status === 404) {
+        toast.error("Kas tidak ditemukan");
+      } else {
+        toast.error("Gagal memuat detail kas");
+      }
       throw err;
+    } finally {
+      setLoading(false);
     }
-  };
+  }, []);
 
   /**
    * Create new cash account
    */
-  const createCashAccount = async (data: CreateCashAccountData) => {
-    try {
-      const response = await cashAccountsService.create(data);
-      console.log("✅ Cash account created:", response);
+  const createCashAccount = useCallback(
+    async (data: CreateCashAccountData) => {
+      setLoading(true);
+      try {
+        console.log("📤 Creating cash account:", data);
 
-      if (response.success) {
-        toast.success(response.message || "Cash account created successfully");
-        await loadCashAccounts();
-        await loadSummary();
-        return response.data;
-      }
-      throw new Error(response.message || "Failed to create cash account");
-    } catch (err: any) {
-      console.error("❌ Error creating cash account:", err);
+        const response = await cashAccountsService.create(data);
 
-      if (err.response?.status === 422 && err.response?.data?.errors) {
-        const apiErrors = err.response.data.errors;
-        const errorMessages = Object.values(apiErrors).flat().join(", ");
-        toast.error(errorMessages);
-      } else {
-        toast.error(
-          err.response?.data?.message ||
-            err.message ||
-            "Failed to create cash account"
+        console.log("✅ Cash account created:", response);
+
+        toast.success(
+          response.message || "Kas berhasil dibuat"
         );
+
+        // Reload cash accounts
+        await loadCashAccounts();
+        if (summary) await loadSummary();
+
+        return response.success ? response.data : response.data;
+      } catch (err: any) {
+        console.error("❌ Error creating cash account:", err);
+
+        // Handle validation errors (422)
+        if (err.response?.status === 422 && err.response?.data?.errors) {
+          const apiErrors = err.response.data.errors;
+          const errorMessages = Object.values(apiErrors).flat().join(", ");
+          toast.error(errorMessages);
+        } else {
+          const errorMsg =
+            err.response?.data?.message ||
+            err.message ||
+            "Gagal membuat kas";
+          toast.error(errorMsg);
+        }
+
+        throw err;
+      } finally {
+        setLoading(false);
       }
-      throw err;
-    }
-  };
+    },
+    [loadCashAccounts, loadSummary, summary]
+  );
 
   /**
    * Update cash account
    */
-  const updateCashAccount = async (id: number, data: UpdateCashAccountData) => {
-    try {
-      const response = await cashAccountsService.update(id, data);
-      console.log("✅ Cash account updated:", response);
+  const updateCashAccount = useCallback(
+    async (id: number, data: UpdateCashAccountData) => {
+      setLoading(true);
+      try {
+        console.log("📤 Updating cash account:", id, data);
 
-      if (response.success) {
-        toast.success(response.message || "Cash account updated successfully");
-        await loadCashAccounts();
-        await loadSummary();
-        return response.data;
-      }
-      throw new Error(response.message || "Failed to update cash account");
-    } catch (err: any) {
-      console.error("❌ Error updating cash account:", err);
+        const response = await cashAccountsService.update(id, data);
 
-      if (err.response?.status === 422 && err.response?.data?.errors) {
-        const apiErrors = err.response.data.errors;
-        const errorMessages = Object.values(apiErrors).flat().join(", ");
-        toast.error(errorMessages);
-      } else {
-        toast.error(
-          err.response?.data?.message ||
-            err.message ||
-            "Failed to update cash account"
+        console.log("✅ Cash account updated:", response);
+
+        toast.success(
+          response.message || "Kas berhasil diperbarui"
         );
+
+        // Reload cash accounts
+        await loadCashAccounts();
+        if (summary) await loadSummary();
+
+        return response.success ? response.data : response.data;
+      } catch (err: any) {
+        console.error("❌ Error updating cash account:", err);
+
+        // Handle validation errors (422)
+        if (err.response?.status === 422 && err.response?.data?.errors) {
+          const apiErrors = err.response.data.errors;
+          const errorMessages = Object.values(apiErrors).flat().join(", ");
+          toast.error(errorMessages);
+        } else {
+          const errorMsg =
+            err.response?.data?.message ||
+            err.message ||
+            "Gagal memperbarui kas";
+          toast.error(errorMsg);
+        }
+
+        throw err;
+      } finally {
+        setLoading(false);
       }
-      throw err;
-    }
-  };
+    },
+    [loadCashAccounts, loadSummary, summary]
+  );
 
   /**
    * Delete cash account
    */
-  const deleteCashAccount = async (id: number) => {
-    try {
-      const response = await cashAccountsService.delete(id);
-      console.log("✅ Cash account deleted:", response);
+  const deleteCashAccount = useCallback(
+    async (id: number) => {
+      setLoading(true);
+      try {
+        console.log("🗑️ Deleting cash account:", id);
 
-      if (response.success) {
-        toast.success(response.message || "Cash account deleted successfully");
+        const response = await cashAccountsService.delete(id);
+
+        console.log("✅ Cash account deleted");
+
+        toast.success(
+          response.message || "Kas berhasil dihapus"
+        );
+
+        // Reload cash accounts
         await loadCashAccounts();
-        await loadSummary();
+        if (summary) await loadSummary();
+
         return true;
-      }
-      throw new Error(response.message || "Failed to delete cash account");
-    } catch (err: any) {
-      console.error("❌ Error deleting cash account:", err);
-      toast.error(
-        err.response?.data?.message ||
-          err.message ||
-          "Failed to delete cash account"
-      );
-      throw err;
-    }
-  };
+      } catch (err: any) {
+        console.error("❌ Error deleting cash account:", err);
 
-  /**
-   * Get interest rates for cash account
-   */
-  const getInterestRates = async (
-    cashAccountId: number
-  ): Promise<InterestRatesData> => {
-    try {
-      const response = await cashAccountsService.getInterestRates(
-        cashAccountId
-      );
-      console.log("✅ Interest rates loaded:", response);
-
-      if (response.success && response.data) {
-        return response.data;
-      }
-      throw new Error(response.message || "Failed to load interest rates");
-    } catch (err: any) {
-      console.error("❌ Error loading interest rates:", err);
-      toast.error(
-        err.response?.data?.message ||
-          err.message ||
-          "Failed to load interest rates"
-      );
-      throw err;
-    }
-  };
-
-  /**
-   * Create interest rate
-   */
-  const createInterestRate = async (
-    cashAccountId: number,
-    data: CreateInterestRateData
-  ) => {
-    try {
-      const response = await cashAccountsService.createInterestRate(
-        cashAccountId,
-        data
-      );
-      console.log("✅ Interest rate created:", response);
-
-      if (response.success) {
-        toast.success(response.message || "Interest rate created successfully");
-        await loadCurrentRates();
-        return response.data;
-      }
-      throw new Error(response.message || "Failed to create interest rate");
-    } catch (err: any) {
-      console.error("❌ Error creating interest rate:", err);
-
-      if (err.response?.status === 422 && err.response?.data?.errors) {
-        const apiErrors = err.response.data.errors;
-        const errorMessages = Object.values(apiErrors).flat().join(", ");
-        toast.error(errorMessages);
-      } else {
-        toast.error(
+        const errorMsg =
           err.response?.data?.message ||
-            err.message ||
-            "Failed to create interest rate"
-        );
-      }
-      throw err;
-    }
-  };
-
-  /**
-   * Update interest rate
-   */
-  const updateInterestRate = async (
-    rateId: number,
-    data: UpdateInterestRateData
-  ) => {
-    try {
-      const response = await cashAccountsService.updateInterestRate(
-        rateId,
-        data
-      );
-      console.log("✅ Interest rate updated:", response);
-
-      if (response.success) {
-        toast.success(response.message || "Interest rate updated successfully");
-        await loadCurrentRates();
-        return response.data;
-      }
-      throw new Error(response.message || "Failed to update interest rate");
-    } catch (err: any) {
-      console.error("❌ Error updating interest rate:", err);
-
-      if (err.response?.status === 422 && err.response?.data?.errors) {
-        const apiErrors = err.response.data.errors;
-        const errorMessages = Object.values(apiErrors).flat().join(", ");
-        toast.error(errorMessages);
-      } else {
-        toast.error(
-          err.response?.data?.message ||
-            err.message ||
-            "Failed to update interest rate"
-        );
-      }
-      throw err;
-    }
-  };
-
-  /**
-   * Delete interest rate
-   */
-  const deleteInterestRate = async (rateId: number) => {
-    try {
-      const response = await cashAccountsService.deleteInterestRate(rateId);
-      console.log("✅ Interest rate deleted:", response);
-
-      if (response.success) {
-        toast.success(response.message || "Interest rate deleted successfully");
-        await loadCurrentRates();
-        return true;
-      }
-      throw new Error(response.message || "Failed to delete interest rate");
-    } catch (err: any) {
-      console.error("❌ Error deleting interest rate:", err);
-      toast.error(
-        err.response?.data?.message ||
           err.message ||
-          "Failed to delete interest rate"
-      );
+          "Gagal menghapus kas";
+        toast.error(errorMsg);
+
+        throw err;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [loadCashAccounts, loadSummary, summary]
+  );
+
+  /**
+   * Get managers for specific cash account
+   */
+  const getManagers = useCallback(async (cashAccountId: number) => {
+    try {
+      console.log("👥 Loading managers for cash account:", cashAccountId);
+
+      const response = await cashAccountsService.getManagers(cashAccountId);
+      const managersData = response.success 
+        ? response.data 
+        : response.data || [];
+
+      console.log("✅ Managers loaded:", managersData.length);
+
+      return managersData;
+    } catch (err: any) {
+      console.error("❌ Error loading managers:", err);
+      toast.error("Gagal memuat data pengelola");
       throw err;
     }
-  };
+  }, []);
+
+  /**
+   * Get available managers (for assignment)
+   */
+  const getAvailableManagers = useCallback(async () => {
+    try {
+      console.log("👥 Loading available managers");
+
+      const response = await cashAccountsService.getAvailableManagers();
+      const managersData = response.success 
+        ? response.data 
+        : response.data || [];
+
+      console.log("✅ Available managers loaded:", managersData.length);
+
+      return managersData;
+    } catch (err: any) {
+      console.error("❌ Error loading available managers:", err);
+      toast.error("Gagal memuat daftar manager");
+      throw err;
+    }
+  }, []);
 
   /**
    * Assign manager to cash account
    */
-  const assignManager = async (
-    cashAccountId: number,
-    data: AssignManagerData
-  ) => {
-    try {
-      const response = await cashAccountsService.assignManager(
-        cashAccountId,
-        data
-      );
-      console.log("✅ Manager assigned:", response);
+  const assignManager = useCallback(
+    async (cashAccountId: number, data: AssignManagerData) => {
+      setLoading(true);
+      try {
+        console.log("📤 Assigning manager:", cashAccountId, data);
 
-      if (response.success) {
-        toast.success(response.message || "Manager assigned successfully");
+        const response = await cashAccountsService.assignManager(
+          cashAccountId,
+          data
+        );
+
+        console.log("✅ Manager assigned:", response);
+
+        toast.success(
+          response.message || "Manager berhasil ditugaskan"
+        );
+
         await loadCashAccounts();
-        return response.data;
+
+        return response.success ? response.data : response.data;
+      } catch (err: any) {
+        console.error("❌ Error assigning manager:", err);
+
+        const errorMsg =
+          err.response?.data?.message ||
+          err.message ||
+          "Gagal menugaskan manager";
+        toast.error(errorMsg);
+
+        throw err;
+      } finally {
+        setLoading(false);
       }
-      throw new Error(response.message || "Failed to assign manager");
-    } catch (err: any) {
-      console.error("❌ Error assigning manager:", err);
-      toast.error(
-        err.response?.data?.message || err.message || "Failed to assign manager"
-      );
-      throw err;
-    }
-  };
+    },
+    [loadCashAccounts]
+  );
 
   /**
    * Remove manager from cash account
    */
-  const removeManager = async (cashAccountId: number, managerId: number) => {
-    try {
-      const response = await cashAccountsService.removeManager(
-        cashAccountId,
-        managerId
-      );
-      console.log("✅ Manager removed:", response);
+  const removeManager = useCallback(
+    async (cashAccountId: number, managerId: number) => {
+      setLoading(true);
+      try {
+        console.log("🗑️ Removing manager:", cashAccountId, managerId);
 
-      if (response.success) {
-        toast.success(response.message || "Manager removed successfully");
+        const response = await cashAccountsService.removeManager(
+          cashAccountId,
+          managerId
+        );
+
+        console.log("✅ Manager removed");
+
+        toast.success(
+          response.message || "Manager berhasil dihapus"
+        );
+
         await loadCashAccounts();
+
         return true;
+      } catch (err: any) {
+        console.error("❌ Error removing manager:", err);
+
+        const errorMsg =
+          err.response?.data?.message ||
+          err.message ||
+          "Gagal menghapus manager";
+        toast.error(errorMsg);
+
+        throw err;
+      } finally {
+        setLoading(false);
       }
-      throw new Error(response.message || "Failed to remove manager");
-    } catch (err: any) {
-      console.error("❌ Error removing manager:", err);
-      toast.error(
-        err.response?.data?.message || err.message || "Failed to remove manager"
-      );
-      throw err;
-    }
-  };
+    },
+    [loadCashAccounts]
+  );
 
   /**
    * Refresh all data
    */
-  const refresh = async () => {
-    await loadCashAccounts();
-    await loadSummary();
-    await loadCurrentRates();
-  };
+  const refresh = useCallback(async () => {
+    await Promise.all([loadCashAccounts(), loadSummary()]);
+  }, [loadCashAccounts, loadSummary]);
+
+  // Auto-load on mount if enabled
+  useEffect(() => {
+    if (autoLoad) {
+      loadCashAccounts();
+      loadSummary();
+    }
+  }, [autoLoad, loadCashAccounts, loadSummary]);
 
   return {
+    // State
     cashAccounts,
     summary,
-    currentRates,
     loading,
     error,
+
+    // Actions - Cash Accounts
     loadCashAccounts,
     getCashAccountById,
     createCashAccount,
     updateCashAccount,
     deleteCashAccount,
-    getInterestRates,
-    createInterestRate,
-    updateInterestRate,
-    deleteInterestRate,
+
+    // Actions - Managers
+    getManagers,
+    getAvailableManagers,
     assignManager,
     removeManager,
+
+    // Utility
     refresh,
   };
-}
+};
+
+export default useCashAccounts;

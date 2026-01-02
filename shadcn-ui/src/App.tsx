@@ -26,6 +26,10 @@ import IncomeStatement from "./pages/manager/IncomeStatement";
 import Reports from "./pages/manager/Reports";
 import Settings from "./pages/manager/Settings";
 
+// ✅ NEW: Import Manajemen Kas
+import CashAccountsPage from "./pages/manager/kas";
+import CashAccountDetailPage from "./pages/manager/kas/Detail";
+
 // Kas Pages
 import KasDashboard from "./pages/kas/KasDashboard";
 import KasLoanManagement from "./pages/kas/KasLoanManagement";
@@ -104,6 +108,27 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
+            
+            {/* ✅ NEW: Manajemen Kas Route */}
+            <Route
+              path="/manager/kas"
+              element={
+                <ProtectedRoute allowedRoles={["manager", "admin"]}>
+                  <CashAccountsPage />
+                </ProtectedRoute>
+              }
+            />
+            
+            {/* ✅ NEW: Manajemen Kas Detail Route */}
+            <Route
+              path="/manager/kas/:id"
+              element={
+                <ProtectedRoute allowedRoles={["manager", "admin"]}>
+                  <CashAccountDetailPage />
+                </ProtectedRoute>
+              }
+            />
+            
             <Route
               path="/manager/savings"
               element={

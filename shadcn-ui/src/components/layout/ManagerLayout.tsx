@@ -21,6 +21,7 @@ import {
   TrendingUp,
   Wallet,
   DollarSign,
+  UserCog, // ✅ NEW for Pengelola Kas
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -45,6 +46,15 @@ export function ManagerLayout({ children }: ManagerLayoutProps) {
       href: "/manager/members",
       icon: Users,
       current: location.pathname === "/manager/members",
+    },
+    // ✅ NEW: Manajemen Kas
+    {
+      name: "Manajemen Kas",
+      href: "/manager/kas",
+      icon: Wallet,
+      current: location.pathname.startsWith("/manager/kas") || 
+              location.pathname.startsWith("/manager/cash-managers"),
+      badge: null, // Could show number of managed accounts
     },
     {
       name: "Manajemen Simpanan",
@@ -94,18 +104,6 @@ export function ManagerLayout({ children }: ManagerLayoutProps) {
       icon: TrendingUp,
       current: location.pathname === "/manager/income-statement",
     },
-    // {
-    //   name: "Laporan & Analitik",
-    //   href: "/manager/reports",
-    //   icon: FileText,
-    //   current: location.pathname === "/manager/reports",
-    // },
-    // {
-    //   name: "Pengaturan",
-    //   href: "/manager/settings",
-    //   icon: Settings,
-    //   current: location.pathname === "/manager/settings",
-    // },
   ];
 
   // Mock manager data

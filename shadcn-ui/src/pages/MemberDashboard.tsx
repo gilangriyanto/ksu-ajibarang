@@ -150,7 +150,7 @@ export default function MemberDashboard() {
                 <div>
                   <p className="text-sm text-gray-600">Tanggal Bergabung</p>
                   <p className="font-semibold">
-                    {data.profile.joined_date || "N/A"}
+                    {data.profile.joined_at || "N/A"}
                   </p>
                 </div>
                 <div>

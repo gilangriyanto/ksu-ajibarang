@@ -1,36 +1,44 @@
-// =====================================================
-// FIXED: MemberLoans.tsx (Member)
-// =====================================================
+// pages/member/MemberLoans.tsx
+// ✅ UPDATED: Filter API errors - hide balance check errors from member
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { MemberLayout } from "@/components/layout/MemberLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Eye, DollarSign, Calendar, RefreshCw } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import axios from "axios";
+import { toast } from "sonner";
 
 // ✅ Import the hooks
 import useLoans from "@/hooks/useLoans";
 import useInstallments from "@/hooks/useInstallments";
-import useLoanSimulation from "@/hooks/useLoanSimulation";
 
-// ✅ CRITICAL: Import modal components (named exports)
+// ✅ Import modal components
 import { LoanApplicationModal } from "@/components/modals/LoanApplicationModal";
 import { LoanDetailModal } from "@/components/modals/LoanDetailModal";
 import { LoanPaymentModal } from "@/components/modals/LoanPaymentModal";
+
+interface CashAccount {
+  id: number;
+  code: string;
+  name: string;
+  description?: string;
+  interest_rate: number;
+  max_amount: number;
+}
 
 export default function MemberLoans() {
   const { user } = useAuth();
 
   // ✅ Use the hooks (filtered by user_id)
   const { loans, summary, loading, createLoan, refresh } = useLoans({
-    user_id: user?.id, // Member only sees their own loans
+    user_id: user?.id,
     autoLoad: true,
   });
 
-  const { installments, getInstallments, payInstallment } = useInstallments();
-  const { simulate, simulation } = useLoanSimulation();
+  const { installments, getInstallments } = useInstallments();
 
   // ✅ Local state for modals
   const [selectedLoan, setSelectedLoan] = useState(null);
@@ -38,23 +46,75 @@ export default function MemberLoans() {
   const [detailModal, setDetailModal] = useState(false);
   const [paymentModal, setPaymentModal] = useState(false);
 
-  // Mock availableKas data - replace with actual API call
-  const availableKas = [
-    {
-      id: 1,
-      name: "Kas Umum",
-      description: "Pinjaman dengan bunga standar untuk kebutuhan umum",
-      interest_rate: 12,
-      max_amount: 50000000,
-    },
-    {
-      id: 3,
-      name: "Kas Sebrakan",
-      description: "Pinjaman tanpa bunga untuk kebutuhan mendesak",
-      interest_rate: 0,
-      max_amount: 10000000,
-    },
-  ];
+  // ✅ State for cash accounts from API
+  const [availableKas, setAvailableKas] = useState<CashAccount[]>([]);
+  const [loadingKas, setLoadingKas] = useState(false);
+
+  // ✅ Load cash accounts on mount
+  useEffect(() => {
+    loadCashAccounts();
+  }, []);
+
+  // ✅ Load cash accounts from API
+  const loadCashAccounts = async () => {
+    setLoadingKas(true);
+    try {
+      const token = localStorage.getItem("token");
+      console.log("🔍 Loading cash accounts for member...");
+
+      const response = await axios.get(
+        "https://ksp.gascpns.id/api/cash-accounts",
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      console.log("✅ Cash accounts loaded:", response.data);
+
+      let accountsList: CashAccount[] = [];
+
+      if (response.data.success && Array.isArray(response.data.data)) {
+        accountsList = response.data.data;
+      } else if (Array.isArray(response.data)) {
+        accountsList = response.data;
+      }
+
+      // ✅ Filter only Kas I (id: 1) and Kas III (id: 3) for member loans
+      const memberKas = accountsList.filter(
+        (kas) => kas.id === 1 || kas.id === 3
+      );
+
+      setAvailableKas(memberKas);
+      console.log(`🏦 Found ${memberKas.length} available kas for member`);
+    } catch (err: any) {
+      console.error("❌ Error loading cash accounts:", err);
+
+      // Use mock data as fallback
+      console.warn("⚠️ Using mock cash accounts");
+      setAvailableKas([
+        {
+          id: 1,
+          code: "KAS-I",
+          name: "Kas Umum",
+          description: "Pinjaman dengan bunga standar untuk kebutuhan umum",
+          interest_rate: 12,
+          max_amount: 50000000,
+        },
+        {
+          id: 3,
+          code: "KAS-III",
+          name: "Kas Sebrakan",
+          description: "Pinjaman tanpa bunga untuk kebutuhan mendesak",
+          interest_rate: 0,
+          max_amount: 10000000,
+        },
+      ]);
+
+      toast.warning("Menggunakan data kas default");
+    } finally {
+      setLoadingKas(false);
+    }
+  };
 
   // ✅ Format helpers
   const formatCurrency = (amount: number | string) => {
@@ -87,8 +147,11 @@ export default function MemberLoans() {
     try {
       if (!user?.id) {
         console.error("User ID not found");
+        toast.error("User ID tidak ditemukan");
         return;
       }
+
+      console.log("📤 Applying for loan:", formData);
 
       await createLoan({
         user_id: user.id,
@@ -98,30 +161,71 @@ export default function MemberLoans() {
         application_date: new Date().toISOString().split("T")[0],
         loan_purpose: formData.loan_purpose,
       });
+
+      toast.success("Pengajuan pinjaman berhasil!");
       setApplicationModal(false);
-      refresh(); // Reload data after apply
-    } catch (err) {
+      refresh();
+    } catch (err: any) {
       console.error("Error applying loan:", err);
+      
+      // ✅ CRITICAL: Filter errors - only show relevant errors to member
+      if (err.response?.data?.errors) {
+        const errors = err.response.data.errors;
+        console.log("📋 API Errors:", errors);
+        
+        // ✅ Filter: Only show cash_account_id errors (loan limit)
+        // Hide principal_amount errors (balance check - admin concern)
+        const memberRelevantErrors: string[] = [];
+        
+        if (errors.cash_account_id) {
+          memberRelevantErrors.push(...errors.cash_account_id);
+        }
+        
+        if (errors.user_id) {
+          memberRelevantErrors.push(...errors.user_id);
+        }
+        
+        if (errors.tenure_months) {
+          memberRelevantErrors.push(...errors.tenure_months);
+        }
+        
+        if (errors.loan_purpose) {
+          memberRelevantErrors.push(...errors.loan_purpose);
+        }
+        
+        if (errors.application_date) {
+          memberRelevantErrors.push(...errors.application_date);
+        }
+        
+        // ✅ Show filtered errors or generic message
+        if (memberRelevantErrors.length > 0) {
+          toast.error(memberRelevantErrors.join("\n"), {
+            duration: 5000, // Show longer for multiple errors
+          });
+        } else {
+          // If only balance errors (which we hide), show generic message
+          toast.error("Pengajuan tidak dapat diproses saat ini. Silakan hubungi admin.");
+        }
+      } else {
+        // Generic error fallback
+        toast.error(err.message || "Gagal mengajukan pinjaman");
+      }
     }
   };
 
-  // ✅ Handle view detail - FIXED
   const handleViewDetail = (loan: any) => {
     console.log("🔍 Opening detail for loan:", loan);
     setSelectedLoan(loan);
     setDetailModal(true);
   };
 
-  // ✅ Handle payment click - FIXED
   const handlePaymentClick = async (loan: any) => {
     console.log("💰 Opening payment for loan:", loan);
     setSelectedLoan(loan);
-    // Load installments first to get upcoming installment
     await getInstallments(loan.id);
     setPaymentModal(true);
   };
 
-  // Get next unpaid installment
   const getUpcomingInstallment = () => {
     if (!installments || installments.length === 0) return null;
     return (
@@ -148,7 +252,6 @@ export default function MemberLoans() {
     return sum + (amount || 0);
   }, 0);
 
-  // ✅ Calculate progress
   const calculateProgress = (loan: any) => {
     const paid = loan.paid_installments || 0;
     const total = loan.total_installments || loan.tenure_months || 1;
@@ -166,7 +269,6 @@ export default function MemberLoans() {
     );
   }
 
-  // ✅ Render UI
   return (
     <MemberLayout>
       <div className="space-y-6">
@@ -181,9 +283,10 @@ export default function MemberLoans() {
               console.log("➕ Opening loan application modal");
               setApplicationModal(true);
             }}
+            disabled={loadingKas}
           >
             <Plus className="h-4 w-4 mr-2" />
-            Ajukan Pinjaman
+            {loadingKas ? "Memuat..." : "Ajukan Pinjaman"}
           </Button>
         </div>
 
@@ -276,7 +379,6 @@ export default function MemberLoans() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {/* Progress Bar */}
                     <div className="w-full bg-gray-200 rounded-full h-2">
                       <div
                         className="bg-green-600 h-2 rounded-full transition-all"
@@ -365,7 +467,7 @@ export default function MemberLoans() {
         )}
       </div>
 
-      {/* ✅ CRITICAL FIX: Render modal components at the bottom */}
+      {/* Modals */}
       <LoanApplicationModal
         isOpen={applicationModal}
         onClose={() => setApplicationModal(false)}
@@ -392,15 +494,10 @@ export default function MemberLoans() {
         }}
         onSuccess={async () => {
           console.log("🔄 Payment successful, refreshing data...");
-
-          // Reload loans data
           await refresh();
-
-          // Reload installments for the loan
           if (selectedLoan) {
             await getInstallments(selectedLoan.id);
           }
-
           console.log("✅ Data refreshed successfully");
         }}
         upcomingInstallment={getUpcomingInstallment()}

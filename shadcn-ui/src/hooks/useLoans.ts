@@ -122,6 +122,7 @@ export const useLoans = (options: UseLoansOptions = {}) => {
 
   /**
    * Create new loan application
+   * ✅ FIXED: Don't show toast in hook - let parent handle error display
    */
   const createLoan = useCallback(
     async (data: CreateLoanData) => {
@@ -142,13 +143,22 @@ export const useLoans = (options: UseLoansOptions = {}) => {
       } catch (err: any) {
         console.error("❌ Error creating loan:", err);
 
-        const errorMsg =
-          err.data?.message ||
-          err.message ||
-          "Gagal membuat pengajuan pinjaman";
-        toast.error(errorMsg);
-
-        throw err;
+        // ✅ REMOVED: Don't show toast.error here
+        // Let parent component handle error display with filtering
+        
+        // ✅ Create enriched error object
+        const apiError: any = new Error(
+          err.data?.message || err.message || "Gagal membuat pengajuan pinjaman"
+        );
+        
+        // ✅ CRITICAL: Attach response so parent can access errors
+        apiError.response = err.response || {
+          data: err.data,
+          status: err.status,
+        };
+        
+        // ✅ Re-throw to parent component
+        throw apiError;
       } finally {
         setLoading(false);
       }

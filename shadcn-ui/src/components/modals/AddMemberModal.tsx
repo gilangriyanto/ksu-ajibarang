@@ -70,20 +70,22 @@ export const AddMemberModal = ({ isOpen, onClose }: AddMemberModalProps) => {
       
       console.log('Generated employee ID:', employeeId);
       
-      // Add member to database
+      // ✅ FIXED: Add member to database with complete payload
       const memberPayload = {
         member_id: employeeId,
         name: formData.name.trim(),
         email: formData.email.trim() || undefined,
         phone: formData.phone.trim(),
         address: formData.address.trim() || undefined,
+        work_unit: formData.work_unit.trim() || undefined,  // ✅ ADDED
+        position: formData.position.trim() || undefined,    // ✅ ADDED
         join_date: new Date().toISOString().split('T')[0]
       };
 
-      console.log('Adding member with payload:', memberPayload);
+      console.log('📤 Adding member with payload:', memberPayload);
       
       const newMember = await addMember(memberPayload);
-      console.log('Member added successfully:', newMember);
+      console.log('✅ Member added successfully:', newMember);
 
       setSuccess(true);
       console.log('Member creation process completed successfully');
@@ -98,7 +100,7 @@ export const AddMemberModal = ({ isOpen, onClose }: AddMemberModalProps) => {
       }, 2000);
 
     } catch (error) {
-      console.error('Error in member creation process:', error);
+      console.error('❌ Error in member creation process:', error);
       setErrorMsg(error instanceof Error ? error.message : 'Gagal menambahkan anggota');
     } finally {
       setLoading(false);

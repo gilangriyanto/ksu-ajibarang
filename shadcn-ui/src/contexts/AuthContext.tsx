@@ -1,6 +1,6 @@
 // src/contexts/AuthContext.tsx
 
-import React, { createContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { authService, type User } from "@/lib/api/auth.service";
 
@@ -79,6 +79,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(true);
       const response = await authService.login({ email, password });
       setUser(response.user);
+      
+      // ✅ TAMBAHAN: Store role di localStorage (untuk backward compatibility)
+      localStorage.setItem('userRole', response.user.role);
+      
       const redirectPath = getRedirectPath(
         response.user.role,
         response.user.kas_id
@@ -98,10 +102,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(true);
       await authService.logout();
       setUser(null);
+      
+      // ✅ TAMBAHAN: Remove userRole dari localStorage
+      localStorage.removeItem('userRole');
+      
       navigate("/login", { replace: true });
     } catch (error) {
       console.error("Logout error:", error);
       setUser(null);
+      localStorage.removeItem('userRole');
       navigate("/login", { replace: true });
     } finally {
       setLoading(false);
@@ -112,6 +121,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const currentUser = await authService.getCurrentUser();
       setUser(currentUser);
+      
+      // ✅ TAMBAHAN: Update userRole di localStorage
+      localStorage.setItem('userRole', currentUser.role);
     } catch (error) {
       console.error("Refresh user error:", error);
       await logout();
@@ -128,3 +140,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
+
+// ==================== HOOK ====================
+// ✅ TAMBAHAN: Export useAuth hook
+
+/**
+ * Custom hook to access auth context
+ * Must be used within AuthProvider
+ */
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within AuthProvider');
+  }
+  return context;
+};

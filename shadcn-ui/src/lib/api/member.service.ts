@@ -11,7 +11,7 @@ export interface Member {
   phone_number: string | null;
   formatted_phone?: string;
   address: string | null;
-  role: "admin" | "manager" | "member";
+  role: "admin" | "manajer" | "anggota";
   status: "active" | "inactive" | "suspended";
   joined_at: string;
   membership_duration?: string;
@@ -127,14 +127,16 @@ export interface PaginatedResponse<T> {
 
 // ==================== SERVICE ====================
 
+// ✅ UPDATED: Added role field and made employee_id optional
 export interface CreateMemberRequest {
   full_name: string;
-  employee_id: string;
   email?: string;
   password: string;
   password_confirmation: string;
   phone_number?: string;
   address?: string;
+  role?: "admin" | "manajer" | "anggota"; // ✅ Added role field
+  employee_id?: string; // Optional, will be auto-generated if not provided
   work_unit?: string;
   position?: string;
   joined_at?: string;
@@ -145,6 +147,7 @@ class MemberService {
   /**
    * Create new member
    * Admin & Manager only
+   * ✅ UPDATED: Now supports role parameter
    */
   async createMember(data: CreateMemberRequest): Promise<Member> {
     try {
@@ -162,13 +165,17 @@ class MemberService {
       console.error("Create member error:", error);
 
       if (error.response?.status === 403) {
-        throw new Error("Akses ditolak. Hanya admin dan manager yang dapat menambah anggota.");
+        throw new Error(
+          "Akses ditolak. Hanya admin dan manager yang dapat menambah anggota."
+        );
       }
 
       if (error.response?.status === 422) {
         const errors = error.response.data.errors;
         const firstError = Object.values(errors)[0];
-        throw new Error(Array.isArray(firstError) ? firstError[0] : "Validasi gagal");
+        throw new Error(
+          Array.isArray(firstError) ? firstError[0] : "Validasi gagal"
+        );
       }
 
       if (error.response?.data?.message) {
@@ -200,7 +207,9 @@ class MemberService {
       console.error("Get members error:", error);
 
       if (error.response?.status === 403) {
-        throw new Error("Akses ditolak. Hanya admin dan manager yang dapat melihat daftar anggota.");
+        throw new Error(
+          "Akses ditolak. Hanya admin dan manager yang dapat melihat daftar anggota."
+        );
       }
 
       if (error.response?.data?.message) {
@@ -274,10 +283,7 @@ class MemberService {
   /**
    * Update member profile
    */
-  async updateMember(
-    id: number,
-    data: UpdateMemberRequest
-  ): Promise<Member> {
+  async updateMember(id: number, data: UpdateMemberRequest): Promise<Member> {
     try {
       const response = await apiClient.put<ApiResponse<Member>>(
         `/members/${id}`,
@@ -303,7 +309,9 @@ class MemberService {
       if (error.response?.status === 422) {
         const errors = error.response.data.errors;
         const firstError = Object.values(errors)[0];
-        throw new Error(Array.isArray(firstError) ? firstError[0] : "Validasi gagal");
+        throw new Error(
+          Array.isArray(firstError) ? firstError[0] : "Validasi gagal"
+        );
       }
 
       if (error.response?.data?.message) {
@@ -317,10 +325,7 @@ class MemberService {
   /**
    * Change member password
    */
-  async changePassword(
-    id: number,
-    data: ChangePasswordRequest
-  ): Promise<void> {
+  async changePassword(id: number, data: ChangePasswordRequest): Promise<void> {
     try {
       const response = await apiClient.post<ApiResponse<null>>(
         `/members/${id}/change-password`,
@@ -346,7 +351,9 @@ class MemberService {
       if (error.response?.status === 422) {
         const errors = error.response.data.errors;
         const firstError = Object.values(errors)[0];
-        throw new Error(Array.isArray(firstError) ? firstError[0] : "Validasi gagal");
+        throw new Error(
+          Array.isArray(firstError) ? firstError[0] : "Validasi gagal"
+        );
       }
 
       if (error.response?.data?.message) {
@@ -443,7 +450,9 @@ class MemberService {
       console.error("Get statistics error:", error);
 
       if (error.response?.status === 403) {
-        throw new Error("Akses ditolak. Hanya admin dan manager yang dapat melihat statistik.");
+        throw new Error(
+          "Akses ditolak. Hanya admin dan manager yang dapat melihat statistik."
+        );
       }
 
       if (error.response?.data?.message) {
@@ -458,10 +467,7 @@ class MemberService {
    * Update member status
    * Admin only
    */
-  async updateStatus(
-    id: number,
-    data: UpdateStatusRequest
-  ): Promise<Member> {
+  async updateStatus(id: number, data: UpdateStatusRequest): Promise<Member> {
     try {
       const response = await apiClient.post<ApiResponse<Member>>(
         `/members/${id}/update-status`,
@@ -477,7 +483,9 @@ class MemberService {
       console.error("Update status error:", error);
 
       if (error.response?.status === 403) {
-        throw new Error("Akses ditolak. Hanya admin yang dapat mengubah status anggota.");
+        throw new Error(
+          "Akses ditolak. Hanya admin yang dapat mengubah status anggota."
+        );
       }
 
       if (error.response?.status === 400) {
@@ -487,7 +495,9 @@ class MemberService {
       if (error.response?.status === 422) {
         const errors = error.response.data.errors;
         const firstError = Object.values(errors)[0];
-        throw new Error(Array.isArray(firstError) ? firstError[0] : "Validasi gagal");
+        throw new Error(
+          Array.isArray(firstError) ? firstError[0] : "Validasi gagal"
+        );
       }
 
       if (error.response?.data?.message) {

@@ -1,8 +1,10 @@
 // src/contexts/AuthContext.tsx
+// ⚠️ TEMPORARY VERSION - All login goes to /manager
 
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { authService, type User } from "@/lib/api/auth.service";
+import { getRedirectPath } from "@/utils/loginRedirect";
 
 // ==================== TYPES ====================
 
@@ -44,11 +46,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               window.location.pathname === "/login" ||
               window.location.pathname === "/"
             ) {
-              const redirectPath = getRedirectPath(
-                currentUser.role,
-                currentUser.kas_id
-              );
-              navigate(redirectPath, { replace: true });
+              // ⚠️ TEMPORARY: Force to /manager
+              console.log("⚠️ TEMPORARY: Auto-redirecting to /manager");
+              navigate("/manager", { replace: true });
+
+              // ✅ Uncomment this after creating manager account
+              // const redirectPath = getRedirectPath(currentUser);
+              // console.log("🔄 Auto-redirecting to:", redirectPath);
+              // navigate(redirectPath, { replace: true });
             }
           } catch (error) {
             console.error("Token verification failed:", error);
@@ -67,28 +72,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     initAuth();
   }, [navigate]);
 
-  const getRedirectPath = (role: string, kasId?: number) => {
-    if (role === "admin" || role === "manager") return "/manager";
-    if (role === "anggota") return "/member";
-    if (role.startsWith("admin_kas_") && kasId) return `/kas/${kasId}`;
-    return "/login";
-  };
-
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
       setLoading(true);
       const response = await authService.login({ email, password });
+
+      console.log("✅ Login successful, user:", response.user);
+      console.log("🔑 kas_id:", response.user.kas_id);
+      console.log("🎭 role:", response.user.role);
+
       setUser(response.user);
-      
-      // ✅ TAMBAHAN: Store role di localStorage (untuk backward compatibility)
-      localStorage.setItem('userRole', response.user.role);
-      
-      const redirectPath = getRedirectPath(
-        response.user.role,
-        response.user.kas_id
-      );
-      navigate(redirectPath, { replace: true });
-      return true;
+
+      // ✅ Uncomment this after creating manager account
+      // const redirectPath = getRedirectPath(response.user);
+      // console.log("🔄 Redirecting to:", redirectPath);
+      // navigate(redirectPath, { replace: true });
+      // return true;
     } catch (error: any) {
       console.error("Login failed:", error);
       throw error;
@@ -102,15 +101,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(true);
       await authService.logout();
       setUser(null);
-      
-      // ✅ TAMBAHAN: Remove userRole dari localStorage
-      localStorage.removeItem('userRole');
-      
       navigate("/login", { replace: true });
     } catch (error) {
       console.error("Logout error:", error);
       setUser(null);
-      localStorage.removeItem('userRole');
       navigate("/login", { replace: true });
     } finally {
       setLoading(false);
@@ -121,9 +115,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const currentUser = await authService.getCurrentUser();
       setUser(currentUser);
-      
-      // ✅ TAMBAHAN: Update userRole di localStorage
-      localStorage.setItem('userRole', currentUser.role);
     } catch (error) {
       console.error("Refresh user error:", error);
       await logout();
@@ -142,7 +133,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 }
 
 // ==================== HOOK ====================
-// ✅ TAMBAHAN: Export useAuth hook
 
 /**
  * Custom hook to access auth context
@@ -151,7 +141,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
-    throw new Error('useAuth must be used within AuthProvider');
+    throw new Error("useAuth must be used within AuthProvider");
   }
   return context;
 };

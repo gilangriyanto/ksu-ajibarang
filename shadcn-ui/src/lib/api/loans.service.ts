@@ -13,6 +13,8 @@ export interface Loan {
   total_payment: string | number;
   application_date: string;
   loan_purpose: string;
+  loan_number?: string; // ✅ ADDED
+  interest_percentage?: string | number; // ✅ ADDED
   status:
     | "pending"
     | "approved"
@@ -46,6 +48,7 @@ export interface Loan {
   total_installments?: number;
 }
 
+// ✅ UPDATED: Complete Installment interface with all fields from API
 export interface Installment {
   id: number;
   loan_id: number;
@@ -60,6 +63,32 @@ export interface Installment {
   status: "pending" | "paid" | "overdue" | "partial";
   created_at: string;
   updated_at: string;
+
+  // ✅ ADDED: Missing fields that come from API
+  late_fee?: string | number;
+  days_overdue?: number;
+  days_until_due?: number;
+
+  // ✅ ADDED: Nested loan data (from API response)
+  loan?: {
+    id: number;
+    loan_number: string;
+    principal_amount: string | number;
+    tenure_months: number;
+    interest_percentage?: string | number;
+    interest_rate?: string | number;
+    status: string;
+    user?: {
+      id: number;
+      full_name: string;
+      employee_id: string;
+    };
+    cash_account?: {
+      id: number;
+      code: string;
+      name: string;
+    };
+  };
 }
 
 export interface LoanSummary {

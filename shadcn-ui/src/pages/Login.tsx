@@ -13,11 +13,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Building2, LogIn } from "lucide-react";
+import { Building2, LogIn, Eye, EyeOff } from "lucide-react";
 
-export default function Login() {
+function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const { user, login } = useAuth();
@@ -128,15 +129,30 @@ export default function Login() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="Masukkan password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  disabled={loading}
-                />
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Masukkan password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    disabled={loading}
+                    className="pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none"
+                    disabled={loading}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
               </div>
 
               {error && (
@@ -150,38 +166,6 @@ export default function Login() {
                 {loading ? "Memproses..." : "Masuk"}
               </Button>
             </form>
-
-            <div className="mt-6 pt-6 border-t">
-              <p className="text-sm text-gray-600 mb-3">Demo Login:</p>
-              <div className="grid grid-cols-1 gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleDemoLogin("manager")}
-                  disabled={loading}
-                  className="text-xs"
-                >
-                  {loading ? "Loading..." : "Login sebagai Manager"}
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleDemoLogin("member")}
-                  disabled={loading}
-                  className="text-xs"
-                >
-                  {loading ? "Loading..." : "Login sebagai Anggota"}
-                </Button>
-              </div>
-              <div className="mt-3 text-xs text-gray-500">
-                <p>
-                  <strong>Manager:</strong> manager@koperasi.com / manager123
-                </p>
-                <p>
-                  <strong>Member:</strong> member@koperasi.com / member123
-                </p>
-              </div>
-            </div>
           </CardContent>
         </Card>
 
@@ -192,3 +176,5 @@ export default function Login() {
     </div>
   );
 }
+
+export default Login;

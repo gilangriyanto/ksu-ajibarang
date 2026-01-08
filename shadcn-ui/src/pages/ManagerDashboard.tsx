@@ -1,5 +1,5 @@
 // src/pages/manager/ManagerDashboard.tsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { ManagerLayout } from "@/components/layout/ManagerLayout";
 import {
   Card,
@@ -28,10 +28,48 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAdminDashboard } from "@/hooks/useDashboard";
+import useInstallments from "@/hooks/useInstallments";
+
+// ✅ Add Alert Type Definition
+interface DashboardAlert {
+  type: "danger" | "warning" | "info" | "success";
+  title: string;
+  message: string;
+  link?: string;
+  action?: string;
+}
 
 export default function ManagerDashboard() {
   const navigate = useNavigate();
   const { data, loading, error, refresh } = useAdminDashboard();
+  const { getOverdueInstallments, getUpcomingInstallments } = useInstallments();
+
+  const [overdueCount, setOverdueCount] = useState(0);
+  const [upcomingCount, setUpcomingCount] = useState(0);
+  const [pendingLoansCount, setPendingLoansCount] = useState(0);
+
+  // Load installment counts
+  useEffect(() => {
+    loadInstallmentCounts();
+  }, []);
+
+  const loadInstallmentCounts = async () => {
+    try {
+      const overdue = await getOverdueInstallments();
+      const upcoming = await getUpcomingInstallments(7);
+      setOverdueCount(overdue.length);
+      setUpcomingCount(upcoming.length);
+    } catch (error) {
+      console.error("Error loading installment counts:", error);
+    }
+  };
+
+  // Update pending loans count from dashboard data
+  useEffect(() => {
+    if (data?.overview?.loans?.pending_applications) {
+      setPendingLoansCount(data.overview.loans.pending_applications);
+    }
+  }, [data]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("id-ID", {
@@ -89,6 +127,8 @@ export default function ManagerDashboard() {
         return "border-yellow-200 bg-yellow-50";
       case "success":
         return "border-green-200 bg-green-50";
+      case "info":
+        return "border-blue-200 bg-blue-50";
       default:
         return "border-blue-200 bg-blue-50";
     }
@@ -132,6 +172,84 @@ export default function ManagerDashboard() {
     );
   }
 
+  // ✅ Create custom alerts with installment data
+  const customAlerts: DashboardAlert[] = [];
+
+  // Add overdue installments alert (Red)
+  if (overdueCount > 0) {
+    customAlerts.push({
+      type: "danger",
+      title: "Cicilan Terlambat",
+      message: `Ada ${overdueCount} cicilan yang terlambat`,
+      link: "/manager/cicilan-terlambat",
+      action: "Lihat Detail",
+    });
+  }
+
+  // Add pending loans alert (Yellow) - ONLY if not already in data.alerts
+  const hasPendingLoansAlert = data.alerts?.some(
+    (alert: any) =>
+      alert.title?.toLowerCase().includes("pengajuan") ||
+      alert.title?.toLowerCase().includes("pinjaman")
+  );
+
+  if (pendingLoansCount > 0 && !hasPendingLoansAlert) {
+    customAlerts.push({
+      type: "warning",
+      title: "Pengajuan Pinjaman",
+      message: `Ada ${pendingLoansCount} pengajuan pinjaman menunggu persetujuan`,
+      link: "/manager/loans",
+      action: "Review Sekarang",
+    });
+  }
+
+  // Add upcoming installments alert (Blue)
+  if (upcomingCount > 0) {
+    customAlerts.push({
+      type: "info",
+      title: "Cicilan Mendatang",
+      message: `${upcomingCount} cicilan jatuh tempo dalam 7 hari ke depan`,
+      link: "/manager/cicilan-mendatang",
+      action: "Lihat",
+    });
+  }
+
+  // ✅ Fix backend alerts with wrong links
+  const fixedBackendAlerts = (data.alerts || []).map((alert: any) => {
+    const fixedAlert = { ...alert };
+
+    // Fix installment-related links from backend
+    if (fixedAlert.link) {
+      // Replace /installments/overdue with /manager/cicilan-terlambat
+      if (fixedAlert.link.includes("/installments/overdue")) {
+        fixedAlert.link = "/manager/cicilan-terlambat";
+      }
+      // Replace /installments/upcoming with /manager/cicilan-mendatang
+      if (fixedAlert.link.includes("/installments/upcoming")) {
+        fixedAlert.link = "/manager/cicilan-mendatang";
+      }
+      // Replace /loans?status=pending with /manager/loans
+      if (
+        fixedAlert.link.includes("/loans") &&
+        fixedAlert.link.includes("status=pending")
+      ) {
+        fixedAlert.link = "/manager/loans";
+      }
+      // Replace /loans with /manager/loans (for any other loan links)
+      if (
+        fixedAlert.link === "/loans" ||
+        fixedAlert.link.startsWith("/loans?")
+      ) {
+        fixedAlert.link = "/manager/loans";
+      }
+    }
+
+    return fixedAlert;
+  });
+
+  // Merge with fixed backend alerts
+  const allAlerts: DashboardAlert[] = [...customAlerts, ...fixedBackendAlerts];
+
   return (
     <ManagerLayout>
       <div className="space-y-6">
@@ -145,7 +263,13 @@ export default function ManagerDashboard() {
               Berikut adalah ringkasan aktivitas koperasi
             </p>
           </div>
-          <Button variant="outline" onClick={refresh}>
+          <Button
+            variant="outline"
+            onClick={() => {
+              refresh();
+              loadInstallmentCounts();
+            }}
+          >
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
@@ -286,10 +410,10 @@ export default function ManagerDashboard() {
           </CardContent>
         </Card>
 
-        {/* Alerts */}
-        {data.alerts && data.alerts.length > 0 && (
+        {/* ✅ Alerts Section - Includes custom installment alerts */}
+        {allAlerts.length > 0 && (
           <div className="space-y-4 mb-8">
-            {data.alerts.map((alert, index) => (
+            {allAlerts.map((alert, index) => (
               <Alert key={index} className={getAlertColor(alert.type)}>
                 <AlertTriangle className="h-4 w-4" />
                 <div className="flex-1">
@@ -297,7 +421,15 @@ export default function ManagerDashboard() {
                   <AlertDescription>{alert.message}</AlertDescription>
                 </div>
                 {alert.link && (
-                  <Button size="sm" onClick={() => navigate(alert.link!)}>
+                  <Button
+                    size="sm"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      console.log("Navigating to:", alert.link);
+                      navigate(alert.link);
+                    }}
+                  >
                     {alert.action || "Lihat Detail"}
                   </Button>
                 )}

@@ -1,145 +1,200 @@
-import React, { useState } from 'react';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, AlertCircle, CheckCircle, User } from 'lucide-react';
-import { useMembers } from '@/hooks/useMembers';
+import React, { useState } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  User,
+  Mail,
+  Phone,
+  UserPlus,
+  Loader2,
+  AlertCircle,
+  CheckCircle,
+  Lock,
+  Shield,
+} from "lucide-react";
+import { useMembers } from "@/hooks/useMembers";
+import { memberService } from "@/lib/api";
 
 interface AddMemberModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-export const AddMemberModal = ({ isOpen, onClose }: AddMemberModalProps) => {
+export function AddMemberModal({ isOpen, onClose }: AddMemberModalProps) {
   const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    address: '',
-    work_unit: '',
-    position: ''
+    full_name: "",
+    email: "",
+    phone_number: "",
+    password: "",
+    password_confirmation: "",
+    role: "anggota", // default role
   });
-  const [loading, setLoading] = useState(false);
+
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
-  const [errorMsg, setErrorMsg] = useState('');
-  
-  const { addMember, refetch } = useMembers();
+  const [errorMsg, setErrorMsg] = useState("");
 
-  const resetForm = () => {
-    setFormData({
-      name: '',
-      email: '',
-      phone: '',
-      address: '',
-      work_unit: '',
-      position: ''
-    });
-    setSuccess(false);
-    setErrorMsg('');
+  const { refetch } = useMembers();
+
+  const validateForm = () => {
+    const newErrors: Record<string, string> = {};
+
+    // Validate full name
+    if (!formData.full_name.trim()) {
+      newErrors.full_name = "Nama lengkap wajib diisi";
+    }
+
+    // Validate email
+    if (!formData.email.trim()) {
+      newErrors.email = "Email wajib diisi";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      newErrors.email = "Format email tidak valid";
+    }
+
+    // Validate phone (optional but if filled must be valid)
+    if (
+      formData.phone_number &&
+      !/^[0-9+\-\s()]+$/.test(formData.phone_number)
+    ) {
+      newErrors.phone_number = "Format nomor telepon tidak valid";
+    }
+
+    // Validate password
+    if (!formData.password) {
+      newErrors.password = "Password wajib diisi";
+    } else if (formData.password.length < 8) {
+      newErrors.password = "Password minimal 8 karakter";
+    }
+
+    // Validate password confirmation
+    if (!formData.password_confirmation) {
+      newErrors.password_confirmation = "Konfirmasi password wajib diisi";
+    } else if (formData.password !== formData.password_confirmation) {
+      newErrors.password_confirmation = "Password tidak cocok";
+    }
+
+    // Validate role
+    if (!formData.role) {
+      newErrors.role = "Role wajib dipilih";
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
-  const generateEmployeeId = () => {
-    // Generate employee ID dengan format: EMP + timestamp
-    const timestamp = Date.now().toString().slice(-6);
-    return `EMP${timestamp}`;
-  };
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
 
-  const handleSave = async () => {
-    // Validation
-    if (!formData.name.trim()) {
-      setErrorMsg('Nama wajib diisi');
+    if (!validateForm()) {
       return;
     }
 
-    if (!formData.phone.trim()) {
-      setErrorMsg('No. telepon wajib diisi');
-      return;
-    }
+    setIsSubmitting(true);
+    setErrorMsg("");
 
     try {
-      setLoading(true);
-      setErrorMsg('');
-      
-      console.log('Starting member creation process...');
-      
-      // Generate unique employee ID
-      const employeeId = generateEmployeeId();
-      
-      console.log('Generated employee ID:', employeeId);
-      
-      // ✅ FIXED: Add member to database with complete payload
-      const memberPayload = {
-        member_id: employeeId,
-        name: formData.name.trim(),
-        email: formData.email.trim() || undefined,
-        phone: formData.phone.trim(),
-        address: formData.address.trim() || undefined,
-        work_unit: formData.work_unit.trim() || undefined,  // ✅ ADDED
-        position: formData.position.trim() || undefined,    // ✅ ADDED
-        join_date: new Date().toISOString().split('T')[0]
-      };
-
-      console.log('📤 Adding member with payload:', memberPayload);
-      
-      const newMember = await addMember(memberPayload);
-      console.log('✅ Member added successfully:', newMember);
+      // Call API to create member
+      await memberService.createMember({
+        full_name: formData.full_name.trim(),
+        email: formData.email.trim(),
+        phone_number: formData.phone_number.trim() || undefined,
+        password: formData.password,
+        password_confirmation: formData.password_confirmation,
+        role: formData.role as "admin" | "manajer" | "anggota",
+      });
 
       setSuccess(true);
-      console.log('Member creation process completed successfully');
-      
-      // Refresh data
-      await refetch();
-      
-      // Auto close after success
-      setTimeout(() => {
-        resetForm();
-        onClose();
-      }, 2000);
 
-    } catch (error) {
-      console.error('❌ Error in member creation process:', error);
-      setErrorMsg(error instanceof Error ? error.message : 'Gagal menambahkan anggota');
+      // Refetch members list
+      await refetch();
+
+      // Close modal after 1.5 seconds
+      setTimeout(() => {
+        handleClose();
+      }, 1500);
+    } catch (error: any) {
+      console.error("Error adding member:", error);
+      setErrorMsg(
+        error.response?.data?.message ||
+          error.message ||
+          "Gagal menambahkan anggota"
+      );
     } finally {
-      setLoading(false);
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleInputChange = (field: string, value: string) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+    // Clear error for this field
+    if (errors[field]) {
+      setErrors((prev) => {
+        const newErrors = { ...prev };
+        delete newErrors[field];
+        return newErrors;
+      });
     }
   };
 
   const handleClose = () => {
-    if (!loading) {
-      resetForm();
-      onClose();
-    }
+    // Reset form
+    setFormData({
+      full_name: "",
+      email: "",
+      phone_number: "",
+      password: "",
+      password_confirmation: "",
+      role: "anggota",
+    });
+    setErrors({});
+    setSuccess(false);
+    setErrorMsg("");
+    setIsSubmitting(false);
+    onClose();
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[525px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[550px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <User className="h-5 w-5" />
-            Tambah Anggota Baru
+          <DialogTitle className="flex items-center space-x-2">
+            <UserPlus className="h-5 w-5" />
+            <span>Tambah Anggota Baru</span>
           </DialogTitle>
           <DialogDescription>
-            Masukkan informasi anggota baru untuk mendaftar ke koperasi.
-            <br />
-            <span className="text-xs text-gray-500">
-              Password default: <strong>Password123!</strong> (anggota harus mengubahnya setelah login pertama kali)
-            </span>
+            Masukkan informasi untuk mendaftarkan anggota baru
           </DialogDescription>
         </DialogHeader>
 
+        {/* Success Alert */}
         {success && (
           <Alert className="border-green-200 bg-green-50">
             <CheckCircle className="h-4 w-4 text-green-600" />
             <AlertDescription className="text-green-800">
-              Anggota berhasil ditambahkan! Modal akan tertutup otomatis...
+              Anggota berhasil ditambahkan!
             </AlertDescription>
           </Alert>
         )}
 
+        {/* Error Alert */}
         {errorMsg && (
           <Alert className="border-red-200 bg-red-50">
             <AlertCircle className="h-4 w-4 text-red-600" />
@@ -149,128 +204,188 @@ export const AddMemberModal = ({ isOpen, onClose }: AddMemberModalProps) => {
           </Alert>
         )}
 
-        <div className="grid gap-4 py-4">
-          {/* Basic Information */}
-          <div className="space-y-4">
-            <h3 className="text-sm font-medium text-gray-700">Informasi Dasar</h3>
-            
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="member-name" className="text-right">
-                Nama Lengkap <span className="text-red-500">*</span>
-              </Label>
-              <Input 
-                id="member-name" 
-                className="col-span-3" 
-                placeholder="Ahmad Sutanto"
-                value={formData.name}
-                onChange={(e) => setFormData({...formData, name: e.target.value})}
-                disabled={loading || success}
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Full Name */}
+          <div className="space-y-2">
+            <Label htmlFor="full_name">
+              Nama Lengkap <span className="text-red-500">*</span>
+            </Label>
+            <div className="relative">
+              <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+              <Input
+                id="full_name"
+                value={formData.full_name}
+                onChange={(e) => handleInputChange("full_name", e.target.value)}
+                placeholder="Masukkan nama lengkap"
+                className="pl-10"
+                disabled={isSubmitting || success}
               />
             </div>
+            {errors.full_name && (
+              <p className="text-sm text-red-600">{errors.full_name}</p>
+            )}
+          </div>
 
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="member-email" className="text-right">Email</Label>
-              <Input 
-                id="member-email" 
-                type="email" 
-                className="col-span-3" 
-                placeholder="ahmad@email.com"
+          {/* Email */}
+          <div className="space-y-2">
+            <Label htmlFor="email">
+              Email <span className="text-red-500">*</span>
+            </Label>
+            <div className="relative">
+              <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+              <Input
+                id="email"
+                type="email"
                 value={formData.email}
-                onChange={(e) => setFormData({...formData, email: e.target.value})}
-                disabled={loading || success}
+                onChange={(e) => handleInputChange("email", e.target.value)}
+                placeholder="nama@email.com"
+                className="pl-10"
+                disabled={isSubmitting || success}
               />
             </div>
-
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="member-phone" className="text-right">
-                No. Telepon <span className="text-red-500">*</span>
-              </Label>
-              <Input 
-                id="member-phone" 
-                className="col-span-3" 
-                placeholder="08123456789"
-                value={formData.phone}
-                onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                disabled={loading || success}
-              />
-            </div>
-
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="member-address" className="text-right">Alamat</Label>
-              <Textarea 
-                id="member-address" 
-                className="col-span-3" 
-                placeholder="Jl. Contoh No. 123"
-                value={formData.address}
-                onChange={(e) => setFormData({...formData, address: e.target.value})}
-                disabled={loading || success}
-                rows={3}
-              />
-            </div>
+            {errors.email && (
+              <p className="text-sm text-red-600">{errors.email}</p>
+            )}
           </div>
 
-          {/* Work Information */}
-          <div className="space-y-4">
-            <h3 className="text-sm font-medium text-gray-700">Informasi Pekerjaan</h3>
-            
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="work-unit" className="text-right">Unit Kerja</Label>
-              <Input 
-                id="work-unit" 
-                className="col-span-3" 
-                placeholder="Departemen Medis"
-                value={formData.work_unit}
-                onChange={(e) => setFormData({...formData, work_unit: e.target.value})}
-                disabled={loading || success}
+          {/* Phone Number */}
+          <div className="space-y-2">
+            <Label htmlFor="phone_number">
+              Nomor Telepon{" "}
+              <span className="text-gray-400 text-xs">(opsional)</span>
+            </Label>
+            <div className="relative">
+              <Phone className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+              <Input
+                id="phone_number"
+                value={formData.phone_number}
+                onChange={(e) =>
+                  handleInputChange("phone_number", e.target.value)
+                }
+                placeholder="081234567890"
+                className="pl-10"
+                disabled={isSubmitting || success}
               />
             </div>
-
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="position" className="text-right">Jabatan</Label>
-              <Input 
-                id="position" 
-                className="col-span-3" 
-                placeholder="Perawat"
-                value={formData.position}
-                onChange={(e) => setFormData({...formData, position: e.target.value})}
-                disabled={loading || success}
-              />
-            </div>
+            {errors.phone_number && (
+              <p className="text-sm text-red-600">{errors.phone_number}</p>
+            )}
           </div>
 
-          {/* Important Note */}
-          <Alert className="border-blue-200 bg-blue-50">
-            <AlertCircle className="h-4 w-4 text-blue-600" />
-            <AlertDescription className="text-blue-800 text-sm">
-              <strong>Catatan Penting:</strong>
-              <ul className="list-disc list-inside mt-2 space-y-1">
-                <li>ID Anggota akan digenerate otomatis</li>
-                <li>Password default: <strong>Password123!</strong></li>
-                <li>Anggota harus mengubah password setelah login pertama</li>
-                <li>Status anggota: <strong>Aktif</strong> (default)</li>
-              </ul>
-            </AlertDescription>
-          </Alert>
-        </div>
+          {/* Password */}
+          <div className="space-y-2">
+            <Label htmlFor="password">
+              Password <span className="text-red-500">*</span>
+            </Label>
+            <div className="relative">
+              <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+              <Input
+                id="password"
+                type="password"
+                value={formData.password}
+                onChange={(e) => handleInputChange("password", e.target.value)}
+                placeholder="Minimal 8 karakter"
+                className="pl-10"
+                disabled={isSubmitting || success}
+              />
+            </div>
+            {errors.password && (
+              <p className="text-sm text-red-600">{errors.password}</p>
+            )}
+          </div>
 
-        <div className="flex justify-end space-x-2">
-          <Button variant="outline" onClick={handleClose} disabled={loading}>
-            {success ? 'Tutup' : 'Batal'}
-          </Button>
-          {!success && (
-            <Button onClick={handleSave} disabled={loading}>
-              {loading ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Menyimpan...
-                </>
-              ) : (
-                'Tambah Anggota'
-              )}
+          {/* Password Confirmation */}
+          <div className="space-y-2">
+            <Label htmlFor="password_confirmation">
+              Konfirmasi Password <span className="text-red-500">*</span>
+            </Label>
+            <div className="relative">
+              <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+              <Input
+                id="password_confirmation"
+                type="password"
+                value={formData.password_confirmation}
+                onChange={(e) =>
+                  handleInputChange("password_confirmation", e.target.value)
+                }
+                placeholder="Ulangi password"
+                className="pl-10"
+                disabled={isSubmitting || success}
+              />
+            </div>
+            {errors.password_confirmation && (
+              <p className="text-sm text-red-600">
+                {errors.password_confirmation}
+              </p>
+            )}
+          </div>
+
+          {/* Role Dropdown */}
+          <div className="space-y-2">
+            <Label htmlFor="role">
+              Role <span className="text-red-500">*</span>
+            </Label>
+            <div className="relative">
+              <Shield className="absolute left-3 top-3 h-4 w-4 text-gray-400 z-10" />
+              <Select
+                value={formData.role}
+                onValueChange={(value) => handleInputChange("role", value)}
+                disabled={isSubmitting || success}
+              >
+                <SelectTrigger className="pl-10">
+                  <SelectValue placeholder="Pilih role" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="anggota">Anggota</SelectItem>
+                  <SelectItem value="manajer">Manager</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {errors.role && (
+              <p className="text-sm text-red-600">{errors.role}</p>
+            )}
+            <p className="text-xs text-gray-500">
+              {formData.role === "anggota" &&
+                "• Member biasa dengan akses terbatas"}
+              {formData.role === "manajer" &&
+                "• Manager dengan akses penuh ke kas tertentu"}
+              {formData.role === "admin" &&
+                "• Administrator dengan akses penuh sistem"}
+            </p>
+          </div>
+
+          <DialogFooter className="mt-6">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleClose}
+              disabled={isSubmitting}
+            >
+              Batal
             </Button>
-          )}
-        </div>
+            {!success && (
+              <Button
+                type="submit"
+                disabled={isSubmitting}
+                className="min-w-[120px]"
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Menambahkan...
+                  </>
+                ) : (
+                  <>
+                    <UserPlus className="h-4 w-4 mr-2" />
+                    Tambah Anggota
+                  </>
+                )}
+              </Button>
+            )}
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );
-};
+}

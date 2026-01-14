@@ -1,8 +1,15 @@
 // src/hooks/useAuth.ts
 import { useContext } from "react";
-import { AuthContext, type AuthContextType } from "@/contexts/AuthContext";
+import { AuthContext } from "@/contexts/AuthContext";
 
-export function useAuth(): AuthContextType {
+/**
+ * Custom hook to use AuthContext
+ * Must be used within AuthProvider
+ *
+ * Usage:
+ * const { user, login, logout, loading } = useAuth();
+ */
+export const useAuth = () => {
   const context = useContext(AuthContext);
 
   if (context === undefined) {
@@ -10,4 +17,6 @@ export function useAuth(): AuthContextType {
   }
 
   return context;
-}
+};
+
+export default useAuth;

@@ -55,6 +55,7 @@ import {
 import { SavingsAddModal } from "@/components/modals/SavingsAddModal";
 import SavingsDetailModal from "@/components/modals/SavingsDetailModal";
 import { SavingsEditModal } from "@/components/modals/SavingsEditModal";
+import { ExportSavingsModalClientSide } from "@/components/modals/ExportSavingsModalClientSide"; // ✅ Client-side export
 import { toast } from "sonner";
 import savingsService, {
   Saving,
@@ -69,6 +70,7 @@ export default function SavingsManagement() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [recordToDelete, setRecordToDelete] = useState<Saving | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
@@ -89,14 +91,8 @@ export default function SavingsManagement() {
     setError(null);
     try {
       console.log("🔄 Loading all data...");
-
-      // Load savings first
       await loadSavings();
-
-      // Then try to load summary from API
-      // If fails, will auto-calculate from savings data
-      await loadSummary();
-
+      await loadSummaryFromTypeEndpoints();
       console.log("✅ All data loaded successfully");
     } catch (err: any) {
       console.error("❌ Error loading data:", err);
@@ -109,98 +105,107 @@ export default function SavingsManagement() {
 
   const loadSavings = async () => {
     try {
+      console.log("📋 Loading all savings...");
       const response = await savingsService.getAll({ all: true });
 
-      console.log("📋 Raw API response:", response);
-      console.log("📋 Response.data:", response.data);
-      console.log("📋 Response.data.data:", response.data?.data);
-
-      // Backend returns: { success: true, data: [...] }
-      // So we need response.data.data to get the array
       let savingsData: Saving[] = [];
-
       if (response.data?.data && Array.isArray(response.data.data)) {
-        // Standard structure: response.data.data
         savingsData = response.data.data;
       } else if (Array.isArray(response.data)) {
-        // Direct array: response.data
         savingsData = response.data;
+      } else if (Array.isArray(response)) {
+        savingsData = response;
       }
 
-      console.log("📋 Parsed savings array:", savingsData);
-      console.log("📋 Savings count:", savingsData.length);
-      console.log("📋 First saving:", savingsData[0]);
-
+      console.log("📋 Parsed savings array:", savingsData.length, "items");
       setSavings(savingsData);
 
       if (savingsData.length === 0) {
-        console.warn("⚠️ No savings data found!");
+        console.warn("⚠️ No savings data found");
       } else {
         console.log(`✅ Successfully loaded ${savingsData.length} savings`);
       }
     } catch (err: any) {
       console.error("❌ Error loading savings:", err);
-      console.error("❌ Error response:", err.response?.data);
-      console.error("❌ Error status:", err.response?.status);
       throw new Error("Gagal memuat data simpanan");
     }
   };
 
-  const loadSummary = async () => {
+  const loadSummaryFromTypeEndpoints = async () => {
     try {
-      const response = await savingsService.getSummary();
+      console.log("📊 Loading summary from type endpoints...");
 
-      console.log("📊 Raw summary response:", response);
-      console.log("📊 Response.data:", response.data);
-      console.log("📊 Response.data.data:", response.data?.data);
+      const [mandatoryRes, voluntaryRes, principalRes, holidayRes] =
+        await Promise.all([
+          savingsService.getByType.mandatory().catch(() => ({ data: [] })),
+          savingsService.getByType.voluntary().catch(() => ({ data: [] })),
+          savingsService.getByType.principal().catch(() => ({ data: [] })),
+          savingsService.getByType.holiday().catch(() => ({ data: [] })),
+        ]);
 
-      // Backend returns: { success: true, data: {...} }
-      let summaryData = null;
+      const mandatoryData = Array.isArray(mandatoryRes?.data?.data)
+        ? mandatoryRes.data.data
+        : Array.isArray(mandatoryRes?.data)
+        ? mandatoryRes.data
+        : [];
 
-      if (response.data?.data) {
-        // Nested structure
-        summaryData = response.data.data;
-      } else if (response.data?.total_balance !== undefined) {
-        // Direct structure
-        summaryData = response.data;
-      }
+      const voluntaryData = Array.isArray(voluntaryRes?.data?.data)
+        ? voluntaryRes.data.data
+        : Array.isArray(voluntaryRes?.data)
+        ? voluntaryRes.data
+        : [];
 
-      console.log("📊 Parsed summary:", summaryData);
+      const principalData = Array.isArray(principalRes?.data?.data)
+        ? principalRes.data.data
+        : Array.isArray(principalRes?.data)
+        ? principalRes.data
+        : [];
 
-      // Convert string numbers to actual numbers if needed
-      if (summaryData) {
-        const cleanedSummary: SavingsSummary = {
-          total_balance: Number(summaryData.total_balance || 0),
-          total_principal: Number(summaryData.total_principal || 0),
-          total_mandatory: Number(summaryData.total_mandatory || 0),
-          total_voluntary: Number(summaryData.total_voluntary || 0),
-          total_holiday: Number(summaryData.total_holiday || 0),
-          total_deposits: Number(summaryData.total_deposits || 0),
-          active_members: Number(summaryData.active_members || 0),
-        };
+      const holidayData = Array.isArray(holidayRes?.data?.data)
+        ? holidayRes.data.data
+        : Array.isArray(holidayRes?.data)
+        ? holidayRes.data
+        : [];
 
-        console.log("📊 Cleaned summary:", cleanedSummary);
-        setSummary(cleanedSummary);
-      } else {
-        console.warn(
-          "⚠️ No summary data from API, calculating from savings data"
-        );
-        calculateSummaryFromData();
-      }
+      const calculateTotal = (data: Saving[]) => {
+        return data.reduce((sum, item) => {
+          const amount = parseFloat(
+            item.final_amount?.toString() || item.amount?.toString() || "0"
+          );
+          return sum + amount;
+        }, 0);
+      };
+
+      const total_mandatory = calculateTotal(mandatoryData);
+      const total_voluntary = calculateTotal(voluntaryData);
+      const total_principal = calculateTotal(principalData);
+      const total_holiday = calculateTotal(holidayData);
+      const total_balance =
+        total_mandatory + total_voluntary + total_principal + total_holiday;
+
+      const allSavings = [
+        ...mandatoryData,
+        ...voluntaryData,
+        ...principalData,
+        ...holidayData,
+      ];
+      const uniqueUserIds = new Set(allSavings.map((s) => s.user_id));
+      const active_members = uniqueUserIds.size;
+      const total_deposits = allSavings.length;
+
+      const calculatedSummary: SavingsSummary = {
+        total_balance,
+        total_principal,
+        total_mandatory,
+        total_voluntary,
+        total_holiday,
+        total_deposits,
+        active_members,
+      };
+
+      setSummary(calculatedSummary);
     } catch (err: any) {
       console.error("❌ Error loading summary:", err);
-      console.error("❌ Error response:", err.response?.data);
-      console.error("❌ Error status:", err.response?.status);
-
-      // If summary endpoint doesn't exist, calculate from savings data
-      console.warn("⚠️ Summary endpoint not available, calculating from data");
-      calculateSummaryFromData();
-    }
-  };
-
-  // Calculate summary from savings data if API endpoint doesn't exist
-  const calculateSummaryFromData = () => {
-    if (savings.length === 0) {
       setSummary({
         total_balance: 0,
         total_principal: 0,
@@ -210,48 +215,7 @@ export default function SavingsManagement() {
         total_deposits: 0,
         active_members: 0,
       });
-      return;
     }
-
-    const summary: SavingsSummary = {
-      total_balance: 0,
-      total_principal: 0,
-      total_mandatory: 0,
-      total_voluntary: 0,
-      total_holiday: 0,
-      total_deposits: savings.length,
-      active_members: new Set(savings.map((s) => s.user_id)).size,
-    };
-
-    savings.forEach((saving) => {
-      const amount = parseFloat(
-        saving.final_amount?.toString() ||
-          saving.balance?.toString() ||
-          saving.amount?.toString() ||
-          "0"
-      );
-      const savingType = saving.savings_type || saving.saving_type;
-
-      summary.total_balance += amount;
-
-      switch (savingType) {
-        case "principal":
-          summary.total_principal += amount;
-          break;
-        case "mandatory":
-          summary.total_mandatory += amount;
-          break;
-        case "voluntary":
-          summary.total_voluntary += amount;
-          break;
-        case "holiday":
-          summary.total_holiday += amount;
-          break;
-      }
-    });
-
-    console.log("📊 Calculated summary from data:", summary);
-    setSummary(summary);
   };
 
   const handleRefresh = async () => {
@@ -355,15 +319,8 @@ export default function SavingsManagement() {
     setIsEditModalOpen(true);
   };
 
-  // ✅ SIMPLIFIED - No need for handleAddSavings anymore
-  // Modal handles API call directly via onSuccess callback
-
   const handleSaveSavings = async (updatedSavings: any) => {
     try {
-      console.log("📤 Updating savings with data:", updatedSavings);
-
-      // ✅ Backend PUT /savings/{id} requires ALL fields
-      // Send the complete updated savings object
       await savingsService.update(updatedSavings.id, {
         user_id: updatedSavings.user_id,
         cash_account_id: updatedSavings.cash_account_id,
@@ -383,8 +340,6 @@ export default function SavingsManagement() {
       setSelectedRecord(null);
     } catch (err: any) {
       console.error("❌ Error updating savings:", err);
-      console.error("❌ Error data:", err.response?.data);
-
       const errorMsg =
         err.data?.message || err.message || "Gagal memperbarui simpanan";
       toast.error(errorMsg);
@@ -393,12 +348,10 @@ export default function SavingsManagement() {
 
   const handleApprove = async (record: Saving) => {
     try {
-      console.log("🔄 Approving saving:", record.id);
       await savingsService.approve(record.id, "Disetujui oleh manager");
       toast.success("Simpanan berhasil disetujui");
       await loadAllData();
     } catch (err: any) {
-      console.error("❌ Error approving savings:", err);
       const errorMsg =
         err.data?.message || err.message || "Gagal menyetujui simpanan";
       toast.error(errorMsg);
@@ -407,12 +360,10 @@ export default function SavingsManagement() {
 
   const handleReject = async (record: Saving) => {
     try {
-      console.log("🔄 Rejecting saving:", record.id);
       await savingsService.reject(record.id, "Ditolak oleh manager");
       toast.success("Simpanan berhasil ditolak");
       await loadAllData();
     } catch (err: any) {
-      console.error("❌ Error rejecting savings:", err);
       const errorMsg =
         err.data?.message || err.message || "Gagal menolak simpanan";
       toast.error(errorMsg);
@@ -433,7 +384,6 @@ export default function SavingsManagement() {
         setRecordToDelete(null);
         setIsDeleteDialogOpen(false);
       } catch (err: any) {
-        console.error("❌ Error deleting savings:", err);
         toast.error(err.response?.data?.message || "Gagal menghapus simpanan");
       }
     }
@@ -444,6 +394,7 @@ export default function SavingsManagement() {
       <ManagerLayout>
         <div className="flex items-center justify-center h-64">
           <RefreshCw className="h-8 w-8 animate-spin text-gray-400" />
+          <span className="ml-2 text-gray-600">Memuat data...</span>
         </div>
       </ManagerLayout>
     );
@@ -454,7 +405,6 @@ export default function SavingsManagement() {
       <div className="space-y-6">
         <BackButton to="/manager" />
 
-        {/* Error Alert */}
         {error && (
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
@@ -481,9 +431,15 @@ export default function SavingsManagement() {
               />
               Refresh
             </Button>
-            <Button variant="outline">
+            {/* ✅ Export Button - Client Side */}
+            <Button
+              variant="outline"
+              onClick={() => setIsExportModalOpen(true)}
+              className="bg-green-50 hover:bg-green-100 text-green-700 border-green-200"
+              disabled={savings.length === 0}
+            >
               <Download className="h-4 w-4 mr-2" />
-              Export
+              Export CSV
             </Button>
             <Button onClick={() => setIsAddModalOpen(true)}>
               <Plus className="h-4 w-4 mr-2" />
@@ -746,19 +702,13 @@ export default function SavingsManagement() {
         </Card>
 
         {/* Modals */}
-        {/* ✅ UPDATED - Use onSuccess instead of onAdd */}
         <SavingsAddModal
           isOpen={isAddModalOpen}
           onClose={() => setIsAddModalOpen(false)}
           onSuccess={async () => {
-            console.log("✅ Savings added successfully, refreshing data...");
             setIsAddModalOpen(false);
-
-            // Add small delay to ensure backend has processed the data
             await new Promise((resolve) => setTimeout(resolve, 500));
-
-            await loadAllData(); // Refresh all data after successful add
-            console.log("✅ Data refresh completed");
+            await loadAllData();
           }}
         />
 
@@ -785,6 +735,13 @@ export default function SavingsManagement() {
           onSave={handleSaveSavings}
         />
 
+        {/* ✅ Client-Side Export Modal */}
+        <ExportSavingsModalClientSide
+          isOpen={isExportModalOpen}
+          onClose={() => setIsExportModalOpen(false)}
+          savings={savings}
+        />
+
         {/* Delete Confirmation Dialog */}
         <AlertDialog
           open={isDeleteDialogOpen}
@@ -795,8 +752,10 @@ export default function SavingsManagement() {
               <AlertDialogTitle>Hapus Simpanan</AlertDialogTitle>
               <AlertDialogDescription>
                 Apakah Anda yakin ingin menghapus simpanan{" "}
-                <strong>{recordToDelete?.user_name}</strong>? Tindakan ini tidak
-                dapat dibatalkan.
+                <strong>
+                  {recordToDelete?.user?.full_name || recordToDelete?.user_name}
+                </strong>
+                ? Tindakan ini tidak dapat dibatalkan.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

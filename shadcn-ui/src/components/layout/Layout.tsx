@@ -1,16 +1,16 @@
-import React, { useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
-import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import React, { useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
+import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+} from "@/components/ui/dropdown-menu";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import {
   Building2,
   Users,
@@ -28,8 +28,8 @@ import {
   DollarSign,
   Calendar,
   Shield,
-  Briefcase
-} from 'lucide-react';
+  Briefcase,
+} from "lucide-react";
 
 interface NavigationItem {
   name: string;
@@ -46,55 +46,99 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   // Safe function to get initials
   const getInitials = (name?: string) => {
-    if (!name || typeof name !== 'string') return 'U';
+    if (!name || typeof name !== "string") return "U";
     try {
-      return name.split(' ').map(n => n[0]).join('').toUpperCase();
+      return name
+        .split(" ")
+        .map((n) => n[0])
+        .join("")
+        .toUpperCase();
     } catch (error) {
-      return 'U';
+      return "U";
     }
   };
 
   const handleLogout = () => {
     logout();
-    navigate('/');
+    navigate("/");
   };
 
   // Navigation items based on user role
   const getNavigationItems = (): NavigationItem[] => {
-    if (user?.role === 'manager') {
+    if (user?.role === "manager") {
       return [
-        { name: 'Dashboard', href: '/manager', icon: BarChart3 },
-        { name: 'Anggota', href: '/manager/members', icon: Users },
-        { name: 'Pinjaman', href: '/manager/loans', icon: CreditCard },
-        { name: 'Simpanan', href: '/manager/savings', icon: PiggyBank },
-        { name: 'Monitoring Pembayaran', href: '/manager/payment-monitoring', icon: TrendingUp },
-        { name: 'Aset', href: '/manager/assets', icon: Briefcase },
+        { name: "Dashboard", href: "/manager", icon: BarChart3 },
+        { name: "Anggota", href: "/manager/members", icon: Users },
+        { name: "Pinjaman", href: "/manager/loans", icon: CreditCard },
+        { name: "Simpanan", href: "/manager/savings", icon: PiggyBank },
         {
-          name: 'Akuntansi',
-          href: '/manager/accounting',
+          name: "Monitoring Pembayaran",
+          href: "/manager/payment-monitoring",
+          icon: TrendingUp,
+        },
+        { name: "Aset", href: "/manager/assets", icon: Briefcase },
+        {
+          name: "Akuntansi",
+          href: "/manager/accounting",
           icon: Calculator,
           children: [
-            { name: 'Bagan Akun', href: '/manager/accounting/coa', icon: FileText },
-            { name: 'Jurnal Umum', href: '/manager/accounting/journal-entries', icon: FileText },
-            { name: 'Jurnal Manual', href: '/manager/accounting/manual-journal', icon: FileText },
-            { name: 'Periode Akuntansi', href: '/manager/accounting/periods', icon: Calendar },
-            { name: 'Neraca', href: '/manager/accounting/balance-sheet', icon: BarChart3 },
-            { name: 'Laba Rugi', href: '/manager/accounting/income-statement', icon: TrendingUp },
-            { name: 'Arus Kas', href: '/manager/accounting/cash-flow', icon: DollarSign },
-            { name: 'Neraca Saldo', href: '/manager/accounting/trial-balance', icon: Calculator },
-            { name: 'Laporan Keuangan', href: '/manager/accounting/reports', icon: FileText },
-          ]
+            {
+              name: "Bagan Akun",
+              href: "/manager/accounting/coa",
+              icon: FileText,
+            },
+            {
+              name: "Jurnal Umum",
+              href: "/manager/accounting/journal-entries",
+              icon: FileText,
+            },
+            {
+              name: "Jurnal Manual",
+              href: "/manager/accounting/manual-journal",
+              icon: FileText,
+            },
+            {
+              name: "Periode Akuntansi",
+              href: "/manager/accounting/periods",
+              icon: Calendar,
+            },
+            {
+              name: "Neraca",
+              href: "/manager/accounting/balance-sheet",
+              icon: BarChart3,
+            },
+            {
+              name: "Laba Rugi",
+              href: "/manager/accounting/income-statement",
+              icon: TrendingUp,
+            },
+            {
+              name: "Arus Kas",
+              href: "/manager/accounting/cash-flow",
+              icon: DollarSign,
+            },
+            {
+              name: "Neraca Saldo",
+              href: "/manager/accounting/trial-balance",
+              icon: Calculator,
+            },
+            {
+              name: "Laporan Keuangan",
+              href: "/manager/accounting/reports",
+              icon: FileText,
+            },
+          ],
         },
-        { name: 'User Management', href: '/manager/users', icon: Shield },
-        { name: 'Notifikasi', href: '/manager/notifications', icon: Bell },
-        { name: 'Pengaturan', href: '/manager/settings', icon: Settings },
+        { name: "User Management", href: "/manager/users", icon: Shield },
+        { name: "Notifikasi", href: "/manager/notifications", icon: Bell },
+        { name: "Pengaturan", href: "/manager/settings", icon: Settings },
       ];
     } else {
       return [
-        { name: 'Dashboard', href: '/member', icon: BarChart3 },
-        { name: 'Pinjaman Saya', href: '/member/loans', icon: CreditCard },
-        { name: 'Simpanan Saya', href: '/member/savings', icon: PiggyBank },
-        { name: 'Profil', href: '/member/profile', icon: User },
+        { name: "Dashboard", href: "/member", icon: BarChart3 },
+        { name: "Pinjaman Saya", href: "/member/loans", icon: CreditCard },
+        { name: "Simpanan Saya", href: "/member/savings", icon: PiggyBank },
+        { name: "Profil", href: "/member/profile", icon: User },
       ];
     }
   };
@@ -103,7 +147,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   const isActiveLink = (href: string, children?: NavigationItem[]) => {
     if (children) {
-      return children.some(child => location.pathname === child.href);
+      return children.some((child) => location.pathname === child.href);
     }
     return location.pathname === href;
   };
@@ -115,7 +159,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <div>
           <h1 className="font-bold text-lg">Koperasi RS</h1>
           <p className="text-sm text-gray-500">
-            {user?.role === 'manager' ? 'Manager Panel' : 'Member Panel'}
+            {user?.role === "manager" ? "Manager Panel" : "Member Panel"}
           </p>
         </div>
       </div>
@@ -126,11 +170,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <li key={item.name}>
               {item.children ? (
                 <div>
-                  <div className={`flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium ${
-                    isActiveLink(item.href, item.children)
-                      ? 'bg-blue-100 text-blue-700'
-                      : 'text-gray-600 hover:bg-gray-100'
-                  }`}>
+                  <div
+                    className={`flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium ${
+                      isActiveLink(item.href, item.children)
+                        ? "bg-blue-100 text-blue-700"
+                        : "text-gray-600 hover:bg-gray-100"
+                    }`}
+                  >
                     <item.icon className="h-5 w-5" />
                     <span>{item.name}</span>
                   </div>
@@ -141,8 +187,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
                           to={child.href}
                           className={`flex items-center space-x-3 px-3 py-2 rounded-lg text-sm ${
                             location.pathname === child.href
-                              ? 'bg-blue-100 text-blue-700'
-                              : 'text-gray-600 hover:bg-gray-100'
+                              ? "bg-blue-100 text-blue-700"
+                              : "text-gray-600 hover:bg-gray-100"
                           }`}
                           onClick={() => setIsMobileMenuOpen(false)}
                         >
@@ -158,8 +204,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   to={item.href}
                   className={`flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium ${
                     isActiveLink(item.href)
-                      ? 'bg-blue-100 text-blue-700'
-                      : 'text-gray-600 hover:bg-gray-100'
+                      ? "bg-blue-100 text-blue-700"
+                      : "text-gray-600 hover:bg-gray-100"
                   }`}
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
@@ -215,11 +261,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <div className="flex items-center space-x-4">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="flex items-center space-x-2">
+                  <Button
+                    variant="ghost"
+                    className="flex items-center space-x-2"
+                  >
                     <Avatar className="h-8 w-8">
-                      <AvatarFallback>
-                        {getInitials(user?.name)}
-                      </AvatarFallback>
+                      <AvatarFallback>{getInitials(user?.name)}</AvatarFallback>
                     </Avatar>
                     <span className="hidden md:block">{user?.name}</span>
                   </Button>
@@ -245,9 +292,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </header>
 
         {/* Main Content Area */}
-        <main className="flex-1 overflow-y-auto p-6">
-          {children}
-        </main>
+        <main className="flex-1 overflow-y-auto p-6">{children}</main>
       </div>
     </div>
   );

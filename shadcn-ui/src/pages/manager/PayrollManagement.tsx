@@ -39,10 +39,12 @@ import {
   AlertCircle,
   Loader2,
   Info,
+  Upload,
 } from "lucide-react";
 import memberService from "@/lib/api/member.service";
 import serviceAllowanceService from "@/lib/api/serviceAllowance.service";
 import { toast } from "sonner";
+import { ImportExcelModal } from "@/components/modals/ImportExcelModal";
 
 // Import types separately
 import type {
@@ -51,7 +53,7 @@ import type {
 } from "@/lib/api/serviceAllowance.service";
 
 // =====================================================
-// MODAL: Input Service Allowance
+// MODAL: Input Service Allowance (KEEP SAME)
 // =====================================================
 const InputAllowanceModal = ({
   isOpen,
@@ -73,7 +75,6 @@ const InputAllowanceModal = ({
   const [loading, setLoading] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
 
-  // Fetch members
   useEffect(() => {
     const fetchMembers = async () => {
       try {
@@ -93,7 +94,6 @@ const InputAllowanceModal = ({
     }
   }, [isOpen]);
 
-  // Preview calculation
   const handlePreview = async () => {
     if (!selectedMember || !receivedAmount) {
       toast.error("Pilih anggota dan masukkan jumlah yang diterima");
@@ -121,7 +121,6 @@ const InputAllowanceModal = ({
     }
   };
 
-  // Submit allowance
   const handleSubmit = async () => {
     if (!selectedMember || !receivedAmount) {
       toast.error("Lengkapi semua data");
@@ -146,7 +145,6 @@ const InputAllowanceModal = ({
       onSuccess();
       onClose();
 
-      // Reset form
       setSelectedMember("");
       setReceivedAmount("500000");
       setNotes("");
@@ -237,7 +235,6 @@ const InputAllowanceModal = ({
             />
           </div>
 
-          {/* Preview Button */}
           <div className="flex justify-center">
             <Button
               variant="outline"
@@ -249,7 +246,6 @@ const InputAllowanceModal = ({
             </Button>
           </div>
 
-          {/* Preview Result */}
           {showPreview && preview && (
             <Alert className="border-blue-200 bg-blue-50">
               <AlertCircle className="h-4 w-4 text-blue-600" />
@@ -344,7 +340,7 @@ const InputAllowanceModal = ({
 };
 
 // =====================================================
-// MODAL: View Detail
+// MODAL: View Detail (KEEP SAME)
 // =====================================================
 const ViewAllowanceModal = ({
   isOpen,
@@ -459,7 +455,7 @@ const ViewAllowanceModal = ({
 };
 
 // =====================================================
-// MAIN COMPONENT
+// MAIN COMPONENT - WITH IMPORT EXCEL
 // =====================================================
 export default function PayrollManagement() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -467,6 +463,7 @@ export default function PayrollManagement() {
     new Date().toISOString().slice(0, 7)
   );
   const [inputModal, setInputModal] = useState(false);
+  const [importModal, setImportModal] = useState(false); // ✅ NEW
   const [viewModal, setViewModal] = useState(false);
   const [selectedAllowance, setSelectedAllowance] =
     useState<ServiceAllowance | null>(null);
@@ -474,20 +471,17 @@ export default function PayrollManagement() {
   const [summary, setSummary] = useState<any>(null);
   const [loading, setLoading] = useState(false);
 
-  // Fetch allowances and summary
   const fetchData = async () => {
     try {
       setLoading(true);
       const [year, month] = selectedMonth.split("-").map(Number);
 
-      // Fetch allowances
       const allowanceData = await serviceAllowanceService.getAll({
         month,
         year,
       });
       setAllowances(allowanceData);
 
-      // Fetch summary
       try {
         const summaryData = await serviceAllowanceService.getPeriodSummary(
           month,
@@ -571,7 +565,6 @@ export default function PayrollManagement() {
     document.body.removeChild(link);
   };
 
-  // Filter allowances by search term
   const filteredAllowances = allowances.filter((allowance) => {
     const searchLower = searchTerm.toLowerCase();
     return (
@@ -580,7 +573,6 @@ export default function PayrollManagement() {
     );
   });
 
-  // Calculate statistics
   const totalReceived = filteredAllowances.reduce(
     (sum, a) => sum + parseFloat(a.received_amount),
     0
@@ -600,7 +592,7 @@ export default function PayrollManagement() {
   return (
     <ManagerLayout>
       <div className="space-y-6">
-        {/* Header */}
+        {/* Header - WITH IMPORT BUTTON */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">
@@ -609,17 +601,22 @@ export default function PayrollManagement() {
             <p className="text-gray-600 mt-1">Kelola jasa pelayanan anggota</p>
           </div>
           <div className="flex space-x-2">
+            {/* ✅ NEW: Import Excel Button */}
+            <Button variant="outline" onClick={() => setImportModal(true)}>
+              <Upload className="w-4 h-4 mr-2" />
+              Import Excel
+            </Button>
             <Button
               className="bg-green-600 hover:bg-green-700"
               onClick={() => setInputModal(true)}
             >
               <Plus className="w-4 h-4 mr-2" />
-              Input Jasa Pelayanan
+              Input Manual
             </Button>
           </div>
         </div>
 
-        {/* Statistics Cards */}
+        {/* Statistics Cards (KEEP SAME) */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <Card>
             <CardContent className="p-6">
@@ -683,7 +680,7 @@ export default function PayrollManagement() {
           </Card>
         </div>
 
-        {/* Filters */}
+        {/* Filters (KEEP SAME) */}
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">Filter Data</CardTitle>
@@ -712,7 +709,7 @@ export default function PayrollManagement() {
           </CardContent>
         </Card>
 
-        {/* Allowances Table */}
+        {/* Allowances Table (KEEP SAME) */}
         <Card>
           <CardHeader>
             <CardTitle>Daftar Jasa Pelayanan</CardTitle>
@@ -813,7 +810,7 @@ export default function PayrollManagement() {
           </CardContent>
         </Card>
 
-        {/* Reports Section */}
+        {/* Reports Section (KEEP SAME) */}
         <Card>
           <CardHeader>
             <CardTitle>Laporan</CardTitle>
@@ -850,6 +847,14 @@ export default function PayrollManagement() {
         onClose={() => setInputModal(false)}
         onSuccess={fetchData}
       />
+
+      {/* ✅ NEW: Import Excel Modal */}
+      <ImportExcelModal
+        isOpen={importModal}
+        onClose={() => setImportModal(false)}
+        onSuccess={fetchData}
+      />
+
       <ViewAllowanceModal
         isOpen={viewModal}
         onClose={() => setViewModal(false)}

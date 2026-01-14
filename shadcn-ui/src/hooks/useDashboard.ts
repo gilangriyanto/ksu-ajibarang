@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import dashboardService, {
   type AdminDashboardData,
+  type ManagerDashboardData,
   type MemberDashboardData,
   type AdminQuickStats,
   type MemberQuickStats,
@@ -23,8 +24,46 @@ export function useAdminDashboard() {
       const dashboardData = await dashboardService.getAdminDashboard();
       setData(dashboardData);
     } catch (err: any) {
-      setError(err.message || "Gagal memuat dashboard");
+      setError(err.message || "Gagal memuat dashboard admin");
       console.error("Admin dashboard error:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDashboard();
+  }, []);
+
+  const refresh = () => {
+    fetchDashboard();
+  };
+
+  return {
+    data,
+    loading,
+    error,
+    refresh,
+  };
+}
+
+/**
+ * Hook for Manager Dashboard
+ */
+export function useManagerDashboard() {
+  const [data, setData] = useState<ManagerDashboardData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchDashboard = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const dashboardData = await dashboardService.getManagerDashboard();
+      setData(dashboardData);
+    } catch (err: any) {
+      setError(err.message || "Gagal memuat dashboard manager");
+      console.error("Manager dashboard error:", err);
     } finally {
       setLoading(false);
     }
@@ -61,7 +100,7 @@ export function useMemberDashboard() {
       const dashboardData = await dashboardService.getMemberDashboard();
       setData(dashboardData);
     } catch (err: any) {
-      setError(err.message || "Gagal memuat dashboard");
+      setError(err.message || "Gagal memuat dashboard anggota");
       console.error("Member dashboard error:", err);
     } finally {
       setLoading(false);

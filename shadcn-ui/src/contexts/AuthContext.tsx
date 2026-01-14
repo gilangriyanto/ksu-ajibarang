@@ -1,147 +1,137 @@
 // src/contexts/AuthContext.tsx
-// ⚠️ TEMPORARY VERSION - All login goes to /manager
+import React, {
+  createContext,
+  useState,
+  useEffect,
+  ReactNode,
+  useContext,
+} from "react";
+import { authService, User, LoginResponse } from "@/lib/api/auth.service";
 
-import React, { createContext, useContext, useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { authService, type User } from "@/lib/api/auth.service";
-import { getRedirectPath } from "@/utils/loginRedirect";
-
-// ==================== TYPES ====================
-
-export interface AuthContextType {
+// Define AuthContext interface
+interface AuthContextType {
   user: User | null;
-  loading: boolean;
-  login: (email: string, password: string) => Promise<boolean>;
+  login: (email: string, password: string) => Promise<User>;
   logout: () => Promise<void>;
-  refreshUser: () => Promise<void>;
+  loading: boolean;
 }
 
-// ==================== CONTEXT ====================
-
+// Create context
 export const AuthContext = createContext<AuthContextType | undefined>(
   undefined
 );
 
-// ==================== PROVIDER ====================
+interface AuthProviderProps {
+  children: ReactNode;
+}
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const navigate = useNavigate();
 
+  // Check if user is logged in on mount
   useEffect(() => {
-    const initAuth = async () => {
+    const checkAuth = async () => {
       try {
         if (authService.isAuthenticated()) {
+          const currentUser = await authService.getCurrentUser();
+          // ✅ Map cash_account_id to kas_id
+          const mappedUser = {
+            ...currentUser,
+            kas_id: currentUser.kas_id || currentUser.cash_account_id || null,
+          };
+          setUser(mappedUser);
+        } else {
           const storedUser = authService.getStoredUser();
           if (storedUser) {
-            setUser(storedUser);
-          }
-
-          try {
-            const currentUser = await authService.getCurrentUser();
-            setUser(currentUser);
-
-            if (
-              window.location.pathname === "/login" ||
-              window.location.pathname === "/"
-            ) {
-              // ⚠️ TEMPORARY: Force to /manager
-              console.log("⚠️ TEMPORARY: Auto-redirecting to /manager");
-              navigate("/manager", { replace: true });
-
-              // ✅ Uncomment this after creating manager account
-              // const redirectPath = getRedirectPath(currentUser);
-              // console.log("🔄 Auto-redirecting to:", redirectPath);
-              // navigate(redirectPath, { replace: true });
-            }
-          } catch (error) {
-            console.error("Token verification failed:", error);
-            setUser(null);
-            localStorage.removeItem("token");
-            localStorage.removeItem("user");
+            // ✅ Map cash_account_id to kas_id
+            const mappedUser = {
+              ...storedUser,
+              kas_id: storedUser.kas_id || storedUser.cash_account_id || null,
+            };
+            setUser(mappedUser);
           }
         }
       } catch (error) {
-        console.error("Auth initialization error:", error);
+        console.error("Auth check failed:", error);
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        setUser(null);
       } finally {
         setLoading(false);
       }
     };
 
-    initAuth();
-  }, [navigate]);
+    checkAuth();
+  }, []);
 
-  const login = async (email: string, password: string): Promise<boolean> => {
+  // Login function - Returns User object
+  const login = async (email: string, password: string): Promise<User> => {
     try {
-      setLoading(true);
-      const response = await authService.login({ email, password });
+      const response: LoginResponse = await authService.login({
+        email,
+        password,
+      });
 
-      console.log("✅ Login successful, user:", response.user);
-      console.log("🔑 kas_id:", response.user.kas_id);
-      console.log("🎭 role:", response.user.role);
+      console.log("✅ Login response:", response);
+      console.log("✅ Raw user:", response.user);
+      console.log(
+        "✅ cash_account_id:",
+        (response.user as any).cash_account_id
+      );
 
-      setUser(response.user);
+      // ✅ CRITICAL: Map cash_account_id to kas_id for consistency
+      const userData: User = {
+        ...response.user,
+        kas_id:
+          response.user.kas_id ||
+          (response.user as any).cash_account_id ||
+          null,
+      };
 
-      // ✅ Uncomment this after creating manager account
-      // const redirectPath = getRedirectPath(response.user);
-      // console.log("🔄 Redirecting to:", redirectPath);
-      // navigate(redirectPath, { replace: true });
-      // return true;
-    } catch (error: any) {
-      console.error("Login failed:", error);
+      setUser(userData);
+
+      console.log("✅ User set in context:", userData);
+      console.log("✅ Final kas_id:", userData.kas_id);
+
+      return userData;
+    } catch (error) {
+      console.error("❌ Login failed in AuthContext:", error);
       throw error;
-    } finally {
-      setLoading(false);
     }
   };
 
-  const logout = async () => {
+  // Logout function
+  const logout = async (): Promise<void> => {
     try {
-      setLoading(true);
       await authService.logout();
-      setUser(null);
-      navigate("/login", { replace: true });
     } catch (error) {
-      console.error("Logout error:", error);
-      setUser(null);
-      navigate("/login", { replace: true });
+      console.error("Logout failed:", error);
     } finally {
-      setLoading(false);
-    }
-  };
-
-  const refreshUser = async () => {
-    try {
-      const currentUser = await authService.getCurrentUser();
-      setUser(currentUser);
-    } catch (error) {
-      console.error("Refresh user error:", error);
-      await logout();
+      setUser(null);
     }
   };
 
   const value: AuthContextType = {
     user,
-    loading,
     login,
     logout,
-    refreshUser,
+    loading,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-}
+};
 
-// ==================== HOOK ====================
-
-/**
- * Custom hook to access auth context
- * Must be used within AuthProvider
- */
+// ✅ EXPORT useAuth HOOK HERE
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error("useAuth must be used within AuthProvider");
+
+  if (context === undefined) {
+    throw new Error("useAuth must be used within an AuthProvider");
   }
+
   return context;
 };
+
+// Export User type
+export type { User };

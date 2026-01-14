@@ -1,5 +1,6 @@
 // src/lib/api/dashboard.service.ts
-import apiClient, { ApiResponse } from "./api-client";
+import apiClient from "./api-client";
+import type { ApiResponse } from "./api-client";
 
 // ==================== TYPES ====================
 
@@ -74,6 +75,90 @@ export interface AdminDashboardData {
   recent_activities: RecentActivity[];
   alerts: Alert[];
   charts_data: ChartsData;
+}
+
+// Manager Dashboard Types
+export interface ManagerInfo {
+  full_name: string;
+  employee_id: string;
+  email: string;
+  managed_accounts_count: number;
+}
+
+export interface ManagedAccount {
+  id: number;
+  code: string;
+  name: string;
+  description: string;
+  type: string;
+  current_balance: number;
+  is_active: boolean;
+  loan_rate: number;
+  savings_rate: number;
+  savings_count: number;
+  active_loans_count: number;
+}
+
+export interface ManagerSummary {
+  total_accounts: number;
+  total_balance: number;
+  total_savings: number;
+  total_loans_disbursed: number;
+  active_loans: number;
+  pending_savings: number;
+  pending_loans: number;
+}
+
+export interface ManagerTransaction {
+  type: "loan" | "saving";
+  id: number;
+  title: string;
+  description: string;
+  amount: number;
+  date: string;
+  status: string;
+  cash_account: {
+    id: number;
+    code: string;
+    name: string;
+  };
+}
+
+export interface PendingApprovals {
+  pending_savings: any[];
+  pending_loans: Array<{
+    id: number;
+    loan_number: string;
+    member_name: string;
+    employee_id: string;
+    amount: number;
+    tenure_months: number;
+    date: string;
+    cash_account: string;
+  }>;
+}
+
+export interface ManagerStatistics {
+  this_month: {
+    savings_collected: number;
+    loans_disbursed: number;
+    installments_collected: number;
+  };
+  this_year: {
+    savings_collected: number;
+    loans_disbursed: number;
+    installments_collected: number;
+  };
+}
+
+export interface ManagerDashboardData {
+  manager_info: ManagerInfo;
+  managed_accounts: ManagedAccount[];
+  summary: ManagerSummary;
+  recent_transactions: ManagerTransaction[];
+  pending_approvals: PendingApprovals;
+  alerts: Alert[];
+  statistics: ManagerStatistics;
 }
 
 // Member Dashboard Types
@@ -170,35 +255,28 @@ export interface MemberQuickStats {
   upcoming_installments: number;
 }
 
+// Union type for Quick Stats
+export type QuickStats = AdminQuickStats | MemberQuickStats;
+
 // ==================== SERVICE ====================
 
 class DashboardService {
   /**
    * Get Admin Dashboard Data
-   * For Admin/Manager role only
+   * For Admin role only
    */
   async getAdminDashboard(): Promise<AdminDashboardData> {
-    try {
-      const response = await apiClient.get<ApiResponse<AdminDashboardData>>(
-        "/dashboard/admin"
-      );
+    const response = await apiClient.get("/dashboard/admin");
+    return response.data.data;
+  }
 
-      if (response.data.success) {
-        return response.data.data;
-      }
-
-      throw new Error(
-        response.data.message || "Failed to fetch admin dashboard"
-      );
-    } catch (error: any) {
-      console.error("Get admin dashboard error:", error);
-
-      if (error.response?.data?.message) {
-        throw new Error(error.response.data.message);
-      }
-
-      throw new Error("Gagal mengambil data dashboard admin");
-    }
+  /**
+   * Get Manager Dashboard Data
+   * For Manager role only
+   */
+  async getManagerDashboard(): Promise<ManagerDashboardData> {
+    const response = await apiClient.get("/dashboard/manager");
+    return response.data.data;
   }
 
   /**
@@ -206,53 +284,17 @@ class DashboardService {
    * For Member role only (shows own data)
    */
   async getMemberDashboard(): Promise<MemberDashboardData> {
-    try {
-      const response = await apiClient.get<ApiResponse<MemberDashboardData>>(
-        "/dashboard/member"
-      );
-
-      if (response.data.success) {
-        return response.data.data;
-      }
-
-      throw new Error(
-        response.data.message || "Failed to fetch member dashboard"
-      );
-    } catch (error: any) {
-      console.error("Get member dashboard error:", error);
-
-      if (error.response?.data?.message) {
-        throw new Error(error.response.data.message);
-      }
-
-      throw new Error("Gagal mengambil data dashboard anggota");
-    }
+    const response = await apiClient.get("/dashboard/member");
+    return response.data.data;
   }
 
   /**
    * Get Quick Stats Widget
    * Response differs based on user role
    */
-  async getQuickStats(): Promise<AdminQuickStats | MemberQuickStats> {
-    try {
-      const response = await apiClient.get<
-        ApiResponse<AdminQuickStats | MemberQuickStats>
-      >("/dashboard/quick-stats");
-
-      if (response.data.success) {
-        return response.data.data;
-      }
-
-      throw new Error(response.data.message || "Failed to fetch quick stats");
-    } catch (error: any) {
-      console.error("Get quick stats error:", error);
-
-      if (error.response?.data?.message) {
-        throw new Error(error.response.data.message);
-      }
-
-      throw new Error("Gagal mengambil statistik cepat");
-    }
+  async getQuickStats(): Promise<QuickStats> {
+    const response = await apiClient.get("/dashboard/quick-stats");
+    return response.data.data;
   }
 }
 

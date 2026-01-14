@@ -36,7 +36,7 @@ import ManagerUpcomingInstallments from "./pages/manager/UpcomingInstallments";
 import MemberOverdueInstallments from "./pages/member/OverdueInstallments";
 import MemberUpcomingInstallments from "./pages/member/UpcomingInstallments";
 
-// ✅ Kas Layout & Dashboard - Used by Admin
+// ✅ Kas Layout & Dashboard - Used by Manager Kas (role="manager")
 import KasLayout from "./components/layout/KasLayout";
 import KasDashboard from "./pages/kas/KasDashboard";
 import KasLoanManagement from "./pages/kas/KasLoanManagement";
@@ -52,27 +52,17 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <Routes>
-            {/* Public Routes */}
+            {/* Public Routes - INSIDE AuthProvider */}
             <Route path="/" element={<Login />} />
             <Route path="/login" element={<Login />} />
 
-            {/* ✅ Admin Route - Uses KasLayout with KasDashboard */}
-            <Route
-              path="/admin"
-              element={
-                <ProtectedRoute allowedRoles={["admin"]}>
-                  <KasLayout>
-                    <KasDashboard />
-                  </KasLayout>
-                </ProtectedRoute>
-              }
-            />
-
-            {/* Member Routes - Only for role "anggota" */}
+            {/* ==========================================
+                MEMBER ROUTES (role="anggota")
+                ========================================== */}
             <Route
               path="/member"
               element={
-                <ProtectedRoute allowedRoles={["anggota", "member"]}>
+                <ProtectedRoute allowedRoles={["anggota"]}>
                   <MemberDashboard />
                 </ProtectedRoute>
               }
@@ -80,7 +70,7 @@ const App = () => (
             <Route
               path="/member/profile"
               element={
-                <ProtectedRoute allowedRoles={["anggota", "member"]}>
+                <ProtectedRoute allowedRoles={["anggota"]}>
                   <MemberProfile />
                 </ProtectedRoute>
               }
@@ -88,7 +78,7 @@ const App = () => (
             <Route
               path="/member/savings"
               element={
-                <ProtectedRoute allowedRoles={["anggota", "member"]}>
+                <ProtectedRoute allowedRoles={["anggota"]}>
                   <MemberSavings />
                 </ProtectedRoute>
               }
@@ -96,17 +86,15 @@ const App = () => (
             <Route
               path="/member/loans"
               element={
-                <ProtectedRoute allowedRoles={["anggota", "member"]}>
+                <ProtectedRoute allowedRoles={["anggota"]}>
                   <MemberLoans />
                 </ProtectedRoute>
               }
             />
-
-            {/* ✅ Member Installment Routes */}
             <Route
               path="/member/cicilan-terlambat"
               element={
-                <ProtectedRoute allowedRoles={["anggota", "member"]}>
+                <ProtectedRoute allowedRoles={["anggota"]}>
                   <MemberOverdueInstallments />
                 </ProtectedRoute>
               }
@@ -114,28 +102,29 @@ const App = () => (
             <Route
               path="/member/cicilan-mendatang"
               element={
-                <ProtectedRoute allowedRoles={["anggota", "member"]}>
+                <ProtectedRoute allowedRoles={["anggota"]}>
                   <MemberUpcomingInstallments />
                 </ProtectedRoute>
               }
             />
-
             <Route
               path="/member/payroll"
               element={
-                <ProtectedRoute allowedRoles={["anggota", "member"]}>
+                <ProtectedRoute allowedRoles={["anggota"]}>
                   <PayrollView />
                 </ProtectedRoute>
               }
             />
 
-            {/* Manager Routes - Only for manager WITHOUT kas_id - Uses ManagerLayout */}
+            {/* ==========================================
+                ADMIN ROUTES (role="admin")
+                Uses ManagerLayout - Full System Access
+                ========================================== */}
             <Route
               path="/manager"
               element={
-                <ProtectedRoute allowedRoles={["manager", "admin"]}>
+                <ProtectedRoute allowedRoles={["admin"]}>
                   <ManagerLayout>
-                    {/* ✅ Harus ada ini */}
                     <ManagerDashboard />
                   </ManagerLayout>
                 </ProtectedRoute>
@@ -144,140 +133,162 @@ const App = () => (
             <Route
               path="/manager/members"
               element={
-                <ProtectedRoute allowedRoles={["manajer", "manager", "admin"]}>
-                  <MemberManagement />
+                <ProtectedRoute allowedRoles={["admin"]}>
+                  <ManagerLayout>
+                    <MemberManagement />
+                  </ManagerLayout>
                 </ProtectedRoute>
               }
             />
-
-            {/* ✅ Manajemen Kas Route */}
             <Route
               path="/manager/kas"
               element={
-                <ProtectedRoute allowedRoles={["manajer", "manager", "admin"]}>
-                  <CashAccountsPage />
+                <ProtectedRoute allowedRoles={["admin"]}>
+                  <ManagerLayout>
+                    <CashAccountsPage />
+                  </ManagerLayout>
                 </ProtectedRoute>
               }
             />
-
-            {/* ✅ Manajemen Kas Detail Route */}
             <Route
               path="/manager/kas/:id"
               element={
-                <ProtectedRoute allowedRoles={["manajer", "manager", "admin"]}>
-                  <CashAccountDetailPage />
+                <ProtectedRoute allowedRoles={["admin"]}>
+                  <ManagerLayout>
+                    <CashAccountDetailPage />
+                  </ManagerLayout>
                 </ProtectedRoute>
               }
             />
-
             <Route
               path="/manager/savings"
               element={
-                <ProtectedRoute allowedRoles={["manajer", "manager", "admin"]}>
-                  <Savings />
+                <ProtectedRoute allowedRoles={["admin"]}>
+                  <ManagerLayout>
+                    <Savings />
+                  </ManagerLayout>
                 </ProtectedRoute>
               }
             />
             <Route
               path="/manager/loans"
               element={
-                <ProtectedRoute allowedRoles={["manajer", "manager", "admin"]}>
-                  <LoanManagement />
+                <ProtectedRoute allowedRoles={["admin"]}>
+                  <ManagerLayout>
+                    <LoanManagement />
+                  </ManagerLayout>
                 </ProtectedRoute>
               }
             />
-
-            {/* ✅ Manager Installment Routes */}
             <Route
               path="/manager/cicilan-terlambat"
               element={
-                <ProtectedRoute allowedRoles={["manajer", "manager", "admin"]}>
-                  <ManagerOverdueInstallments />
+                <ProtectedRoute allowedRoles={["admin"]}>
+                  <ManagerLayout>
+                    <ManagerOverdueInstallments />
+                  </ManagerLayout>
                 </ProtectedRoute>
               }
             />
             <Route
               path="/manager/cicilan-mendatang"
               element={
-                <ProtectedRoute allowedRoles={["manajer", "manager", "admin"]}>
-                  <ManagerUpcomingInstallments />
+                <ProtectedRoute allowedRoles={["admin"]}>
+                  <ManagerLayout>
+                    <ManagerUpcomingInstallments />
+                  </ManagerLayout>
                 </ProtectedRoute>
               }
             />
-
             <Route
               path="/manager/payroll"
               element={
-                <ProtectedRoute allowedRoles={["manajer", "manager", "admin"]}>
-                  <PayrollManagement />
+                <ProtectedRoute allowedRoles={["admin"]}>
+                  <ManagerLayout>
+                    <PayrollManagement />
+                  </ManagerLayout>
                 </ProtectedRoute>
               }
             />
             <Route
               path="/manager/accounting"
               element={
-                <ProtectedRoute allowedRoles={["manajer", "manager", "admin"]}>
-                  <Accounting />
+                <ProtectedRoute allowedRoles={["admin"]}>
+                  <ManagerLayout>
+                    <Accounting />
+                  </ManagerLayout>
                 </ProtectedRoute>
               }
             />
             <Route
               path="/manager/accounts"
               element={
-                <ProtectedRoute allowedRoles={["manajer", "manager", "admin"]}>
-                  <AccountManagement />
+                <ProtectedRoute allowedRoles={["admin"]}>
+                  <ManagerLayout>
+                    <AccountManagement />
+                  </ManagerLayout>
                 </ProtectedRoute>
               }
             />
             <Route
               path="/manager/assets"
               element={
-                <ProtectedRoute allowedRoles={["manajer", "manager", "admin"]}>
-                  <AssetManagement />
+                <ProtectedRoute allowedRoles={["admin"]}>
+                  <ManagerLayout>
+                    <AssetManagement />
+                  </ManagerLayout>
                 </ProtectedRoute>
               }
             />
             <Route
               path="/manager/balance-sheet"
               element={
-                <ProtectedRoute allowedRoles={["manajer", "manager", "admin"]}>
-                  <BalanceSheet />
+                <ProtectedRoute allowedRoles={["admin"]}>
+                  <ManagerLayout>
+                    <BalanceSheet />
+                  </ManagerLayout>
                 </ProtectedRoute>
               }
             />
             <Route
               path="/manager/reports"
               element={
-                <ProtectedRoute allowedRoles={["manajer", "manager", "admin"]}>
-                  <Reports />
+                <ProtectedRoute allowedRoles={["admin"]}>
+                  <ManagerLayout>
+                    <Reports />
+                  </ManagerLayout>
                 </ProtectedRoute>
               }
             />
             <Route
               path="/manager/settings"
               element={
-                <ProtectedRoute allowedRoles={["manajer", "manager", "admin"]}>
-                  <Settings />
+                <ProtectedRoute allowedRoles={["admin"]}>
+                  <ManagerLayout>
+                    <Settings />
+                  </ManagerLayout>
                 </ProtectedRoute>
               }
             />
             <Route
               path="/manager/income-statement"
               element={
-                <ProtectedRoute allowedRoles={["manajer", "manager", "admin"]}>
-                  <IncomeStatement />
+                <ProtectedRoute allowedRoles={["admin"]}>
+                  <ManagerLayout>
+                    <IncomeStatement />
+                  </ManagerLayout>
                 </ProtectedRoute>
               }
             />
 
-            {/* Kas Routes - Only for manager WITH kas_id - Uses KasLayout */}
+            {/* ==========================================
+                MANAGER KAS ROUTES (role="manager")
+                Uses KasLayout - Specific Kas Access Only
+                ========================================== */}
             <Route
               path="/kas/:kasId"
               element={
-                <ProtectedRoute
-                  allowedRoles={["manajer", "manager", "admin"]}
-                  requireKasId={true}
-                >
+                <ProtectedRoute allowedRoles={["manager"]} requireKasId={true}>
                   <KasLayout>
                     <KasDashboard />
                   </KasLayout>
@@ -287,10 +298,7 @@ const App = () => (
             <Route
               path="/kas/:kasId/loans"
               element={
-                <ProtectedRoute
-                  allowedRoles={["manajer", "manager", "admin"]}
-                  requireKasId={true}
-                >
+                <ProtectedRoute allowedRoles={["manager"]} requireKasId={true}>
                   <KasLayout>
                     <KasLoanManagement />
                   </KasLayout>
@@ -300,10 +308,7 @@ const App = () => (
             <Route
               path="/kas/:kasId/savings"
               element={
-                <ProtectedRoute
-                  allowedRoles={["manajer", "manager", "admin"]}
-                  requireKasId={true}
-                >
+                <ProtectedRoute allowedRoles={["manager"]} requireKasId={true}>
                   <KasLayout>
                     <KasSavings />
                   </KasLayout>
@@ -313,10 +318,7 @@ const App = () => (
             <Route
               path="/kas/:kasId/accounting"
               element={
-                <ProtectedRoute
-                  allowedRoles={["manajer", "manager", "admin"]}
-                  requireKasId={true}
-                >
+                <ProtectedRoute allowedRoles={["manager"]} requireKasId={true}>
                   <KasLayout>
                     <KasAccounting />
                   </KasLayout>

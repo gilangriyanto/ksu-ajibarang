@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -21,9 +21,12 @@ import {
   TrendingUp,
   Wallet,
   DollarSign,
-  UserCog, // ✅ NEW for Pengelola Kas
+  UserCog,
+  Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import authService, { User } from "@/lib/api/auth.service";
+import { toast } from "sonner";
 
 interface ManagerLayoutProps {
   children: React.ReactNode;
@@ -32,7 +35,53 @@ interface ManagerLayoutProps {
 export function ManagerLayout({ children }: ManagerLayoutProps) {
   const location = useLocation();
   const navigate = useNavigate();
-  const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  // ✅ User state management
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [loadingUser, setLoadingUser] = useState(true);
+  const [userError, setUserError] = useState<string | null>(null);
+
+  // ✅ Fetch current user on mount
+  useEffect(() => {
+    const fetchCurrentUser = async () => {
+      try {
+        setLoadingUser(true);
+        setUserError(null);
+        console.log("🔄 Fetching current user...");
+
+        // Try to get from localStorage first for instant display
+        const storedUser = authService.getStoredUser();
+        if (storedUser) {
+          setCurrentUser(storedUser);
+          console.log("📦 Loaded user from localStorage:", storedUser);
+        }
+
+        // Then fetch from API for fresh data
+        const user = await authService.getCurrentUser();
+
+        console.log("✅ User data loaded from API:", user);
+        setCurrentUser(user);
+      } catch (error: any) {
+        console.error("❌ Error fetching user:", error);
+        setUserError(error.message || "Gagal memuat data user");
+
+        // If token is invalid, redirect to login
+        if (error.response?.status === 401 || error.response?.status === 403) {
+          toast.error("Sesi Anda telah berakhir. Silakan login kembali.");
+          setTimeout(() => {
+            handleLogout();
+          }, 1500);
+        } else {
+          toast.error("Gagal memuat data pengguna");
+        }
+      } finally {
+        setLoadingUser(false);
+      }
+    };
+
+    fetchCurrentUser();
+  }, []);
 
   const navigation = [
     {
@@ -47,14 +96,14 @@ export function ManagerLayout({ children }: ManagerLayoutProps) {
       icon: Users,
       current: location.pathname === "/manager/members",
     },
-    // ✅ NEW: Manajemen Kas
     {
       name: "Manajemen Kas",
       href: "/manager/kas",
       icon: Wallet,
-      current: location.pathname.startsWith("/manager/kas") || 
-              location.pathname.startsWith("/manager/cash-managers"),
-      badge: null, // Could show number of managed accounts
+      current:
+        location.pathname.startsWith("/manager/kas") ||
+        location.pathname.startsWith("/manager/cash-managers"),
+      badge: null,
     },
     {
       name: "Manajemen Simpanan",
@@ -106,158 +155,234 @@ export function ManagerLayout({ children }: ManagerLayoutProps) {
     },
   ];
 
-  // Mock manager data
-  const managerData = {
-    name: "Dr. Siti Nurhaliza",
-    role: "Manager Koperasi",
-    employeeId: "MGR001",
-    notifications: 5,
+  const handleLogout = async () => {
+    try {
+      await authService.logout();
+    } catch (error) {
+      console.error("Logout error:", error);
+    } finally {
+      // Clear all storage
+      localStorage.clear();
+      sessionStorage.clear();
+      document.cookie.split(";").forEach((c) => {
+        document.cookie = c
+          .replace(/^ +/, "")
+          .replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+      });
+
+      // Redirect to login
+      window.location.href = "/login";
+    }
   };
 
-  const handleLogout = () => {
-    // Clear all authentication data
-    localStorage.clear();
-    sessionStorage.clear();
+  // ✅ Get role-specific icon
+  const getRoleIcon = (role: string) => {
+    switch (role) {
+      case "admin":
+        return Shield;
+      case "manager":
+        return UserCog;
+      case "anggota":
+      case "member":
+        return Users;
+      case "admin_kas_1":
+      case "admin_kas_2":
+      case "admin_kas_3":
+      case "admin_kas_4":
+        return Wallet;
+      default:
+        return Shield;
+    }
+  };
 
-    // Clear any cookies if they exist
-    document.cookie.split(";").forEach((c) => {
-      document.cookie = c
-        .replace(/^ +/, "")
-        .replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
-    });
-
-    // Force full page reload to login
-    window.location.href = "/login";
+  // ✅ Get role display name in Indonesian
+  const getRoleDisplay = (role: string): string => {
+    const roleMap: Record<string, string> = {
+      admin: "Administrator",
+      manager: "Manager Koperasi",
+      anggota: "Anggota",
+      member: "Anggota",
+      admin_kas_1: "Admin Kas 1",
+      admin_kas_2: "Admin Kas 2",
+      admin_kas_3: "Admin Kas 3",
+      admin_kas_4: "Admin Kas 4",
+    };
+    return roleMap[role] || role;
   };
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Mobile sidebar overlay */}
+      {/* Mobile overlay */}
       {isSidebarOpen && (
         <div
-          className="fixed inset-0 z-40 lg:hidden"
+          className="fixed inset-0 z-40 bg-gray-600/75 lg:hidden"
           onClick={() => setIsSidebarOpen(false)}
-        >
-          <div className="fixed inset-0 bg-gray-600 bg-opacity-75" />
-        </div>
+        />
       )}
 
-      {/* Sidebar */}
-      <div
+      {/* Sidebar - FIXED */}
+      <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-40 w-64 bg-white shadow-lg transform transition-transform duration-200 ease-in-out",
+          "fixed top-0 left-0 z-50 h-full w-64 flex flex-col bg-white shadow-lg transition-transform duration-200 ease-in-out",
           isSidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         )}
       >
-        <div className="flex flex-col h-full">
-          {/* Header */}
-          <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200">
-            <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center">
-                <Shield className="w-5 h-5 text-white" />
-              </div>
-              <span className="text-lg font-bold text-gray-900">
-                KoperasiKu
-              </span>
+        {/* Header */}
+        <div className="flex h-16 items-center justify-between px-4 border-b border-gray-200 flex-shrink-0">
+          <div className="flex items-center space-x-2">
+            <div className="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center flex-shrink-0">
+              <Shield className="w-5 h-5 text-white" />
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="lg:hidden"
-              onClick={() => setIsSidebarOpen(false)}
-            >
-              <X className="h-4 w-4" />
-            </Button>
+            <span className="text-lg font-bold text-gray-900">KoperasiKu</span>
           </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="lg:hidden"
+            onClick={() => setIsSidebarOpen(false)}
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
 
-          {/* Manager Info Card */}
-          <div className="p-4">
+        {/* ✅ DYNAMIC: User Card */}
+        <div className="p-4 flex-shrink-0">
+          {loadingUser ? (
+            // Loading state
+            <Card className="bg-gradient-to-r from-green-500 to-green-600 text-white">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-center space-x-2">
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <span className="text-sm">Memuat data...</span>
+                </div>
+              </CardContent>
+            </Card>
+          ) : userError ? (
+            // Error state
+            <Card className="bg-gradient-to-r from-red-500 to-red-600 text-white">
+              <CardContent className="p-4">
+                <div className="text-center">
+                  <p className="text-sm font-medium mb-2">Gagal memuat data</p>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-white hover:bg-white/20"
+                    onClick={() => window.location.reload()}
+                  >
+                    Coba Lagi
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ) : currentUser ? (
+            // ✅ SUCCESS: Display real user data
             <Card className="bg-gradient-to-r from-green-500 to-green-600 text-white">
               <CardContent className="p-4">
                 <div className="flex items-center space-x-3">
-                  <div className="w-12 h-12 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
-                    <Shield className="w-6 h-6" />
+                  <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center flex-shrink-0">
+                    {React.createElement(getRoleIcon(currentUser.role), {
+                      className: "w-6 h-6",
+                    })}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">
-                      {managerData.name}
+                      {currentUser.full_name}
                     </p>
-                    <p className="text-xs opacity-90">{managerData.role}</p>
+                    <p className="text-xs opacity-90 truncate">
+                      {getRoleDisplay(currentUser.role)}
+                    </p>
                     <p className="text-xs opacity-75">
-                      ID: {managerData.employeeId}
+                      ID: {currentUser.employee_id}
                     </p>
                   </div>
                 </div>
+
+                {/* Additional info if available */}
+                {(currentUser.work_unit || currentUser.position) && (
+                  <div className="mt-3 pt-3 border-t border-white/20">
+                    {currentUser.position && (
+                      <p className="text-xs opacity-90 truncate">
+                        {currentUser.position}
+                      </p>
+                    )}
+                    {currentUser.work_unit && (
+                      <p className="text-xs opacity-75 truncate">
+                        {currentUser.work_unit}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Statistics - can be made dynamic later */}
                 <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-                  <div className="bg-white bg-opacity-10 rounded p-2">
+                  <div className="bg-white/10 rounded p-2">
                     <p className="opacity-75">Total Anggota</p>
                     <p className="font-semibold">150</p>
                   </div>
-                  <div className="bg-white bg-opacity-10 rounded p-2">
+                  <div className="bg-white/10 rounded p-2">
                     <p className="opacity-75">Pinjaman Aktif</p>
                     <p className="font-semibold">45</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
-          </div>
+          ) : null}
+        </div>
 
-          {/* Navigation */}
-          <nav className="flex-1 px-4 pb-4 space-y-1 overflow-y-auto">
-            {navigation.map((item) => {
-              const Icon = item.icon;
-              return (
-                <Link
-                  key={item.name}
-                  to={item.href}
-                  className={cn(
-                    "flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors",
-                    item.current
-                      ? "bg-green-100 text-green-700 border-r-2 border-green-600"
-                      : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-                  )}
-                  onClick={() => setIsSidebarOpen(false)}
-                >
-                  <Icon className="w-5 h-5 mr-3 flex-shrink-0" />
-                  <span className="truncate">{item.name}</span>
-                  {item.name === "Dashboard" &&
-                    managerData.notifications > 0 && (
-                      <Badge className="ml-auto bg-red-500 text-white text-xs px-1.5 py-0.5">
-                        {managerData.notifications}
-                      </Badge>
-                    )}
-                </Link>
-              );
-            })}
-          </nav>
-
-          {/* Footer */}
-          <div className="p-4 border-t border-gray-200">
-            <div className="space-y-2">
+        {/* Navigation - Scrollable */}
+        <nav className="flex-1 px-4 pb-4 space-y-1 overflow-y-auto">
+          {navigation.map((item) => {
+            const Icon = item.icon;
+            return (
               <Link
-                to="/manager/settings"
-                className="flex items-center px-3 py-2 text-sm text-gray-600 rounded-lg hover:bg-gray-100"
+                key={item.name}
+                to={item.href}
+                className={cn(
+                  "flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors",
+                  item.current
+                    ? "bg-green-100 text-green-700"
+                    : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                )}
+                onClick={() => setIsSidebarOpen(false)}
               >
-                <Settings className="w-4 h-4 mr-3" />
-                Pengaturan
+                <Icon className="w-5 h-5 mr-3 flex-shrink-0" />
+                <span className="truncate">{item.name}</span>
+                {item.name === "Dashboard" && (
+                  <Badge className="ml-auto bg-red-500 text-white text-xs px-1.5 py-0.5 flex-shrink-0">
+                    5
+                  </Badge>
+                )}
               </Link>
-              <Button
-                variant="ghost"
-                className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50"
-                onClick={handleLogout}
-              >
-                <LogOut className="w-4 h-4 mr-3" />
-                Keluar
-              </Button>
-            </div>
+            );
+          })}
+        </nav>
+
+        {/* Footer */}
+        <div className="p-4 border-t border-gray-200 flex-shrink-0">
+          <div className="space-y-2">
+            <Link
+              to="/manager/settings"
+              className="flex items-center px-3 py-2 text-sm text-gray-600 rounded-lg hover:bg-gray-100"
+            >
+              <Settings className="w-4 h-4 mr-3 flex-shrink-0" />
+              <span className="truncate">Pengaturan</span>
+            </Link>
+            <Button
+              variant="ghost"
+              className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50"
+              onClick={handleLogout}
+            >
+              <LogOut className="w-4 w-4 mr-3 flex-shrink-0" />
+              <span className="truncate">Keluar</span>
+            </Button>
           </div>
         </div>
-      </div>
+      </aside>
 
-      {/* Main content */}
-      <div className="lg:pl-64">
-        {/* Top bar for mobile */}
-        <div className="lg:hidden">
+      {/* Main content area - FIXED with explicit width */}
+      <div className="w-full lg:ml-64 lg:w-[calc(100vw-16rem)]">
+        {/* Mobile header */}
+        <header className="lg:hidden sticky top-0 z-30">
           <div className="flex items-center justify-between h-16 px-4 bg-white border-b border-gray-200">
             <Button
               variant="ghost"
@@ -267,21 +392,24 @@ export function ManagerLayout({ children }: ManagerLayoutProps) {
               <Menu className="h-5 w-5" />
             </Button>
             <div className="flex items-center space-x-2">
-              <Button variant="ghost" size="sm">
+              {currentUser && (
+                <span className="text-sm font-medium text-gray-700 hidden sm:block truncate max-w-[150px]">
+                  {currentUser.full_name}
+                </span>
+              )}
+              <Button variant="ghost" size="sm" className="relative">
                 <Bell className="h-4 w-4" />
-                {managerData.notifications > 0 && (
-                  <Badge className="ml-1 bg-red-500 text-white text-xs px-1.5 py-0.5">
-                    {managerData.notifications}
-                  </Badge>
-                )}
+                <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs bg-red-500 text-white">
+                  5
+                </Badge>
               </Button>
             </div>
           </div>
-        </div>
+        </header>
 
         {/* Page content */}
-        <main className="flex-1">
-          <div className="p-6 lg:p-8">{children}</div>
+        <main className="min-h-screen">
+          <div className="p-4 sm:p-6 lg:p-8">{children}</div>
         </main>
       </div>
     </div>

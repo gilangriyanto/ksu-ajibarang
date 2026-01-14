@@ -1,81 +1,104 @@
 // src/utils/loginRedirect.ts
+// FIXED: Correct role mapping sesuai backend
 
 interface User {
-  role: string;
-  kas_id?: number | null;
+  id: number;
+  name: string;
+  email: string;
+  role: "admin" | "manager" | "member";
+  cash_account_id?: number | null;
 }
 
 /**
- * Smart redirect based on user role and kas_id
+ * Get redirect path after successful login based on user role
  *
- * Logic:
- * - Admin (no kas_id) -> /admin (uses KasLayout)
- * - Manager with kas_id -> /kas/{kasId} (uses KasLayout)
- * - Manager without kas_id -> /manager (uses ManagerLayout)
- * - Anggota -> /member (uses MemberLayout)
+ * CORRECT MAPPING (Backend Standard):
+ * - "admin" = Super Admin → Manager Layout (/manager)
+ * - "manager" = Admin Kas → Kas Layout (/kas/:kasId)
+ * - "member" = Member biasa → Member Layout (/member)
  */
-export function getRedirectPath(user: User): string {
-  const role = user.role?.toLowerCase();
-  const kasId = user.kas_id;
+export const getRedirectPath = (user: User): string => {
+  switch (user.role) {
+    case "admin":
+      // admin = Super Admin → Full access Manager Layout
+      return "/manager";
 
-  console.log("🔄 getRedirectPath called with:", { role, kas_id: kasId });
+    case "manager":
+      // manager = Admin Kas → Manage specific kas
+      if (!user.cash_account_id) {
+        console.error("Manager role requires cash_account_id");
+        return "/login"; // Redirect back to login if no kas assigned
+      }
+      return `/kas/${user.cash_account_id}`;
 
-  // ✅ Admin without kas_id -> Admin dashboard with KasLayout
-  if (role === "admin" && !kasId) {
-    console.log("✅ Redirecting to: /admin (Admin without kas_id)");
-    return "/admin";
+    case "member":
+      // member = Member biasa → Limited access
+      return "/member";
+
+    default:
+      console.error("Unknown role:", user.role);
+      return "/login";
   }
-
-  // ✅ Admin with kas_id -> Specific kas dashboard
-  if (role === "admin" && kasId) {
-    console.log(`✅ Redirecting to: /kas/${kasId} (Admin with kas_id)`);
-    return `/kas/${kasId}`;
-  }
-
-  // ✅ Manager with kas_id -> Specific kas dashboard
-  if ((role === "manager" || role === "manajer") && kasId) {
-    console.log(`✅ Redirecting to: /kas/${kasId} (Manager with kas_id)`);
-    return `/kas/${kasId}`;
-  }
-
-  // ✅ Manager without kas_id -> Manager dashboard
-  if (role === "manager" || role === "manager") {
-    console.log("✅ Redirecting to: /manager (Manager without kas_id)");
-    return "/manager";
-  }
-
-  // ✅ Member/Anggota -> Member dashboard
-  if (role === "anggota" || role === "member") {
-    console.log("✅ Redirecting to: /member (Anggota)");
-    return "/member";
-  }
-
-  // ❌ Fallback
-  console.warn("⚠️ Unknown role, redirecting to /member");
-  return "/member";
-}
+};
 
 /**
- * Check if user should use KasLayout
+ * Get role display name
  */
-export function shouldUseKasLayout(user: User): boolean {
-  const role = user.role?.toLowerCase();
-  const kasId = user.kas_id;
-
-  // Admin without kas_id OR any user with kas_id uses KasLayout
-  return (role === "admin" && !kasId) || !!kasId;
-}
+export const getRoleName = (role: string): string => {
+  switch (role) {
+    case "admin":
+      return "Super Admin";
+    case "manager":
+      return "Admin Kas";
+    case "member":
+      return "Member";
+    default:
+      return "Unknown";
+  }
+};
 
 /**
- * Get kas name by ID
+ * Get role description
  */
-export function getKasName(kasId: number): string {
-  const kasNames: Record<number, string> = {
-    1: "Kas 1 - Pembiayaan Umum",
-    2: "Kas 2 - Barang & Logistik",
-    3: "Kas 3 - Sebrakan",
-    4: "Kas 4 - Kantin",
-  };
+export const getRoleDescription = (role: string): string => {
+  switch (role) {
+    case "admin":
+      return "Akses penuh ke seluruh sistem";
+    case "manager":
+      return "Mengelola kas tertentu sebagai manager";
+    case "member":
+      return "Anggota biasa koperasi";
+    default:
+      return "";
+  }
+};
 
-  return kasNames[kasId] || `Kas ${kasId}`;
-}
+/**
+ * Check if user can access a specific route
+ */
+export const canAccessRoute = (
+  userRole: string,
+  requiredRole: string | string[],
+  userKasId?: number | null,
+  routeKasId?: number
+): boolean => {
+  // Check if role matches
+  const roles = Array.isArray(requiredRole) ? requiredRole : [requiredRole];
+  if (!roles.includes(userRole)) {
+    return false;
+  }
+
+  // For manager role, check kas_id match
+  if (userRole === "manager" && routeKasId !== undefined) {
+    return userKasId === routeKasId;
+  }
+
+  return true;
+};
+
+export default {
+  getRedirectPath,
+  getRoleName,
+  getRoleDescription,
+  canAccessRoute,
+};

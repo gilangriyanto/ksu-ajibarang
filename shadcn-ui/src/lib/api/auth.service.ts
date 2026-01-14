@@ -22,7 +22,8 @@ export interface User {
   position?: string;
   joined_at?: string;
   created_at?: string;
-  kas_id?: number; // untuk admin kas
+  kas_id?: number; // untuk admin kas (frontend preference)
+  cash_account_id?: number; // ✅ Backend field (actual from API)
 }
 
 // Interface untuk Login Request

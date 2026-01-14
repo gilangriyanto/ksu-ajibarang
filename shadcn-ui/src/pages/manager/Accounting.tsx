@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { ManagerLayout } from "@/components/layout/ManagerLayout";
 import {
   Card,
@@ -40,6 +41,8 @@ import {
   Calculator,
   Loader2,
   FileText,
+  ArrowLeft,
+  Zap,
 } from "lucide-react";
 import journalService from "@/lib/api/journal.service";
 import chartOfAccountsService from "@/lib/api/chartOfAccounts.service";
@@ -50,7 +53,7 @@ import type { Journal, JournalDetail } from "@/lib/api/journal.service";
 import type { ChartOfAccount } from "@/lib/api/chartOfAccounts.service";
 
 // =====================================================
-// MODAL: Add/Edit Journal
+// MODAL: Add/Edit Journal (KEEP SAME)
 // =====================================================
 const JournalFormModal = ({
   isOpen,
@@ -89,7 +92,6 @@ const JournalFormModal = ({
     }
 
     if (journal) {
-      // Edit mode - populate form
       setFormData({
         journal_type: journal.journal_type,
         description: journal.description,
@@ -106,7 +108,6 @@ const JournalFormModal = ({
         }))
       );
     } else {
-      // Reset for add mode
       setFormData({
         journal_type: "general",
         description: "",
@@ -167,7 +168,6 @@ const JournalFormModal = ({
   const isBalanced = Math.abs(totalDebit - totalCredit) < 0.01;
 
   const handleSubmit = async () => {
-    // Validation
     if (
       !formData.description ||
       !formData.transaction_date ||
@@ -178,7 +178,6 @@ const JournalFormModal = ({
       return;
     }
 
-    // Check all entries have account selected
     if (entries.some((e) => e.chart_of_account_id === 0)) {
       toast.error("Pilih akun untuk semua entry");
       return;
@@ -391,7 +390,7 @@ const JournalFormModal = ({
                 </div>
                 <div>
                   <span className="text-gray-600">Total Kredit: </span>
-                  <span className="font-medium text-red-600">
+                  <span className="font-medium text-purple-600">
                     {formatCurrency(totalCredit)}
                   </span>
                 </div>
@@ -444,7 +443,7 @@ const JournalFormModal = ({
 };
 
 // =====================================================
-// MODAL: View Journal Detail
+// MODAL: View Journal Detail (KEEP SAME)
 // =====================================================
 const ViewJournalModal = ({
   isOpen,
@@ -475,7 +474,7 @@ const ViewJournalModal = ({
   };
 
   return (
-    <Dialog open={isOpen} onChangeChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Detail Jurnal - {journal.journal_number}</DialogTitle>
@@ -485,7 +484,6 @@ const ViewJournalModal = ({
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* Header Info */}
           <div className="grid grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
             <div>
               <Label className="font-medium text-gray-600">Nomor Jurnal:</Label>
@@ -505,13 +503,11 @@ const ViewJournalModal = ({
             </div>
           </div>
 
-          {/* Description */}
           <div>
             <Label className="font-medium">Deskripsi:</Label>
             <p className="mt-1 text-gray-700">{journal.description}</p>
           </div>
 
-          {/* Journal Entries Table */}
           <div>
             <Label className="font-medium text-lg mb-3 block">
               Detail Entries:
@@ -557,7 +553,7 @@ const ViewJournalModal = ({
                           ? formatCurrency(detail.debit)
                           : "-"}
                       </td>
-                      <td className="py-3 px-4 text-right font-medium text-red-600">
+                      <td className="py-3 px-4 text-right font-medium text-purple-600">
                         {parseFloat(detail.credit) > 0
                           ? formatCurrency(detail.credit)
                           : "-"}
@@ -573,7 +569,7 @@ const ViewJournalModal = ({
                     <td className="py-3 px-4 text-right font-bold text-green-600">
                       {formatCurrency(journal.total_debit)}
                     </td>
-                    <td className="py-3 px-4 text-right font-bold text-red-600">
+                    <td className="py-3 px-4 text-right font-bold text-purple-600">
                       {formatCurrency(journal.total_credit)}
                     </td>
                   </tr>
@@ -582,7 +578,6 @@ const ViewJournalModal = ({
             </div>
           </div>
 
-          {/* Status Info */}
           <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
             <div>
               <Label className="font-medium">Status:</Label>
@@ -625,9 +620,10 @@ const ViewJournalModal = ({
 };
 
 // =====================================================
-// MAIN COMPONENT
+// MAIN COMPONENT - NEW UI
 // =====================================================
 export default function Accounting() {
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedType, setSelectedType] = useState("all");
   const [journals, setJournals] = useState<Journal[]>([]);
@@ -771,14 +767,22 @@ export default function Accounting() {
     document.body.removeChild(link);
   };
 
-  // Filter journals
   const filteredJournals = journals.filter(
     (journal) =>
       journal.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
       journal.journal_number.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Summary
+  // Summary by type
+  const summaryByType = {
+    all: journals.length,
+    general: journals.filter((j) => j.journal_type === "general").length,
+    special: journals.filter((j) => j.journal_type === "special").length,
+    adjusting: journals.filter((j) => j.journal_type === "adjusting").length,
+    closing: journals.filter((j) => j.journal_type === "closing").length,
+    reversing: journals.filter((j) => j.journal_type === "reversing").length,
+  };
+
   const summary = {
     totalJournals: journals.length,
     totalDebit: journals.reduce((sum, j) => sum + parseFloat(j.total_debit), 0),
@@ -786,298 +790,350 @@ export default function Accounting() {
       (sum, j) => sum + parseFloat(j.total_credit),
       0
     ),
-    lockedJournals: journals.filter((j) => j.is_locked).length,
+    otomatis: journals.filter((j) => j.journal_type !== "general").length,
+    manual: journals.filter((j) => j.journal_type === "general").length,
   };
 
   return (
     <ManagerLayout>
       <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">
-              Akuntansi & Jurnal
-            </h1>
-            <p className="text-gray-600 mt-1">
-              Kelola jurnal keuangan dan posting akuntansi
-            </p>
-          </div>
+        {/* Header with Back Button */}
+        <div className="flex items-center gap-4">
           <Button
-            className="bg-blue-600 hover:bg-blue-700"
-            onClick={() => {
-              setSelectedJournal(null);
-              setFormModal(true);
-            }}
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate("/manager")}
+            className="flex items-center gap-2"
           >
-            <Plus className="w-4 h-4 mr-2" />
-            Tambah Jurnal
+            <ArrowLeft className="w-4 h-4" />
+            Kembali
           </Button>
         </div>
 
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        {/* Title and Action Buttons */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Sistem Jurnal</h1>
+            <p className="text-gray-600 text-sm mt-1">
+              Kelola semua jenis jurnal akuntansi dengan otomatisasi
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" className="gap-2">
+              <Zap className="w-4 h-4" />
+              Generate Auto Jurnal
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handleDownloadReport}
+              className="gap-2"
+            >
+              <Download className="w-4 h-4" />
+              Export
+            </Button>
+            <Button
+              className="bg-gray-900 hover:bg-gray-800 gap-2"
+              onClick={() => {
+                setSelectedJournal(null);
+                setFormModal(true);
+              }}
+            >
+              <Plus className="w-4 h-4" />
+              Jurnal Manual
+            </Button>
+          </div>
+        </div>
+
+        {/* Summary Cards - Horizontal Layout */}
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           <Card>
             <CardContent className="p-6">
-              <div className="flex items-center">
-                <BookOpen className="h-8 w-8 text-blue-600" />
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600">
-                    Total Jurnal
-                  </p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {summary.totalJournals}
-                  </p>
-                </div>
-              </div>
+              <p className="text-sm text-gray-600 mb-1">Total Jurnal</p>
+              <p className="text-3xl font-bold text-gray-900">
+                {summary.totalJournals}
+              </p>
+              <p className="text-xs text-gray-500 mt-1">Entries</p>
             </CardContent>
           </Card>
 
           <Card>
             <CardContent className="p-6">
-              <div className="flex items-center">
-                <TrendingUp className="h-8 w-8 text-green-600" />
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600">
-                    Total Debit
-                  </p>
-                  <p className="text-lg font-bold text-green-600">
-                    {formatCurrency(summary.totalDebit)}
-                  </p>
-                </div>
-              </div>
+              <p className="text-sm text-gray-600 mb-1">Total Debit</p>
+              <p className="text-2xl font-bold text-green-600">
+                {formatCurrency(summary.totalDebit).replace("Rp", "Rp ")}
+              </p>
+              <p className="text-xs text-gray-500 mt-1">Sisi debit</p>
             </CardContent>
           </Card>
 
           <Card>
             <CardContent className="p-6">
-              <div className="flex items-center">
-                <TrendingUp className="h-8 w-8 text-red-600" />
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600">
-                    Total Kredit
-                  </p>
-                  <p className="text-lg font-bold text-red-600">
-                    {formatCurrency(summary.totalCredit)}
-                  </p>
-                </div>
-              </div>
+              <p className="text-sm text-gray-600 mb-1">Total Kredit</p>
+              <p className="text-2xl font-bold text-purple-600">
+                {formatCurrency(summary.totalCredit).replace("Rp", "Rp ")}
+              </p>
+              <p className="text-xs text-gray-500 mt-1">Sisi kredit</p>
             </CardContent>
           </Card>
 
           <Card>
             <CardContent className="p-6">
-              <div className="flex items-center">
-                <Lock className="h-8 w-8 text-purple-600" />
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600">Locked</p>
-                  <p className="text-2xl font-bold text-purple-600">
-                    {summary.lockedJournals}
-                  </p>
-                </div>
-              </div>
+              <p className="text-sm text-gray-600 mb-1">Jurnal Otomatis</p>
+              <p className="text-3xl font-bold text-orange-600">
+                {summary.otomatis}
+              </p>
+              <p className="text-xs text-gray-500 mt-1">System generated</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-6">
+              <p className="text-sm text-gray-600 mb-1">Jurnal Manual</p>
+              <p className="text-3xl font-bold text-red-600">
+                {summary.manual}
+              </p>
+              <p className="text-xs text-gray-500 mt-1">Manual entries</p>
             </CardContent>
           </Card>
         </div>
 
-        {/* Search and Filter */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Filter & Pencarian</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-col md:flex-row gap-4">
-              <div className="flex-1">
-                <div className="relative">
-                  <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                  <Input
-                    placeholder="Cari nomor jurnal atau deskripsi..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
-                  />
+        {/* Tabs Navigation */}
+        <Tabs
+          value={selectedType}
+          onValueChange={setSelectedType}
+          className="w-full"
+        >
+          <TabsList className="bg-transparent border-b w-full justify-start rounded-none h-auto p-0">
+            <TabsTrigger
+              value="all"
+              className="data-[state=active]:border-b-2 data-[state=active]:border-blue-600 rounded-none"
+            >
+              Semua Jurnal
+            </TabsTrigger>
+            <TabsTrigger
+              value="general"
+              className="data-[state=active]:border-b-2 data-[state=active]:border-blue-600 rounded-none"
+            >
+              Jurnal Umum
+            </TabsTrigger>
+            <TabsTrigger
+              value="special"
+              className="data-[state=active]:border-b-2 data-[state=active]:border-blue-600 rounded-none"
+            >
+              Jurnal Khusus
+            </TabsTrigger>
+            <TabsTrigger
+              value="adjusting"
+              className="data-[state=active]:border-b-2 data-[state=active]:border-blue-600 rounded-none"
+            >
+              Jurnal Penyesuaian
+            </TabsTrigger>
+            <TabsTrigger
+              value="closing"
+              className="data-[state=active]:border-b-2 data-[state=active]:border-blue-600 rounded-none"
+            >
+              Jurnal Penutup
+            </TabsTrigger>
+            <TabsTrigger
+              value="reversing"
+              className="data-[state=active]:border-b-2 data-[state=active]:border-blue-600 rounded-none"
+            >
+              Jurnal Pembalik
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value={selectedType} className="mt-6">
+            <Card>
+              <CardHeader className="border-b">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <FileText className="w-5 h-5" />
+                    <CardTitle>Daftar Jurnal</CardTitle>
+                  </div>
+                  <p className="text-sm text-gray-500">
+                    Semua jurnal yang dibuat secara otomatis dan manual
+                  </p>
                 </div>
-              </div>
-              <div className="flex gap-2">
-                <Select value={selectedType} onValueChange={setSelectedType}>
-                  <SelectTrigger className="w-48">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Semua Jenis</SelectItem>
-                    <SelectItem value="general">Jurnal Umum</SelectItem>
-                    <SelectItem value="special">Jurnal Khusus</SelectItem>
-                    <SelectItem value="adjusting">
-                      Jurnal Penyesuaian
-                    </SelectItem>
-                    <SelectItem value="closing">Jurnal Penutup</SelectItem>
-                    <SelectItem value="reversing">Jurnal Pembalik</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Button variant="outline" onClick={handleDownloadReport}>
-                  <Download className="w-4 h-4 mr-2" />
-                  Export
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+              </CardHeader>
+              <CardContent className="p-6">
+                {/* Search */}
+                <div className="mb-6">
+                  <div className="relative max-w-md">
+                    <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                    <Input
+                      placeholder="Cari jurnal..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                </div>
 
-        {/* Journals Table */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Daftar Jurnal</CardTitle>
-            <CardDescription>
-              Menampilkan {filteredJournals.length} dari {journals.length}{" "}
-              jurnal
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="flex justify-center items-center py-8">
-                <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
-                <span className="ml-2 text-gray-600">Memuat data...</span>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b">
-                      <th className="text-left py-3 px-4 font-medium text-gray-600">
-                        No. Jurnal
-                      </th>
-                      <th className="text-left py-3 px-4 font-medium text-gray-600">
-                        Tanggal
-                      </th>
-                      <th className="text-left py-3 px-4 font-medium text-gray-600">
-                        Jenis
-                      </th>
-                      <th className="text-left py-3 px-4 font-medium text-gray-600">
-                        Deskripsi
-                      </th>
-                      <th className="text-left py-3 px-4 font-medium text-gray-600">
-                        Debit
-                      </th>
-                      <th className="text-left py-3 px-4 font-medium text-gray-600">
-                        Kredit
-                      </th>
-                      <th className="text-left py-3 px-4 font-medium text-gray-600">
-                        Status
-                      </th>
-                      <th className="text-left py-3 px-4 font-medium text-gray-600">
-                        Aksi
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredJournals.map((journal) => (
-                      <tr
-                        key={journal.id}
-                        className="border-b hover:bg-gray-50"
-                      >
-                        <td className="py-3 px-4 font-mono font-medium">
-                          {journal.journal_number}
-                        </td>
-                        <td className="py-3 px-4">
-                          {formatDate(journal.transaction_date)}
-                        </td>
-                        <td className="py-3 px-4">
-                          <Badge
-                            className={getJournalTypeColor(
-                              journal.journal_type
-                            )}
+                {/* Table */}
+                {loading ? (
+                  <div className="flex justify-center items-center py-12">
+                    <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+                    <span className="ml-2 text-gray-600">Memuat data...</span>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b bg-gray-50">
+                          <th className="text-left py-3 px-4 font-medium text-gray-600 text-sm">
+                            Tanggal
+                          </th>
+                          <th className="text-left py-3 px-4 font-medium text-gray-600 text-sm">
+                            Referensi
+                          </th>
+                          <th className="text-left py-3 px-4 font-medium text-gray-600 text-sm">
+                            Deskripsi
+                          </th>
+                          <th className="text-left py-3 px-4 font-medium text-gray-600 text-sm">
+                            Jenis
+                          </th>
+                          <th className="text-left py-3 px-4 font-medium text-gray-600 text-sm">
+                            Sumber
+                          </th>
+                          <th className="text-right py-3 px-4 font-medium text-gray-600 text-sm">
+                            Debit
+                          </th>
+                          <th className="text-right py-3 px-4 font-medium text-gray-600 text-sm">
+                            Kredit
+                          </th>
+                          <th className="text-center py-3 px-4 font-medium text-gray-600 text-sm">
+                            Status
+                          </th>
+                          <th className="text-center py-3 px-4 font-medium text-gray-600 text-sm">
+                            Aksi
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredJournals.map((journal) => (
+                          <tr
+                            key={journal.id}
+                            className="border-b hover:bg-gray-50"
                           >
-                            {journal.type_name}
-                          </Badge>
-                        </td>
-                        <td className="py-3 px-4">
-                          <div>
-                            <p className="font-medium text-gray-900">
-                              {journal.description}
-                            </p>
-                            <p className="text-sm text-gray-500">
-                              {journal.creator.full_name}
-                            </p>
-                          </div>
-                        </td>
-                        <td className="py-3 px-4 font-medium text-green-600">
-                          {formatCurrency(journal.total_debit)}
-                        </td>
-                        <td className="py-3 px-4 font-medium text-red-600">
-                          {formatCurrency(journal.total_credit)}
-                        </td>
-                        <td className="py-3 px-4">
-                          <div className="flex flex-col gap-1">
-                            {journal.is_locked && (
-                              <Badge className="bg-red-100 text-red-800">
-                                <Lock className="w-3 h-3 mr-1" />
-                                Locked
+                            <td className="py-4 px-4 text-sm">
+                              {formatDate(journal.transaction_date)}
+                            </td>
+                            <td className="py-4 px-4">
+                              <span className="font-mono text-sm font-medium">
+                                {journal.journal_number}
+                              </span>
+                            </td>
+                            <td className="py-4 px-4">
+                              <div>
+                                <p className="font-medium text-sm">
+                                  {journal.description}
+                                </p>
+                                <p className="text-xs text-gray-500">
+                                  {journal.details.length} akun terlibat
+                                </p>
+                              </div>
+                            </td>
+                            <td className="py-4 px-4">
+                              <Badge
+                                className={getJournalTypeColor(
+                                  journal.journal_type
+                                )}
+                              >
+                                {journal.type_name}
                               </Badge>
-                            )}
-                            {journal.is_balanced && (
+                            </td>
+                            <td className="py-4 px-4">
+                              <Badge
+                                className={
+                                  journal.journal_type === "general"
+                                    ? "bg-red-100 text-red-800"
+                                    : "bg-green-100 text-green-800"
+                                }
+                              >
+                                {journal.journal_type === "general"
+                                  ? "Manual"
+                                  : "Simpanan"}
+                              </Badge>
+                            </td>
+                            <td className="py-4 px-4 text-right font-medium text-green-600 text-sm">
+                              {formatCurrency(journal.total_debit).replace(
+                                "Rp",
+                                "Rp "
+                              )}
+                            </td>
+                            <td className="py-4 px-4 text-right font-medium text-purple-600 text-sm">
+                              {formatCurrency(journal.total_credit).replace(
+                                "Rp",
+                                "Rp "
+                              )}
+                            </td>
+                            <td className="py-4 px-4 text-center">
                               <Badge className="bg-green-100 text-green-800">
-                                ✓ Balance
+                                Posted
                               </Badge>
-                            )}
-                          </div>
-                        </td>
-                        <td className="py-3 px-4">
-                          <div className="flex space-x-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleView(journal)}
-                            >
-                              <Eye className="w-4 h-4" />
-                            </Button>
-                            {!journal.is_locked && (
-                              <>
+                            </td>
+                            <td className="py-4 px-4">
+                              <div className="flex justify-center gap-1">
                                 <Button
                                   size="sm"
-                                  variant="outline"
-                                  onClick={() => handleEdit(journal)}
+                                  variant="ghost"
+                                  onClick={() => handleView(journal)}
+                                  className="h-8 w-8 p-0"
                                 >
-                                  <Edit className="w-4 h-4" />
+                                  <Eye className="w-4 h-4" />
                                 </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => handleLock(journal)}
-                                  title="Lock jurnal"
-                                >
-                                  <Lock className="w-4 h-4" />
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="text-red-600 hover:text-red-700"
-                                  onClick={() => handleDelete(journal)}
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </Button>
-                              </>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                                {!journal.is_locked && (
+                                  <>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => handleEdit(journal)}
+                                      className="h-8 w-8 p-0"
+                                    >
+                                      <Edit className="w-4 h-4" />
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => handleLock(journal)}
+                                      className="h-8 w-8 p-0"
+                                    >
+                                      <Lock className="w-4 h-4" />
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => handleDelete(journal)}
+                                      className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                  </>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
 
-                {filteredJournals.length === 0 && !loading && (
-                  <div className="text-center py-8">
-                    <FileText className="mx-auto h-12 w-12 text-gray-400" />
-                    <h3 className="mt-2 text-sm font-medium text-gray-900">
-                      Belum ada data
-                    </h3>
-                    <p className="mt-1 text-sm text-gray-500">
-                      Belum ada jurnal yang terdaftar
-                    </p>
+                    {filteredJournals.length === 0 && !loading && (
+                      <div className="text-center py-12">
+                        <FileText className="mx-auto h-12 w-12 text-gray-400" />
+                        <h3 className="mt-2 text-sm font-medium text-gray-900">
+                          Belum ada data
+                        </h3>
+                        <p className="mt-1 text-sm text-gray-500">
+                          Belum ada jurnal yang terdaftar
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
 
       {/* Modals */}

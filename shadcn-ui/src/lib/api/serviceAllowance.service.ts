@@ -106,6 +106,27 @@ export interface AllowanceResponse {
   };
 }
 
+// ✅ NEW: Import Excel types
+export interface ImportExcelResponse {
+  total_processed: number;
+  success_count: number;
+  failed_count: number;
+  results: {
+    success: Array<{
+      row: number;
+      member: string;
+      period: string;
+      amount: number;
+      summary: string;
+    }>;
+    failed: Array<{
+      row: number;
+      user_id?: number;
+      error: string;
+    }>;
+  };
+}
+
 // =====================================================
 // SERVICE
 // =====================================================
@@ -199,6 +220,40 @@ const serviceAllowanceService = {
       { params }
     );
     return response.data.data;
+  },
+
+  /**
+   * ✅ NEW: Import service allowances from Excel
+   * POST /service-allowances/import/excel
+   */
+  importExcel: async (file: File): Promise<ImportExcelResponse> => {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const response = await apiClient.post<ApiResponse<ImportExcelResponse>>(
+      "/service-allowances/import/excel",
+      formData,
+      {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      }
+    );
+    return response.data.data;
+  },
+
+  /**
+   * ✅ NEW: Download Excel template for import
+   * GET /service-allowances/export/template
+   */
+  downloadTemplate: async (): Promise<Blob> => {
+    const response = await apiClient.get(
+      "/service-allowances/export/template",
+      {
+        responseType: "blob",
+      }
+    );
+    return response.data;
   },
 };
 

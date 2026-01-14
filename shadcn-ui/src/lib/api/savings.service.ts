@@ -161,6 +161,76 @@ const savingsService = {
       return response.data;
     },
   },
+
+  // ✅ NEW: Export Excel functions
+  export: {
+    /**
+     * Export all savings data to Excel
+     * GET /savings/export/excel
+     */
+    all: async (): Promise<Blob> => {
+      const response = await apiClient.get("/savings/export/excel", {
+        responseType: "blob",
+      });
+      return response.data;
+    },
+
+    /**
+     * Export savings by month
+     * GET /savings/export/excel?month=1&year=2026
+     */
+    byMonth: async (month: number, year: number): Promise<Blob> => {
+      const response = await apiClient.get("/savings/export/excel", {
+        params: { month, year },
+        responseType: "blob",
+      });
+      return response.data;
+    },
+
+    /**
+     * Export savings by year
+     * GET /savings/export/excel?year=2026
+     */
+    byYear: async (year: number): Promise<Blob> => {
+      const response = await apiClient.get("/savings/export/excel", {
+        params: { year },
+        responseType: "blob",
+      });
+      return response.data;
+    },
+
+    /**
+     * Export savings by type
+     * GET /savings/export/excel?savings_type=mandatory
+     */
+    byType: async (
+      savingsType: "principal" | "mandatory" | "voluntary" | "holiday"
+    ): Promise<Blob> => {
+      const response = await apiClient.get("/savings/export/excel", {
+        params: { savings_type: savingsType },
+        responseType: "blob",
+      });
+      return response.data;
+    },
+
+    /**
+     * Export savings with custom filters
+     * GET /savings/export/excel?month=1&year=2026&savings_type=mandatory&status=approved
+     */
+    custom: async (params: {
+      month?: number;
+      year?: number;
+      savings_type?: string;
+      status?: string;
+      user_id?: number;
+    }): Promise<Blob> => {
+      const response = await apiClient.get("/savings/export/excel", {
+        params,
+        responseType: "blob",
+      });
+      return response.data;
+    },
+  },
 };
 
 export default savingsService;

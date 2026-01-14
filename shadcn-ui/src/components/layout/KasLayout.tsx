@@ -190,8 +190,8 @@ export function KasLayout({ children }: KasLayoutProps) {
         </div>
       </aside>
 
-      {/* Main content area - FIXED */}
-      <div className="lg:ml-64">
+      {/* Main content area - FIXED with explicit width */}
+      <div className="w-full lg:ml-64 lg:w-[calc(100vw-16rem)]">
         {/* Mobile header */}
         <header className="lg:hidden sticky top-0 z-30">
           <div className="flex items-center justify-between h-16 px-4 bg-white border-b border-gray-200">

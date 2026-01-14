@@ -42,6 +42,7 @@ import KasDashboard from "./pages/kas/KasDashboard";
 import KasLoanManagement from "./pages/kas/KasLoanManagement";
 import KasSavings from "./pages/kas/KasSavings";
 import KasAccounting from "./pages/kas/KasAccounting";
+import KasSettings from "./pages/kas/KasSettings"; // ✅ NEW: Settings untuk manage interest rates
 
 const queryClient = new QueryClient();
 
@@ -321,6 +322,17 @@ const App = () => (
                 <ProtectedRoute allowedRoles={["manager"]} requireKasId={true}>
                   <KasLayout>
                     <KasAccounting />
+                  </KasLayout>
+                </ProtectedRoute>
+              }
+            />
+            {/* ✅ NEW: KasSettings Route */}
+            <Route
+              path="/kas/:kasId/settings"
+              element={
+                <ProtectedRoute allowedRoles={["manager"]} requireKasId={true}>
+                  <KasLayout>
+                    <KasSettings />
                   </KasLayout>
                 </ProtectedRoute>
               }

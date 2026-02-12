@@ -13,8 +13,14 @@ export interface Loan {
   total_payment: string | number;
   application_date: string;
   loan_purpose: string;
-  loan_number?: string; // ✅ ADDED
-  interest_percentage?: string | number; // ✅ ADDED
+  loan_number?: string;
+  interest_percentage?: string | number;
+
+  // ✅ NEW: Deduction Method fields (UPDATED FEATURE)
+  deduction_method?: "none" | "salary" | "service_allowance" | "mixed";
+  salary_deduction_percentage?: number;
+  service_allowance_deduction_percentage?: number;
+
   status:
     | "pending"
     | "approved"
@@ -64,12 +70,10 @@ export interface Installment {
   created_at: string;
   updated_at: string;
 
-  // ✅ ADDED: Missing fields that come from API
   late_fee?: string | number;
   days_overdue?: number;
   days_until_due?: number;
 
-  // ✅ ADDED: Nested loan data (from API response)
   loan?: {
     id: number;
     loan_number: string;
@@ -118,7 +122,6 @@ export interface LoanSimulation {
   }>;
 }
 
-// ✅ NEW: Eligibility Check Types
 export interface LoanEligibility {
   user: {
     id: number;
@@ -164,6 +167,7 @@ export interface LoanEligibility {
   };
 }
 
+// ✅ UPDATED: Add deduction_method fields to CreateLoanData
 export interface CreateLoanData {
   user_id: number;
   cash_account_id: number;
@@ -171,8 +175,14 @@ export interface CreateLoanData {
   tenure_months: number;
   application_date: string;
   loan_purpose: string;
+
+  // ✅ NEW: Deduction Method fields (UPDATED FEATURE)
+  deduction_method?: "none" | "salary" | "service_allowance" | "mixed";
+  salary_deduction_percentage?: number;
+  service_allowance_deduction_percentage?: number;
 }
 
+// ✅ UPDATED: Add deduction_method fields to UpdateLoanData
 export interface UpdateLoanData {
   user_id?: number;
   cash_account_id?: number;
@@ -180,6 +190,11 @@ export interface UpdateLoanData {
   tenure_months?: number;
   application_date?: string;
   loan_purpose?: string;
+
+  // ✅ NEW: Deduction Method fields (UPDATED FEATURE)
+  deduction_method?: "none" | "salary" | "service_allowance" | "mixed";
+  salary_deduction_percentage?: number;
+  service_allowance_deduction_percentage?: number;
 }
 
 export interface ApproveLoanData {
@@ -221,6 +236,7 @@ const loansService = {
 
   /**
    * Create new loan application
+   * ✅ UPDATED: Now includes deduction_method fields
    */
   create: async (data: CreateLoanData) => {
     const response = await apiClient.post("/loans", data);
@@ -229,6 +245,7 @@ const loansService = {
 
   /**
    * Update loan application
+   * ✅ UPDATED: Now includes deduction_method fields
    */
   update: async (id: number, data: UpdateLoanData) => {
     const response = await apiClient.put(`/loans/${id}`, data);
@@ -285,7 +302,7 @@ const loansService = {
   payInstallment: async (installmentId: number, data: PayInstallmentData) => {
     const response = await apiClient.post(
       `/installments/${installmentId}/pay`,
-      data
+      data,
     );
     return response.data;
   },
@@ -332,10 +349,8 @@ const loansService = {
     return response.data;
   },
 
-  // ✅ NEW: Check loan eligibility (Problem 3 - Loan Limit)
   /**
    * Check if user can apply for loan in specific cash account
-   * Returns available cash accounts and loan limit status
    */
   checkEligibility: async (data: {
     user_id: number;
@@ -363,7 +378,7 @@ const loansService = {
    * Helper: Get status badge color
    */
   getStatusColor: (
-    status: string
+    status: string,
   ): "default" | "secondary" | "destructive" | "outline" => {
     const colors: Record<
       string,
@@ -395,6 +410,34 @@ const loansService = {
   },
 
   /**
+   * ✅ NEW: Get deduction method label in Indonesian
+   */
+  getDeductionMethodLabel: (method?: string): string => {
+    const labels: Record<string, string> = {
+      none: "Tidak Ada Potongan",
+      salary: "Potongan Gaji",
+      service_allowance: "Potongan Jasa Pelayanan",
+      mixed: "Kombinasi (Gaji + Jasa Pelayanan)",
+    };
+    return method ? labels[method] || method : "Tidak Ditentukan";
+  },
+
+  /**
+   * ✅ NEW: Get deduction method badge color
+   */
+  getDeductionMethodColor: (method?: string): string => {
+    const colors: Record<string, string> = {
+      none: "bg-gray-100 text-gray-800",
+      salary: "bg-blue-100 text-blue-800",
+      service_allowance: "bg-green-100 text-green-800",
+      mixed: "bg-purple-100 text-purple-800",
+    };
+    return method
+      ? colors[method] || "bg-gray-100 text-gray-800"
+      : "bg-gray-100 text-gray-800";
+  },
+
+  /**
    * Helper: Parse numeric value (handles string/number)
    */
   parseAmount: (amount: string | number): number => {
@@ -406,7 +449,7 @@ const loansService = {
    */
   calculateTotal: (
     principal: string | number,
-    interest: string | number
+    interest: string | number,
   ): number => {
     const p = loansService.parseAmount(principal);
     const i = loansService.parseAmount(interest);

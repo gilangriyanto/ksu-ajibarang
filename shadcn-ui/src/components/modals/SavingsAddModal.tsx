@@ -1,3 +1,7 @@
+// components/modals/SavingsAddModal.tsx
+// ✅ UPDATED VERSION: With Dynamic Saving Types from API
+// ✅ BACKWARD COMPATIBLE: Still works with old savings_type enum if API fails
+
 import React, { useState, useEffect } from "react";
 import {
   Dialog,
@@ -18,10 +22,17 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { PiggyBank, DollarSign, Loader2 } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  PiggyBank,
+  DollarSign,
+  Loader2,
+  Info,
+  AlertCircle,
+} from "lucide-react";
 import { toast } from "sonner";
 import apiClient from "@/lib/api/api-client";
-import savingsService from "@/lib/api/savings.service";
+import savingsService, { SavingType } from "@/lib/api/savings.service";
 
 interface Member {
   id: number;
@@ -32,17 +43,22 @@ interface Member {
 
 interface NewSavings {
   user_id: number;
-  savings_type: string;
   cash_account_id: number;
   transaction_date: string;
   amount: number;
   description?: string;
+
+  // ✅ NEW: Use saving_type_id (prefer this)
+  saving_type_id?: number;
+
+  // ✅ OLD: Fallback to savings_type if API fails
+  savings_type?: string;
 }
 
 interface SavingsAddModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: () => void; // ✅ Changed from onAdd
+  onSuccess: () => void;
 }
 
 export function SavingsAddModal({
@@ -52,21 +68,27 @@ export function SavingsAddModal({
 }: SavingsAddModalProps) {
   const [formData, setFormData] = useState<NewSavings>({
     user_id: 0,
-    savings_type: "mandatory",
     cash_account_id: 1,
     transaction_date: new Date().toISOString().split("T")[0],
     amount: 0,
     description: "",
+    saving_type_id: undefined,
+    savings_type: undefined,
   });
+
   const [members, setMembers] = useState<Member[]>([]);
+  const [savingTypes, setSavingTypes] = useState<SavingType[]>([]); // ✅ NEW
   const [loadingMembers, setLoadingMembers] = useState(false);
+  const [loadingSavingTypes, setLoadingSavingTypes] = useState(false); // ✅ NEW
+  const [useFallback, setUseFallback] = useState(false); // ✅ NEW: Flag for fallback mode
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Load members on mount
+  // ✅ Load members and saving types on mount
   useEffect(() => {
     if (isOpen) {
       loadMembers();
+      loadSavingTypes(); // ✅ NEW
     }
   }, [isOpen]);
 
@@ -86,6 +108,63 @@ export function SavingsAddModal({
     }
   };
 
+  /**
+   * ✅ NEW: Load saving types from API
+   */
+  const loadSavingTypes = async () => {
+    try {
+      setLoadingSavingTypes(true);
+      console.log("🔄 Loading saving types from API...");
+
+      const response = await savingsService.getSavingTypes({ is_active: true });
+
+      const typesData = response.data?.data || response.data || [];
+      console.log(`✅ Loaded ${typesData.length} saving types:`, typesData);
+
+      setSavingTypes(typesData);
+      setUseFallback(false); // Success, use API data
+    } catch (err: any) {
+      console.error("❌ Error loading saving types:", err);
+      console.warn("⚠️ Falling back to hardcoded saving types");
+
+      // ✅ FALLBACK: Use hardcoded enum if API fails
+      setUseFallback(true);
+      toast.warning("Menggunakan daftar jenis simpanan default");
+    } finally {
+      setLoadingSavingTypes(false);
+    }
+  };
+
+  /**
+   * ✅ FALLBACK: Hardcoded saving types (for old system compatibility)
+   */
+  const fallbackSavingTypes = [
+    {
+      id: "principal",
+      name: "Simpanan Pokok",
+      code: "principal",
+      description: "Setoran awal keanggotaan",
+    },
+    {
+      id: "mandatory",
+      name: "Simpanan Wajib",
+      code: "mandatory",
+      description: "Setoran bulanan wajib",
+    },
+    {
+      id: "voluntary",
+      name: "Simpanan Sukarela",
+      code: "voluntary",
+      description: "Setoran sukarela kapan saja",
+    },
+    {
+      id: "holiday",
+      name: "Simpanan Hari Raya",
+      code: "holiday",
+      description: "Setoran untuk hari raya",
+    },
+  ];
+
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
 
@@ -93,8 +172,17 @@ export function SavingsAddModal({
       newErrors.user_id = "Anggota harus dipilih";
     }
 
-    if (!formData.savings_type) {
-      newErrors.savings_type = "Jenis simpanan harus dipilih";
+    // ✅ NEW: Validate saving_type_id OR savings_type
+    if (!useFallback) {
+      // Using API: validate saving_type_id
+      if (!formData.saving_type_id) {
+        newErrors.saving_type_id = "Jenis simpanan harus dipilih";
+      }
+    } else {
+      // Using fallback: validate savings_type
+      if (!formData.savings_type) {
+        newErrors.savings_type = "Jenis simpanan harus dipilih";
+      }
     }
 
     if (!formData.cash_account_id) {
@@ -124,56 +212,51 @@ export function SavingsAddModal({
     setIsSubmitting(true);
 
     try {
-      // ✅ Prepare payload with all required fields
-      const payload = {
+      // ✅ Build payload based on mode (API or fallback)
+      const payload: any = {
         user_id: formData.user_id,
-        savings_type: formData.savings_type,
         cash_account_id: formData.cash_account_id,
         transaction_date: formData.transaction_date,
         amount: formData.amount,
         description: formData.description || "",
       };
 
-      console.log("📤 Sending data to API:", payload);
+      if (!useFallback) {
+        // ✅ NEW: Using API - send saving_type_id
+        payload.saving_type_id = formData.saving_type_id;
+        console.log("📤 Sending data with saving_type_id:", payload);
+      } else {
+        // ✅ OLD: Using fallback - send savings_type
+        payload.savings_type = formData.savings_type;
+        console.log("📤 Sending data with savings_type (fallback):", payload);
+      }
 
-      // ✅ Direct API call from modal
       await savingsService.create(payload);
 
       console.log("✅ Savings created successfully");
-
       toast.success("Simpanan berhasil ditambahkan");
 
-      // ✅ Call onSuccess to refresh parent data
       onSuccess();
-
-      // Close and reset
       handleClose();
     } catch (error: any) {
       console.error("❌ Error adding savings:", error);
       console.error("❌ Error response:", error.response?.data);
 
-      // Handle validation errors from API
       if (error.response?.data?.errors) {
         const apiErrors = error.response.data.errors;
-        console.error("❌ Validation errors:", apiErrors);
-
-        // Convert array errors to string for display
         const formErrors: Record<string, string> = {};
         Object.keys(apiErrors).forEach((key) => {
           formErrors[key] = Array.isArray(apiErrors[key])
             ? apiErrors[key][0]
             : apiErrors[key];
         });
-
         setErrors(formErrors);
-
         toast.error("Validasi gagal. Periksa kembali form Anda");
       } else {
         const errorMessage =
           error.response?.data?.message ||
           error.message ||
           "Gagal menambahkan simpanan";
-
         toast.error(errorMessage);
       }
     } finally {
@@ -183,10 +266,9 @@ export function SavingsAddModal({
 
   const handleInputChange = (
     field: keyof NewSavings,
-    value: string | number
+    value: string | number,
   ) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
-    // Clear error for this field when user starts typing
     if (errors[field]) {
       setErrors((prev) => {
         const newErrors = { ...prev };
@@ -196,19 +278,21 @@ export function SavingsAddModal({
     }
   };
 
-  const getSavingTypeName = (type: string) => {
-    switch (type) {
-      case "principal":
-        return "Simpanan Pokok";
-      case "mandatory":
-        return "Simpanan Wajib";
-      case "voluntary":
-        return "Simpanan Sukarela";
-      case "holiday":
-        return "Simpanan Hari Raya";
-      default:
-        return type;
-    }
+  const getSavingTypeName = (typeOrCode: string) => {
+    // Try to find in API data first
+    const apiType = savingTypes.find(
+      (t) => t.id.toString() === typeOrCode || t.code === typeOrCode,
+    );
+    if (apiType) return apiType.name;
+
+    // Fallback to hardcoded names
+    const nameMap: Record<string, string> = {
+      principal: "Simpanan Pokok",
+      mandatory: "Simpanan Wajib",
+      voluntary: "Simpanan Sukarela",
+      holiday: "Simpanan Hari Raya",
+    };
+    return nameMap[typeOrCode] || typeOrCode;
   };
 
   const formatCurrency = (amount: number) => {
@@ -222,11 +306,12 @@ export function SavingsAddModal({
   const handleClose = () => {
     setFormData({
       user_id: 0,
-      savings_type: "mandatory",
       cash_account_id: 1,
       transaction_date: new Date().toISOString().split("T")[0],
       amount: 0,
       description: "",
+      saving_type_id: undefined,
+      savings_type: undefined,
     });
     setErrors({});
     setIsSubmitting(false);
@@ -234,6 +319,11 @@ export function SavingsAddModal({
   };
 
   const selectedMember = members.find((m) => m.id === formData.user_id);
+
+  // ✅ Get selected saving type (from API or fallback)
+  const selectedSavingType = !useFallback
+    ? savingTypes.find((t) => t.id === formData.saving_type_id)
+    : fallbackSavingTypes.find((t) => t.id === formData.savings_type);
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
@@ -247,6 +337,16 @@ export function SavingsAddModal({
             Tambahkan simpanan baru untuk anggota
           </DialogDescription>
         </DialogHeader>
+
+        {/* ✅ Info Alert: Show which mode we're using */}
+        {useFallback && (
+          <Alert className="bg-yellow-50 border-yellow-200">
+            <AlertCircle className="h-4 w-4 text-yellow-600" />
+            <AlertDescription className="text-yellow-800 text-sm">
+              Menggunakan daftar jenis simpanan default (mode kompatibilitas)
+            </AlertDescription>
+          </Alert>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Member Selection */}
@@ -285,31 +385,90 @@ export function SavingsAddModal({
             )}
           </div>
 
-          {/* Savings Type */}
+          {/* ✅ NEW: Dynamic Savings Type Selection */}
           <div className="space-y-2">
             <Label htmlFor="savingsType">
               Jenis Simpanan <span className="text-red-500">*</span>
             </Label>
             <Select
-              value={formData.savings_type}
-              onValueChange={(value) =>
-                handleInputChange("savings_type", value)
+              value={
+                !useFallback
+                  ? formData.saving_type_id?.toString() || ""
+                  : formData.savings_type || ""
               }
+              onValueChange={(value) => {
+                if (!useFallback) {
+                  // API mode: set saving_type_id
+                  handleInputChange("saving_type_id", parseInt(value));
+                } else {
+                  // Fallback mode: set savings_type
+                  handleInputChange("savings_type", value);
+                }
+              }}
+              disabled={loadingSavingTypes}
             >
               <SelectTrigger
-                className={errors.savings_type ? "border-red-500" : ""}
+                className={
+                  errors.saving_type_id || errors.savings_type
+                    ? "border-red-500"
+                    : ""
+                }
               >
-                <SelectValue placeholder="Pilih jenis simpanan" />
+                <SelectValue
+                  placeholder={
+                    loadingSavingTypes
+                      ? "Memuat jenis simpanan..."
+                      : "Pilih jenis simpanan"
+                  }
+                />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="principal">Simpanan Pokok</SelectItem>
-                <SelectItem value="mandatory">Simpanan Wajib</SelectItem>
-                <SelectItem value="voluntary">Simpanan Sukarela</SelectItem>
-                <SelectItem value="holiday">Simpanan Hari Raya</SelectItem>
+                {!useFallback ? (
+                  // ✅ NEW: Load from API
+                  savingTypes.length === 0 ? (
+                    <div className="p-2 text-sm text-gray-500">
+                      Tidak ada jenis simpanan tersedia
+                    </div>
+                  ) : (
+                    savingTypes.map((type) => (
+                      <SelectItem key={type.id} value={type.id.toString()}>
+                        <div className="flex flex-col">
+                          <span className="font-medium">{type.name}</span>
+                          {type.description && (
+                            <span className="text-xs text-gray-500">
+                              {type.description}
+                            </span>
+                          )}
+                          {type.is_mandatory && (
+                            <span className="text-xs text-orange-600">
+                              Wajib
+                            </span>
+                          )}
+                        </div>
+                      </SelectItem>
+                    ))
+                  )
+                ) : (
+                  // ✅ OLD: Fallback to hardcoded enum
+                  fallbackSavingTypes.map((type) => (
+                    <SelectItem key={type.id} value={type.id}>
+                      <div className="flex flex-col">
+                        <span className="font-medium">{type.name}</span>
+                        {type.description && (
+                          <span className="text-xs text-gray-500">
+                            {type.description}
+                          </span>
+                        )}
+                      </div>
+                    </SelectItem>
+                  ))
+                )}
               </SelectContent>
             </Select>
-            {errors.savings_type && (
-              <p className="text-sm text-red-600">{errors.savings_type}</p>
+            {(errors.saving_type_id || errors.savings_type) && (
+              <p className="text-sm text-red-600">
+                {errors.saving_type_id || errors.savings_type}
+              </p>
             )}
           </div>
 
@@ -399,7 +558,7 @@ export function SavingsAddModal({
           </div>
 
           {/* Summary */}
-          {formData.amount > 0 && selectedMember && (
+          {formData.amount > 0 && selectedMember && selectedSavingType && (
             <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
               <h4 className="font-medium text-blue-900 mb-2">
                 Ringkasan Simpanan
@@ -413,9 +572,7 @@ export function SavingsAddModal({
                 </div>
                 <div className="flex justify-between">
                   <span className="text-blue-700">Jenis:</span>
-                  <span className="font-medium">
-                    {getSavingTypeName(formData.savings_type)}
-                  </span>
+                  <span className="font-medium">{selectedSavingType.name}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-blue-700">Jumlah:</span>
@@ -432,7 +589,7 @@ export function SavingsAddModal({
                         day: "numeric",
                         month: "long",
                         year: "numeric",
-                      }
+                      },
                     )}
                   </span>
                 </div>
@@ -451,7 +608,7 @@ export function SavingsAddModal({
             </Button>
             <Button
               type="submit"
-              disabled={isSubmitting || loadingMembers}
+              disabled={isSubmitting || loadingMembers || loadingSavingTypes}
               className="min-w-[140px]"
             >
               {isSubmitting ? (
@@ -472,3 +629,5 @@ export function SavingsAddModal({
     </Dialog>
   );
 }
+
+export default SavingsAddModal;

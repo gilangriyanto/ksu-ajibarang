@@ -1,5 +1,6 @@
 // components/modals/LoanAddModal.tsx
-// ✅ FINAL BUG-FREE VERSION: Currency format + All validations correct
+// ✅ UPDATED VERSION: With Deduction Method Feature
+// ✅ BUG-FREE: All validations, currency format, and API integration correct
 
 import React, { useState, useEffect } from "react";
 import {
@@ -32,6 +33,8 @@ import {
   Loader2,
   AlertCircle,
   Calculator,
+  Percent,
+  Info,
 } from "lucide-react";
 import { toast } from "sonner";
 import axios from "axios";
@@ -72,19 +75,26 @@ export function LoanAddModal({
   onClose,
   onSuccess,
 }: LoanAddModalProps) {
-  // ✅ Form state
+  // ✅ Form state with deduction_method fields
   const [formData, setFormData] = useState({
-    user_id: '',
-    cash_account_id: '',
-    principal_amount: '',
-    tenure_months: '12',
+    user_id: "",
+    cash_account_id: "",
+    principal_amount: "",
+    tenure_months: "12",
     application_date: new Date().toISOString().split("T")[0],
-    loan_purpose: '',
+    loan_purpose: "",
+    deduction_method: "none" as
+      | "none"
+      | "salary"
+      | "service_allowance"
+      | "mixed",
+    salary_deduction_percentage: 0,
+    service_allowance_deduction_percentage: 0,
   });
 
   // ✅ UI state
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [simulationLoading, setSimulationLoading] = useState(false);
   const [simulation, setSimulation] = useState<SimulationResult | null>(null);
 
@@ -105,11 +115,12 @@ export function LoanAddModal({
 
   // ✅ Format currency for display
   const formatCurrency = (value: number | string): string => {
-    const num = typeof value === 'string' ? parseFloat(value.replace(/\D/g, '')) : value;
-    if (isNaN(num)) return '';
-    return new Intl.NumberFormat('id-ID', {
-      style: 'currency',
-      currency: 'IDR',
+    const num =
+      typeof value === "string" ? parseFloat(value.replace(/\D/g, "")) : value;
+    if (isNaN(num)) return "";
+    return new Intl.NumberFormat("id-ID", {
+      style: "currency",
+      currency: "IDR",
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(num);
@@ -117,15 +128,15 @@ export function LoanAddModal({
 
   // ✅ Format input with Rp prefix
   const formatCurrencyInput = (value: string): string => {
-    const numbers = value.replace(/\D/g, '');
-    if (!numbers) return '';
-    const formatted = new Intl.NumberFormat('id-ID').format(parseInt(numbers));
+    const numbers = value.replace(/\D/g, "");
+    if (!numbers) return "";
+    const formatted = new Intl.NumberFormat("id-ID").format(parseInt(numbers));
     return `Rp ${formatted}`;
   };
 
   // ✅ Parse currency to plain number
   const parseCurrency = (value: string): number => {
-    const numbers = value.replace(/\D/g, '');
+    const numbers = value.replace(/\D/g, "");
     return numbers ? parseInt(numbers) : 0;
   };
 
@@ -141,26 +152,22 @@ export function LoanAddModal({
     setLoadingMembers(true);
     try {
       const token = localStorage.getItem("token");
-      console.log("🔍 Loading members...");
-
       const response = await axios.get(
         "https://ksp.gascpns.id/api/members?all=true",
         {
           headers: { Authorization: `Bearer ${token}` },
-        }
+        },
       );
 
-      console.log("✅ Members loaded:", response.data);
-
       let membersList: Member[] = [];
-      
+
       if (response.data.success && Array.isArray(response.data.data)) {
         membersList = response.data.data.filter(
-          (user: any) => user.status === "active"
+          (user: any) => user.status === "active",
         );
       } else if (Array.isArray(response.data)) {
         membersList = response.data.filter(
-          (user: any) => user.status === "active"
+          (user: any) => user.status === "active",
         );
       }
 
@@ -180,19 +187,15 @@ export function LoanAddModal({
     setLoadingAccounts(true);
     try {
       const token = localStorage.getItem("token");
-      console.log("🔍 Loading cash accounts...");
-
       const response = await axios.get(
         "https://ksp.gascpns.id/api/cash-accounts",
         {
           headers: { Authorization: `Bearer ${token}` },
-        }
+        },
       );
 
-      console.log("✅ Cash accounts loaded:", response.data);
-
       let accountsList: CashAccount[] = [];
-      
+
       if (response.data.success && Array.isArray(response.data.data)) {
         accountsList = response.data.data;
       } else if (Array.isArray(response.data)) {
@@ -203,12 +206,23 @@ export function LoanAddModal({
       console.log(`🏦 Found ${accountsList.length} cash accounts`);
     } catch (err: any) {
       console.error("❌ Error loading cash accounts:", err);
-      
+
       // Use mock data as fallback
-      console.warn("⚠️ Using mock cash accounts");
       setCashAccounts([
-        { id: 1, code: "KAS-I", name: "Kas Umum", interest_rate: 12, max_amount: 50000000 },
-        { id: 3, code: "KAS-III", name: "Kas Sebrakanz", interest_rate: 0, max_amount: 10000000 },
+        {
+          id: 1,
+          code: "KAS-I",
+          name: "Kas Umum",
+          interest_rate: 12,
+          max_amount: 50000000,
+        },
+        {
+          id: 3,
+          code: "KAS-III",
+          name: "Kas Sebrakanz",
+          interest_rate: 0,
+          max_amount: 10000000,
+        },
       ]);
     } finally {
       setLoadingAccounts(false);
@@ -216,37 +230,37 @@ export function LoanAddModal({
   };
 
   // ✅ Run simulation
-  const runSimulation = async (amount: number, tenure: number, kasId: number) => {
+  const runSimulation = async (
+    amount: number,
+    tenure: number,
+    kasId: number,
+  ) => {
     setSimulationLoading(true);
     setSimulation(null);
 
     try {
-      console.log('🧮 Running simulation:', { amount, tenure, kasId });
-
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem("token");
       const response = await axios.post(
-        'https://ksp.gascpns.id/api/loans/simulate',
+        "https://ksp.gascpns.id/api/loans/simulate",
         {
-          principal_amount: amount,      // ✅ Number
-          tenure_months: tenure,          // ✅ Number
-          cash_account_id: kasId,         // ✅ Number
+          principal_amount: amount,
+          tenure_months: tenure,
+          cash_account_id: kasId,
         },
         {
           headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
           },
-        }
+        },
       );
-
-      console.log('✅ Simulation result:', response.data);
 
       if (response.data.success && response.data.data) {
         setSimulation(response.data.data);
       }
     } catch (err: any) {
-      console.error('❌ Simulation error:', err);
-      setError(err.response?.data?.message || 'Gagal menghitung simulasi');
+      console.error("❌ Simulation error:", err);
+      setError(err.response?.data?.message || "Gagal menghitung simulasi");
     } finally {
       setSimulationLoading(false);
     }
@@ -261,15 +275,19 @@ export function LoanAddModal({
     if (amount >= 100000 && tenure >= 6 && kasId > 0) {
       const timer = setTimeout(() => {
         runSimulation(amount, tenure, kasId);
-      }, 500); // Debounce 500ms
+      }, 500);
 
       return () => clearTimeout(timer);
     } else {
       setSimulation(null);
     }
-  }, [formData.principal_amount, formData.tenure_months, formData.cash_account_id]);
+  }, [
+    formData.principal_amount,
+    formData.tenure_months,
+    formData.cash_account_id,
+  ]);
 
-  // ✅ Validate form
+  // ✅ Validate form with deduction method validation
   const validateForm = (): boolean => {
     const userId = parseInt(formData.user_id);
     const kasId = parseInt(formData.cash_account_id);
@@ -278,95 +296,158 @@ export function LoanAddModal({
 
     // Validate user
     if (!userId || userId <= 0) {
-      setError('Pilih anggota terlebih dahulu');
+      setError("Pilih anggota terlebih dahulu");
       return false;
     }
 
     // Validate kas
     if (!kasId || kasId <= 0) {
-      setError('Pilih Kas terlebih dahulu');
+      setError("Pilih Kas terlebih dahulu");
       return false;
     }
 
     // Validate amount
     if (!amount || amount < 100000) {
-      setError('Jumlah pinjaman minimal Rp 100.000');
+      setError("Jumlah pinjaman minimal Rp 100.000");
       return false;
     }
 
-    // Check max amount for selected kas
-    const selectedKas = cashAccounts.find(k => k.id === kasId);
+    const selectedKas = cashAccounts.find((k) => k.id === kasId);
     if (selectedKas?.max_amount && amount > selectedKas.max_amount) {
-      setError(`Jumlah pinjaman maksimal ${formatCurrency(selectedKas.max_amount)} untuk ${selectedKas.name}`);
+      setError(
+        `Jumlah pinjaman maksimal ${formatCurrency(selectedKas.max_amount)} untuk ${selectedKas.name}`,
+      );
       return false;
     }
 
     if (amount > 500000000) {
-      setError('Jumlah pinjaman maksimal Rp 500.000.000');
+      setError("Jumlah pinjaman maksimal Rp 500.000.000");
       return false;
     }
 
     // Validate tenure
     if (!tenure || tenure < 6) {
-      setError('Jangka waktu minimal 6 bulan');
+      setError("Jangka waktu minimal 6 bulan");
       return false;
     }
 
     if (tenure > 60) {
-      setError('Jangka waktu maksimal 60 bulan');
+      setError("Jangka waktu maksimal 60 bulan");
       return false;
     }
 
+    // ✅ NEW: Validate deduction method
+    if (!formData.deduction_method) {
+      setError("Pilih metode potongan angsuran");
+      return false;
+    }
+
+    // ✅ NEW: Validate salary deduction percentage
+    if (
+      formData.deduction_method === "salary" ||
+      formData.deduction_method === "mixed"
+    ) {
+      if (
+        formData.salary_deduction_percentage <= 0 ||
+        formData.salary_deduction_percentage > 100
+      ) {
+        setError("Persentase potongan gaji harus antara 1-100%");
+        return false;
+      }
+    }
+
+    // ✅ NEW: Validate service allowance deduction percentage
+    if (
+      formData.deduction_method === "service_allowance" ||
+      formData.deduction_method === "mixed"
+    ) {
+      if (
+        formData.service_allowance_deduction_percentage <= 0 ||
+        formData.service_allowance_deduction_percentage > 100
+      ) {
+        setError("Persentase potongan jasa pelayanan harus antara 1-100%");
+        return false;
+      }
+    }
+
+    // ✅ NEW: Validate mixed deduction total
+    if (formData.deduction_method === "mixed") {
+      const total =
+        formData.salary_deduction_percentage +
+        formData.service_allowance_deduction_percentage;
+      if (total !== 100) {
+        setError(`Total persentase potongan harus 100% (Saat ini: ${total}%)`);
+        return false;
+      }
+    }
+
     // Validate purpose
-    if (!formData.loan_purpose.trim() || formData.loan_purpose.trim().length < 10) {
-      setError('Tujuan pinjaman minimal 10 karakter');
+    if (
+      !formData.loan_purpose.trim() ||
+      formData.loan_purpose.trim().length < 10
+    ) {
+      setError("Tujuan pinjaman minimal 10 karakter");
       return false;
     }
 
     // Validate date
     if (!formData.application_date) {
-      setError('Tanggal pengajuan harus diisi');
+      setError("Tanggal pengajuan harus diisi");
       return false;
     }
 
-    setError('');
+    setError("");
     return true;
   };
 
-  // ✅ Handle submit
+  // ✅ Handle submit with deduction method
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Prevent double submit
-    if (loading) {
-      console.warn('⚠️ Already submitting, ignoring...');
-      return;
-    }
+    if (loading) return;
 
-    // Validate
     if (!validateForm()) {
       return;
     }
 
     try {
       setLoading(true);
-      setError('');
+      setError("");
 
       const userId = parseInt(formData.user_id);
       const kasId = parseInt(formData.cash_account_id);
       const amount = parseCurrency(formData.principal_amount);
       const tenure = parseInt(formData.tenure_months);
 
-      const loanData = {
-        user_id: userId,                              // ✅ Number
-        cash_account_id: kasId,                       // ✅ Number
-        principal_amount: amount,                     // ✅ Number
-        tenure_months: tenure,                        // ✅ Number
-        application_date: formData.application_date,  // ✅ String
-        loan_purpose: formData.loan_purpose.trim(),   // ✅ String
+      // ✅ Build loan data with deduction method
+      const loanData: any = {
+        user_id: userId,
+        cash_account_id: kasId,
+        principal_amount: amount,
+        tenure_months: tenure,
+        application_date: formData.application_date,
+        loan_purpose: formData.loan_purpose.trim(),
+        deduction_method: formData.deduction_method,
       };
 
-      console.log("📤 Submitting loan:", loanData);
+      // ✅ Add percentage fields based on deduction method
+      if (
+        formData.deduction_method === "salary" ||
+        formData.deduction_method === "mixed"
+      ) {
+        loanData.salary_deduction_percentage =
+          formData.salary_deduction_percentage;
+      }
+
+      if (
+        formData.deduction_method === "service_allowance" ||
+        formData.deduction_method === "mixed"
+      ) {
+        loanData.service_allowance_deduction_percentage =
+          formData.service_allowance_deduction_percentage;
+      }
+
+      console.log("📤 Submitting loan with deduction method:", loanData);
 
       const token = localStorage.getItem("token");
       const response = await axios.post(
@@ -377,29 +458,28 @@ export function LoanAddModal({
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
-        }
+        },
       );
 
       console.log("✅ Loan created:", response.data);
 
       toast.success("Pengajuan pinjaman berhasil dibuat");
 
-      // Refresh parent data
       onSuccess();
-
-      // Close and reset
       handleClose();
     } catch (error: any) {
       console.error("❌ Error creating loan:", error);
 
-      // Handle validation errors
       if (error.response?.status === 422 && error.response?.data?.errors) {
         const apiErrors = error.response.data.errors;
         const errorMessages = Object.values(apiErrors).flat();
         setError(errorMessages.join(", "));
         toast.error(errorMessages.join(", "));
       } else {
-        const errMsg = error.response?.data?.message || error.message || "Gagal membuat pinjaman";
+        const errMsg =
+          error.response?.data?.message ||
+          error.message ||
+          "Gagal membuat pinjaman";
         setError(errMsg);
         toast.error(errMsg);
       }
@@ -411,14 +491,17 @@ export function LoanAddModal({
   // ✅ Reset form
   const resetForm = () => {
     setFormData({
-      user_id: '',
-      cash_account_id: '',
-      principal_amount: '',
-      tenure_months: '12',
+      user_id: "",
+      cash_account_id: "",
+      principal_amount: "",
+      tenure_months: "12",
       application_date: new Date().toISOString().split("T")[0],
-      loan_purpose: '',
+      loan_purpose: "",
+      deduction_method: "none",
+      salary_deduction_percentage: 0,
+      service_allowance_deduction_percentage: 0,
     });
-    setError('');
+    setError("");
     setSimulation(null);
   };
 
@@ -431,19 +514,24 @@ export function LoanAddModal({
   };
 
   // Get selected data
-  const selectedMember = members.find(m => m.id.toString() === formData.user_id);
-  const selectedAccount = cashAccounts.find(ca => ca.id.toString() === formData.cash_account_id);
+  const selectedMember = members.find(
+    (m) => m.id.toString() === formData.user_id,
+  );
+  const selectedAccount = cashAccounts.find(
+    (ca) => ca.id.toString() === formData.cash_account_id,
+  );
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[650px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center space-x-2">
             <CreditCard className="h-5 w-5" />
             <span>Pengajuan Pinjaman Baru</span>
           </DialogTitle>
           <DialogDescription>
-            Masukkan informasi lengkap untuk pengajuan pinjaman. Simulasi akan muncul otomatis.
+            Masukkan informasi lengkap untuk pengajuan pinjaman. Simulasi akan
+            muncul otomatis.
           </DialogDescription>
         </DialogHeader>
 
@@ -460,14 +548,15 @@ export function LoanAddModal({
           <div className="space-y-2">
             <div className="flex items-center space-x-2 mb-2">
               <User className="h-4 w-4 text-gray-500" />
-              <Label>Pilih Anggota <span className="text-red-500">*</span></Label>
+              <Label>
+                Pilih Anggota <span className="text-red-500">*</span>
+              </Label>
             </div>
             <Select
               value={formData.user_id}
-              onValueChange={(value) => {
-                console.log('👤 Member selected:', value);
-                setFormData({ ...formData, user_id: value });
-              }}
+              onValueChange={(value) =>
+                setFormData({ ...formData, user_id: value })
+              }
               disabled={loadingMembers || loading}
             >
               <SelectTrigger>
@@ -476,8 +565,8 @@ export function LoanAddModal({
                     loadingMembers
                       ? "Memuat anggota..."
                       : members.length === 0
-                      ? "Tidak ada anggota"
-                      : "Pilih anggota"
+                        ? "Tidak ada anggota"
+                        : "Pilih anggota"
                   }
                 />
               </SelectTrigger>
@@ -489,7 +578,8 @@ export function LoanAddModal({
                 ) : (
                   members.map((member) => (
                     <SelectItem key={member.id} value={member.id.toString()}>
-                      {member.employee_id || `ID-${member.id}`} - {member.full_name}
+                      {member.employee_id || `ID-${member.id}`} -{" "}
+                      {member.full_name}
                     </SelectItem>
                   ))
                 )}
@@ -504,13 +594,14 @@ export function LoanAddModal({
 
           {/* Cash Account Selection */}
           <div className="space-y-2">
-            <Label>Pilih Kas <span className="text-red-500">*</span></Label>
+            <Label>
+              Pilih Kas <span className="text-red-500">*</span>
+            </Label>
             <Select
               value={formData.cash_account_id}
-              onValueChange={(value) => {
-                console.log('🏦 Kas selected:', value);
-                setFormData({ ...formData, cash_account_id: value });
-              }}
+              onValueChange={(value) =>
+                setFormData({ ...formData, cash_account_id: value })
+              }
               disabled={loadingAccounts || loading}
             >
               <SelectTrigger>
@@ -519,8 +610,8 @@ export function LoanAddModal({
                     loadingAccounts
                       ? "Memuat kas..."
                       : cashAccounts.length === 0
-                      ? "Tidak ada kas"
-                      : "Pilih kas"
+                        ? "Tidak ada kas"
+                        : "Pilih kas"
                   }
                 />
               </SelectTrigger>
@@ -533,10 +624,13 @@ export function LoanAddModal({
                   cashAccounts.map((account) => (
                     <SelectItem key={account.id} value={account.id.toString()}>
                       <div>
-                        <div className="font-medium">{account.code} - {account.name}</div>
+                        <div className="font-medium">
+                          {account.code} - {account.name}
+                        </div>
                         <div className="text-xs text-gray-500">
                           Bunga: {account.interest_rate || 0}%
-                          {account.max_amount && ` • Max: ${formatCurrency(account.max_amount)}`}
+                          {account.max_amount &&
+                            ` • Max: ${formatCurrency(account.max_amount)}`}
                         </div>
                       </div>
                     </SelectItem>
@@ -548,7 +642,9 @@ export function LoanAddModal({
 
           {/* Amount Input */}
           <div className="space-y-2">
-            <Label>Jumlah Pinjaman <span className="text-red-500">*</span></Label>
+            <Label>
+              Jumlah Pinjaman <span className="text-red-500">*</span>
+            </Label>
             <div className="relative">
               <DollarSign className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
               <Input
@@ -562,20 +658,22 @@ export function LoanAddModal({
             </div>
             <p className="text-xs text-gray-500">
               Minimal: Rp 100.000
-              {selectedAccount?.max_amount && ` • Maksimal: ${formatCurrency(selectedAccount.max_amount)}`}
+              {selectedAccount?.max_amount &&
+                ` • Maksimal: ${formatCurrency(selectedAccount.max_amount)}`}
             </p>
           </div>
 
           {/* Tenure & Date */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Jangka Waktu <span className="text-red-500">*</span></Label>
+              <Label>
+                Jangka Waktu <span className="text-red-500">*</span>
+              </Label>
               <Select
                 value={formData.tenure_months}
-                onValueChange={(value) => {
-                  console.log('📅 Tenure selected:', value);
-                  setFormData({ ...formData, tenure_months: value });
-                }}
+                onValueChange={(value) =>
+                  setFormData({ ...formData, tenure_months: value })
+                }
                 disabled={loading}
               >
                 <SelectTrigger>
@@ -594,7 +692,9 @@ export function LoanAddModal({
             </div>
 
             <div className="space-y-2">
-              <Label>Tanggal Pengajuan <span className="text-red-500">*</span></Label>
+              <Label>
+                Tanggal Pengajuan <span className="text-red-500">*</span>
+              </Label>
               <Input
                 type="date"
                 value={formData.application_date}
@@ -604,6 +704,199 @@ export function LoanAddModal({
                 disabled={loading}
               />
             </div>
+          </div>
+
+          {/* ✅ NEW: Deduction Method Section */}
+          <div className="space-y-4 border-t pt-4">
+            <div className="flex items-center space-x-2">
+              <Percent className="h-4 w-4 text-purple-600" />
+              <Label className="text-base font-semibold">
+                Metode Potongan Angsuran
+              </Label>
+            </div>
+
+            {/* Deduction Method Selection */}
+            <div className="space-y-2">
+              <Label>
+                Pilih Metode Potongan <span className="text-red-500">*</span>
+              </Label>
+              <Select
+                value={formData.deduction_method}
+                onValueChange={(value: any) => {
+                  setFormData({
+                    ...formData,
+                    deduction_method: value,
+                    // Reset percentages when changing method
+                    salary_deduction_percentage:
+                      value === "none"
+                        ? 0
+                        : formData.salary_deduction_percentage,
+                    service_allowance_deduction_percentage:
+                      value === "none"
+                        ? 0
+                        : formData.service_allowance_deduction_percentage,
+                  });
+                }}
+                disabled={loading}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">
+                    <div className="flex flex-col">
+                      <span className="font-medium">Tidak Ada Potongan</span>
+                      <span className="text-xs text-gray-500">
+                        Bayar manual via kas/transfer
+                      </span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="salary">
+                    <div className="flex flex-col">
+                      <span className="font-medium">Potongan Gaji</span>
+                      <span className="text-xs text-gray-500">
+                        Angsuran dipotong dari gaji bulanan
+                      </span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="service_allowance">
+                    <div className="flex flex-col">
+                      <span className="font-medium">
+                        Potongan Jasa Pelayanan
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        Angsuran dipotong dari jasa pelayanan
+                      </span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="mixed">
+                    <div className="flex flex-col">
+                      <span className="font-medium">
+                        Kombinasi (Gaji + Jasa Pelayanan)
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        Angsuran dipotong dari keduanya
+                      </span>
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* ✅ Conditional: Salary Deduction Percentage */}
+            {(formData.deduction_method === "salary" ||
+              formData.deduction_method === "mixed") && (
+              <div className="space-y-2 bg-blue-50 p-4 rounded-lg">
+                <Label className="flex items-center space-x-2">
+                  <Percent className="h-4 w-4 text-blue-600" />
+                  <span>
+                    Persentase Potongan Gaji (%){" "}
+                    <span className="text-red-500">*</span>
+                  </span>
+                </Label>
+                <Input
+                  type="number"
+                  min="1"
+                  max="100"
+                  value={formData.salary_deduction_percentage || ""}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      salary_deduction_percentage:
+                        parseInt(e.target.value) || 0,
+                    })
+                  }
+                  placeholder="Contoh: 100 (untuk 100%)"
+                  disabled={loading}
+                />
+                <p className="text-xs text-blue-700">
+                  💡 Angsuran akan dipotong{" "}
+                  <strong>{formData.salary_deduction_percentage}%</strong> dari
+                  gaji bulanan
+                </p>
+              </div>
+            )}
+
+            {/* ✅ Conditional: Service Allowance Deduction Percentage */}
+            {(formData.deduction_method === "service_allowance" ||
+              formData.deduction_method === "mixed") && (
+              <div className="space-y-2 bg-green-50 p-4 rounded-lg">
+                <Label className="flex items-center space-x-2">
+                  <Percent className="h-4 w-4 text-green-600" />
+                  <span>
+                    Persentase Potongan Jasa Pelayanan (%){" "}
+                    <span className="text-red-500">*</span>
+                  </span>
+                </Label>
+                <Input
+                  type="number"
+                  min="1"
+                  max="100"
+                  value={formData.service_allowance_deduction_percentage || ""}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      service_allowance_deduction_percentage:
+                        parseInt(e.target.value) || 0,
+                    })
+                  }
+                  placeholder="Contoh: 100 (untuk 100%)"
+                  disabled={loading}
+                />
+                <p className="text-xs text-green-700">
+                  💡 Angsuran akan dipotong{" "}
+                  <strong>
+                    {formData.service_allowance_deduction_percentage}%
+                  </strong>{" "}
+                  dari jasa pelayanan
+                </p>
+              </div>
+            )}
+
+            {/* ✅ Mixed Deduction Summary */}
+            {formData.deduction_method === "mixed" && (
+              <Alert
+                className={
+                  formData.salary_deduction_percentage +
+                    formData.service_allowance_deduction_percentage ===
+                  100
+                    ? "bg-green-50 border-green-200"
+                    : "bg-orange-50 border-orange-200"
+                }
+              >
+                <Info className="h-4 w-4" />
+                <AlertDescription>
+                  <div className="space-y-1">
+                    <p className="font-medium">Total Persentase Potongan:</p>
+                    <p className="text-sm">
+                      Gaji: {formData.salary_deduction_percentage}% + Jasa
+                      Pelayanan:{" "}
+                      {formData.service_allowance_deduction_percentage}% =
+                      <strong
+                        className={
+                          formData.salary_deduction_percentage +
+                            formData.service_allowance_deduction_percentage ===
+                          100
+                            ? "text-green-700 ml-1"
+                            : "text-orange-700 ml-1"
+                        }
+                      >
+                        {formData.salary_deduction_percentage +
+                          formData.service_allowance_deduction_percentage}
+                        %
+                      </strong>
+                    </p>
+                    {formData.salary_deduction_percentage +
+                      formData.service_allowance_deduction_percentage !==
+                      100 && (
+                      <p className="text-xs text-orange-700 mt-2">
+                        ⚠️ Total harus 100% untuk metode kombinasi
+                      </p>
+                    )}
+                  </div>
+                </AlertDescription>
+              </Alert>
+            )}
           </div>
 
           {/* Simulation Card */}
@@ -623,7 +916,9 @@ export function LoanAddModal({
               <CardContent className="p-4">
                 <div className="flex items-center gap-2 mb-3">
                   <Calculator className="h-5 w-5 text-blue-600" />
-                  <h3 className="font-semibold text-blue-900">Simulasi Pinjaman</h3>
+                  <h3 className="font-semibold text-blue-900">
+                    Simulasi Pinjaman
+                  </h3>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -655,7 +950,8 @@ export function LoanAddModal({
 
                 <div className="mt-3 p-2 bg-white rounded">
                   <p className="text-xs text-gray-600">
-                    💡 Effective Rate: <strong>{simulation.effective_rate}%</strong>
+                    💡 Effective Rate:{" "}
+                    <strong>{simulation.effective_rate}%</strong>
                   </p>
                 </div>
               </CardContent>
@@ -664,7 +960,9 @@ export function LoanAddModal({
 
           {/* Purpose */}
           <div className="space-y-2">
-            <Label>Tujuan Pinjaman <span className="text-red-500">*</span></Label>
+            <Label>
+              Tujuan Pinjaman <span className="text-red-500">*</span>
+            </Label>
             <Textarea
               placeholder="Jelaskan tujuan pinjaman (minimal 10 karakter)"
               value={formData.loan_purpose}

@@ -23,6 +23,7 @@ import {
   DollarSign,
   UserCog,
   Loader2,
+  ArrowLeftRight, // ✅ NEW: Icon untuk Cash Transfer
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import authService, { User } from "@/lib/api/auth.service";
@@ -106,10 +107,22 @@ export function ManagerLayout({ children }: ManagerLayoutProps) {
       badge: null,
     },
     {
+      name: "Transfer Kas", // ✅ NEW: Cash Transfer Menu
+      href: "/manager/cash-transfers",
+      icon: ArrowLeftRight,
+      current: location.pathname === "/manager/cash-transfers",
+    },
+    {
       name: "Manajemen Simpanan",
       href: "/manager/savings",
       icon: PiggyBank,
       current: location.pathname === "/manager/savings",
+    },
+    {
+      name: "Jenis Simpanan",
+      href: "/manager/saving-types",
+      icon: PiggyBank,
+      current: location.pathname === "/manager/saving-types",
     },
     {
       name: "Manajemen Pinjaman",
@@ -122,6 +135,12 @@ export function ManagerLayout({ children }: ManagerLayoutProps) {
       href: "/manager/payroll",
       icon: DollarSign,
       current: location.pathname === "/manager/payroll",
+    },
+    {
+      name: "Potongan Gaji",
+      href: "/manager/salary-deductions",
+      icon: Calculator,
+      current: location.pathname === "/manager/salary-deductions",
     },
     {
       name: "Manajemen Akun",
@@ -152,6 +171,12 @@ export function ManagerLayout({ children }: ManagerLayoutProps) {
       href: "/manager/income-statement",
       icon: TrendingUp,
       current: location.pathname === "/manager/income-statement",
+    },
+    {
+      name: "Pengunduran Diri",
+      href: "/manager/resignations",
+      icon: TrendingUp,
+      current: location.pathname === "/manager/resignations",
     },
   ];
 
@@ -224,7 +249,9 @@ export function ManagerLayout({ children }: ManagerLayoutProps) {
       <aside
         className={cn(
           "fixed top-0 left-0 z-50 h-full w-64 flex flex-col bg-white shadow-lg transition-transform duration-200 ease-in-out",
-          isSidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+          isSidebarOpen
+            ? "translate-x-0"
+            : "-translate-x-full lg:translate-x-0",
         )}
       >
         {/* Header */}
@@ -341,7 +368,7 @@ export function ManagerLayout({ children }: ManagerLayoutProps) {
                   "flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors",
                   item.current
                     ? "bg-green-100 text-green-700"
-                    : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                    : "text-gray-600 hover:bg-gray-100 hover:text-gray-900",
                 )}
                 onClick={() => setIsSidebarOpen(false)}
               >

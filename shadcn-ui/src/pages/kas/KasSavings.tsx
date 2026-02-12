@@ -56,6 +56,8 @@ export default function KasSavings() {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedSaving, setSelectedSaving] = useState(null);
+  const [savingTypes, setSavingTypes] = useState<SavingType[]>([]);
+  const [loadingTypes, setLoadingTypes] = useState(false);
 
   // ✅ Use real API with hooks
   const { savings, loading, deleteSaving, refresh } = useSavings({
@@ -64,7 +66,7 @@ export default function KasSavings() {
 
   // ✅ Filter savings by kas_id (frontend filtering)
   const kasSavings = savings.filter(
-    (saving) => saving.cash_account_id === kasId
+    (saving) => saving.cash_account_id === kasId,
   );
 
   // Filter by type
@@ -376,7 +378,7 @@ export default function KasSavings() {
                         </TableCell>
                         <TableCell>
                           {new Date(saving.transaction_date).toLocaleDateString(
-                            "id-ID"
+                            "id-ID",
                           )}
                         </TableCell>
                         <TableCell>{getStatusBadge(saving.status)}</TableCell>

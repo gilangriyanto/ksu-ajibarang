@@ -356,7 +356,7 @@ export function SavingsDetailModal({
                   <p className="font-medium text-green-900">
                     {savings.approved_at
                       ? new Date(savings.approved_at).toLocaleDateString(
-                          "id-ID"
+                          "id-ID",
                         )
                       : "-"}
                   </p>

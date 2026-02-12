@@ -2,7 +2,6 @@ import React, { useEffect, useState } from "react";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -48,7 +47,6 @@ export function LoanDetailModal({
   const { schedule, getSchedule, installments, getInstallments } =
     useInstallments();
 
-  // Load schedule when modal opens
   useEffect(() => {
     if (loan && isOpen) {
       loadScheduleData();
@@ -143,7 +141,6 @@ export function LoanDetailModal({
       ? parseFloat(loan.monthly_payment)
       : loan.monthly_payment;
 
-  // Get paid installments for history
   const paidInstallments = installments
     .filter((i) => i.status === "paid")
     .slice(0, 3);
@@ -161,10 +158,11 @@ export function LoanDetailModal({
                 <DialogTitle className="text-xl font-bold">
                   Detail Pinjaman #{loan.id}
                 </DialogTitle>
-                <DialogDescription className="flex items-center space-x-2">
+                {/* ✅ FIX: Use <div> instead of <DialogDescription> to avoid <p> containing <div> (Badge) */}
+                <div className="text-sm text-muted-foreground flex items-center space-x-2 mt-1">
                   <span>{loan.user?.full_name || "N/A"}</span>
                   {getStatusBadge(loan.status)}
-                </DialogDescription>
+                </div>
               </div>
             </div>
             <div className="flex items-center space-x-2">
@@ -310,6 +308,80 @@ export function LoanDetailModal({
                     % per tahun
                   </p>
                 </div>
+                {loan.deduction_method && (
+                  <div className="space-y-2">
+                    <p className="text-sm text-gray-500">
+                      Metode Potongan Angsuran
+                    </p>
+                    <div className="flex items-center gap-2">
+                      {loan.deduction_method === "none" && (
+                        <Badge className="bg-gray-100 text-gray-800">
+                          Tidak Ada Potongan (Manual)
+                        </Badge>
+                      )}
+
+                      {loan.deduction_method === "salary" && (
+                        <div className="flex items-center gap-2">
+                          <Badge className="bg-blue-100 text-blue-800">
+                            Potongan Gaji
+                          </Badge>
+                          <span className="text-sm font-medium text-blue-900">
+                            {loan.salary_deduction_percentage}% dari gaji
+                          </span>
+                        </div>
+                      )}
+
+                      {loan.deduction_method === "service_allowance" && (
+                        <div className="flex items-center gap-2">
+                          <Badge className="bg-green-100 text-green-800">
+                            Potongan Jasa Pelayanan
+                          </Badge>
+                          <span className="text-sm font-medium text-green-900">
+                            {loan.service_allowance_deduction_percentage}% dari
+                            jasa pelayanan
+                          </span>
+                        </div>
+                      )}
+
+                      {loan.deduction_method === "mixed" && (
+                        <div className="space-y-2">
+                          <Badge className="bg-purple-100 text-purple-800">
+                            Kombinasi (Gaji + Jasa Pelayanan)
+                          </Badge>
+                          <div className="grid grid-cols-2 gap-2 mt-2">
+                            <div className="bg-blue-50 p-2 rounded">
+                              <p className="text-xs text-blue-700">Dari Gaji</p>
+                              <p className="font-medium text-blue-900">
+                                {loan.salary_deduction_percentage}%
+                              </p>
+                            </div>
+                            <div className="bg-green-50 p-2 rounded">
+                              <p className="text-xs text-green-700">
+                                Dari Jasa Pelayanan
+                              </p>
+                              <p className="font-medium text-green-900">
+                                {loan.service_allowance_deduction_percentage}%
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="bg-gray-50 p-3 rounded-lg mt-2">
+                      <p className="text-xs text-gray-600">
+                        {loan.deduction_method === "none" &&
+                          "💡 Pembayaran angsuran dilakukan secara manual via kas atau transfer bank"}
+                        {loan.deduction_method === "salary" &&
+                          `💡 Angsuran akan dipotong otomatis ${loan.salary_deduction_percentage}% dari gaji bulanan`}
+                        {loan.deduction_method === "service_allowance" &&
+                          `💡 Angsuran akan dipotong otomatis ${loan.service_allowance_deduction_percentage}% dari jasa pelayanan`}
+                        {loan.deduction_method === "mixed" &&
+                          `💡 Angsuran akan dipotong ${loan.salary_deduction_percentage}% dari gaji dan ${loan.service_allowance_deduction_percentage}% dari jasa pelayanan`}
+                      </p>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -325,7 +397,7 @@ export function LoanDetailModal({
                   <p className="text-sm text-gray-500">Tanggal Pengajuan</p>
                   <p className="font-medium">
                     {new Date(loan.application_date).toLocaleDateString(
-                      "id-ID"
+                      "id-ID",
                     )}
                   </p>
                 </div>
@@ -334,7 +406,7 @@ export function LoanDetailModal({
                     <p className="text-sm text-gray-500">Tanggal Pencairan</p>
                     <p className="font-medium">
                       {new Date(loan.disbursement_date).toLocaleDateString(
-                        "id-ID"
+                        "id-ID",
                       )}
                     </p>
                   </div>
@@ -444,7 +516,7 @@ export function LoanDetailModal({
                           <p className="text-sm text-gray-500">
                             Jatuh tempo:{" "}
                             {new Date(installment.due_date).toLocaleDateString(
-                              "id-ID"
+                              "id-ID",
                             )}
                           </p>
                         </div>
@@ -455,7 +527,7 @@ export function LoanDetailModal({
                           <p className="text-xs text-gray-500 mt-1">
                             Dibayar:{" "}
                             {new Date(
-                              installment.payment_date
+                              installment.payment_date,
                             ).toLocaleDateString("id-ID")}
                           </p>
                         )}
@@ -497,7 +569,7 @@ export function LoanDetailModal({
                           <p className="text-sm text-gray-500">
                             {payment.payment_date
                               ? new Date(
-                                  payment.payment_date
+                                  payment.payment_date,
                                 ).toLocaleDateString("id-ID")
                               : "N/A"}
                           </p>

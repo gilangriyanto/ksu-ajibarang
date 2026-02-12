@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
+import { ArrowLeftRight } from "lucide-react";
 
 interface KasLayoutProps {
   children: React.ReactNode;
@@ -61,6 +62,12 @@ export function KasLayout({ children }: KasLayoutProps) {
       icon: Calculator,
       current: location.pathname === `/kas/${kasId}/accounting`,
     },
+    {
+      name: "Transfer Kas",
+      href: `/kas/${kasId}/cash-transfers`, // kasId dari route params
+      icon: ArrowLeftRight,
+      current: location.pathname.includes("/cash-transfers"),
+    },
   ];
 
   const kasData = {
@@ -89,7 +96,9 @@ export function KasLayout({ children }: KasLayoutProps) {
       <aside
         className={cn(
           "fixed top-0 left-0 z-50 h-full w-64 flex flex-col bg-white shadow-lg transition-transform duration-200 ease-in-out",
-          isSidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+          isSidebarOpen
+            ? "translate-x-0"
+            : "-translate-x-full lg:translate-x-0",
         )}
       >
         {/* Header */}
@@ -152,7 +161,7 @@ export function KasLayout({ children }: KasLayoutProps) {
                   "flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors",
                   item.current
                     ? "bg-purple-100 text-purple-700"
-                    : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                    : "text-gray-600 hover:bg-gray-100 hover:text-gray-900",
                 )}
                 onClick={() => setIsSidebarOpen(false)}
               >

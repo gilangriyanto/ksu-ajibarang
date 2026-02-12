@@ -23,18 +23,25 @@ import AccountManagement from "./pages/manager/AccountManagement";
 import AssetManagement from "./pages/manager/AssetManagement";
 import BalanceSheet from "./pages/manager/BalanceSheet";
 import IncomeStatement from "./pages/manager/IncomeStatement";
+import SalaryDeductionManagement from "./pages/manager/SalaryDeductionManagement";
 import Reports from "./pages/manager/Reports";
 import Settings from "./pages/manager/Settings";
 
 // ✅ Import Manajemen Kas
 import CashAccountsPage from "./pages/manager/kas";
 import CashAccountDetailPage from "./pages/manager/kas/Detail";
-
+// ✅ ADD: Import Saving Types Management
+import SavingTypesManagement from "./pages/manager/SavingTypesManagement";
 // ✅ Import Installment Pages
 import ManagerOverdueInstallments from "./pages/manager/OverdueInstallments";
 import ManagerUpcomingInstallments from "./pages/manager/UpcomingInstallments";
+import ResignationManagement from "./pages/manager/ResignationManagement";
 import MemberOverdueInstallments from "./pages/member/OverdueInstallments";
 import MemberUpcomingInstallments from "./pages/member/UpcomingInstallments";
+import MemberResignation from "./pages/member/MemberResignation";
+// ✅ Import Cash Transfer Pages
+import CashTransferManagement from "./pages/manager/CashTransferManagement";
+// import MemberCashTransfer from "./pages/member/MemberCashTransfer";
 
 // ✅ Kas Layout & Dashboard - Used by Manager Kas (role="manager")
 import KasLayout from "./components/layout/KasLayout";
@@ -116,6 +123,23 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
+            <Route
+              path="/member/resignation"
+              element={
+                <ProtectedRoute allowedRoles={["anggota"]}>
+                  <MemberResignation />
+                </ProtectedRoute>
+              }
+            />
+            {/* ✅ NEW: Member Cash Transfer Route */}
+            {/* <Route
+              path="/member/cash-transfers"
+              element={
+                <ProtectedRoute allowedRoles={["anggota"]}>
+                  <MemberCashTransfer />
+                </ProtectedRoute>
+              }
+            /> */}
 
             {/* ==========================================
                 ADMIN ROUTES (role="admin")
@@ -167,6 +191,17 @@ const App = () => (
                 <ProtectedRoute allowedRoles={["admin"]}>
                   <ManagerLayout>
                     <Savings />
+                  </ManagerLayout>
+                </ProtectedRoute>
+              }
+            />
+            {/* ✅ NEW: Saving Types Management Route */}
+            <Route
+              path="/manager/saving-types"
+              element={
+                <ProtectedRoute allowedRoles={["admin"]}>
+                  <ManagerLayout>
+                    <SavingTypesManagement />
                   </ManagerLayout>
                 </ProtectedRoute>
               }
@@ -232,6 +267,26 @@ const App = () => (
               }
             />
             <Route
+              path="/manager/resignations"
+              element={
+                <ProtectedRoute allowedRoles={["admin"]}>
+                  <ManagerLayout>
+                    <ResignationManagement />
+                  </ManagerLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/manager/salary-deductions"
+              element={
+                <ProtectedRoute allowedRoles={["admin"]}>
+                  <ManagerLayout>
+                    <SalaryDeductionManagement />
+                  </ManagerLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/manager/assets"
               element={
                 <ProtectedRoute allowedRoles={["admin"]}>
@@ -277,6 +332,17 @@ const App = () => (
                 <ProtectedRoute allowedRoles={["admin"]}>
                   <ManagerLayout>
                     <IncomeStatement />
+                  </ManagerLayout>
+                </ProtectedRoute>
+              }
+            />
+            {/* ✅ NEW: Manager Cash Transfer Route */}
+            <Route
+              path="/manager/cash-transfers"
+              element={
+                <ProtectedRoute allowedRoles={["admin"]}>
+                  <ManagerLayout>
+                    <CashTransferManagement />
                   </ManagerLayout>
                 </ProtectedRoute>
               }
@@ -333,6 +399,17 @@ const App = () => (
                 <ProtectedRoute allowedRoles={["manager"]} requireKasId={true}>
                   <KasLayout>
                     <KasSettings />
+                  </KasLayout>
+                </ProtectedRoute>
+              }
+            />
+            {/* ✅ NEW: Cash Transfer for Manager Kas */}
+            <Route
+              path="/kas/:kasId/cash-transfers"
+              element={
+                <ProtectedRoute allowedRoles={["manager"]} requireKasId={true}>
+                  <KasLayout>
+                    <CashTransferManagement />
                   </KasLayout>
                 </ProtectedRoute>
               }

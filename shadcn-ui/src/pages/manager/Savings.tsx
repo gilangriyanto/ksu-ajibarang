@@ -1,3 +1,6 @@
+// src/pages/manager/SavingsManagement.tsx
+// ✅ UPDATED: Use savingsService helper methods for proper type display
+
 import React, { useState, useEffect } from "react";
 import { ManagerLayout } from "@/components/layout/ManagerLayout";
 import { BackButton } from "@/components/ui/back-button";
@@ -55,7 +58,7 @@ import {
 import { SavingsAddModal } from "@/components/modals/SavingsAddModal";
 import SavingsDetailModal from "@/components/modals/SavingsDetailModal";
 import { SavingsEditModal } from "@/components/modals/SavingsEditModal";
-import { ExportSavingsModalClientSide } from "@/components/modals/ExportSavingsModalClientSide"; // ✅ Client-side export
+import { ExportSavingsModalClientSide } from "@/components/modals/ExportSavingsModalClientSide";
 import { toast } from "sonner";
 import savingsService, {
   Saving,
@@ -146,31 +149,31 @@ export default function SavingsManagement() {
       const mandatoryData = Array.isArray(mandatoryRes?.data?.data)
         ? mandatoryRes.data.data
         : Array.isArray(mandatoryRes?.data)
-        ? mandatoryRes.data
-        : [];
+          ? mandatoryRes.data
+          : [];
 
       const voluntaryData = Array.isArray(voluntaryRes?.data?.data)
         ? voluntaryRes.data.data
         : Array.isArray(voluntaryRes?.data)
-        ? voluntaryRes.data
-        : [];
+          ? voluntaryRes.data
+          : [];
 
       const principalData = Array.isArray(principalRes?.data?.data)
         ? principalRes.data.data
         : Array.isArray(principalRes?.data)
-        ? principalRes.data
-        : [];
+          ? principalRes.data
+          : [];
 
       const holidayData = Array.isArray(holidayRes?.data?.data)
         ? holidayRes.data.data
         : Array.isArray(holidayRes?.data)
-        ? holidayRes.data
-        : [];
+          ? holidayRes.data
+          : [];
 
       const calculateTotal = (data: Saving[]) => {
         return data.reduce((sum, item) => {
           const amount = parseFloat(
-            item.final_amount?.toString() || item.amount?.toString() || "0"
+            item.final_amount?.toString() || item.amount?.toString() || "0",
           );
           return sum + amount;
         }, 0);
@@ -233,12 +236,14 @@ export default function SavingsManagement() {
   const filteredRecords = savings.filter((record) => {
     const userName = record.user?.full_name || record.user_name || "";
     const userCode = record.user?.employee_id || record.user_code || "";
-    const savingsType = record.savings_type || record.saving_type || "";
+
+    // ✅ FIXED: Use helper method to get type code
+    const savingTypeCode = savingsService.getSavingTypeCode(record);
 
     const matchesSearch =
       userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       userCode.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesType = typeFilter === "all" || savingsType === typeFilter;
+    const matchesType = typeFilter === "all" || savingTypeCode === typeFilter;
     const matchesStatus =
       statusFilter === "all" || record.status === statusFilter;
     return matchesSearch && matchesType && matchesStatus;
@@ -252,33 +257,12 @@ export default function SavingsManagement() {
     }).format(amount);
   };
 
-  const getSavingsTypeBadge = (type: string) => {
-    switch (type) {
-      case "mandatory":
-        return (
-          <Badge className="bg-blue-100 text-blue-800">Simpanan Wajib</Badge>
-        );
-      case "voluntary":
-        return (
-          <Badge className="bg-green-100 text-green-800">
-            Simpanan Sukarela
-          </Badge>
-        );
-      case "principal":
-        return (
-          <Badge className="bg-purple-100 text-purple-800">
-            Simpanan Pokok
-          </Badge>
-        );
-      case "holiday":
-        return (
-          <Badge className="bg-orange-100 text-orange-800">
-            Simpanan Hari Raya
-          </Badge>
-        );
-      default:
-        return <Badge variant="secondary">{type}</Badge>;
-    }
+  // ✅ UPDATED: Use service helper method with proper Badge component
+  const getSavingsTypeBadge = (saving: Saving) => {
+    const typeName = savingsService.getSavingTypeName(saving);
+    const badgeColor = savingsService.getSavingTypeBadgeColor(saving);
+
+    return <Badge className={badgeColor}>{typeName}</Badge>;
   };
 
   const getStatusBadge = (status: string) => {
@@ -321,18 +305,29 @@ export default function SavingsManagement() {
 
   const handleSaveSavings = async (updatedSavings: any) => {
     try {
-      await savingsService.update(updatedSavings.id, {
+      // ✅ Build update payload properly
+      const updatePayload: any = {
         user_id: updatedSavings.user_id,
         cash_account_id: updatedSavings.cash_account_id,
-        savings_type: updatedSavings.savings_type || updatedSavings.saving_type,
+        transaction_date: updatedSavings.transaction_date,
         amount:
           typeof updatedSavings.amount === "string"
             ? parseFloat(updatedSavings.amount)
             : updatedSavings.amount,
-        transaction_date: updatedSavings.transaction_date,
         description: updatedSavings.description || updatedSavings.notes,
         status: updatedSavings.status,
-      });
+      };
+
+      // ✅ Add saving_type_id OR savings_type
+      if (updatedSavings.saving_type_id) {
+        updatePayload.saving_type_id = updatedSavings.saving_type_id;
+      } else if (updatedSavings.savings_type) {
+        updatePayload.savings_type = updatedSavings.savings_type;
+      }
+
+      console.log("📤 Updating savings with payload:", updatePayload);
+
+      await savingsService.update(updatedSavings.id, updatePayload);
 
       toast.success("Data simpanan berhasil diperbarui");
       await loadAllData();
@@ -431,7 +426,6 @@ export default function SavingsManagement() {
               />
               Refresh
             </Button>
-            {/* ✅ Export Button - Client Side */}
             <Button
               variant="outline"
               onClick={() => setIsExportModalOpen(true)}
@@ -615,13 +609,12 @@ export default function SavingsManagement() {
                           </div>
                         </TableCell>
                         <TableCell>
-                          {getSavingsTypeBadge(
-                            record.savings_type || record.saving_type
-                          )}
+                          {/* ✅ FIXED: Use service helper */}
+                          {getSavingsTypeBadge(record)}
                         </TableCell>
                         <TableCell className="font-medium text-green-600">
                           {formatCurrency(
-                            parseFloat(record.amount?.toString() || "0")
+                            parseFloat(record.amount?.toString() || "0"),
                           )}
                         </TableCell>
                         <TableCell className="font-medium text-blue-600">
@@ -629,14 +622,14 @@ export default function SavingsManagement() {
                             parseFloat(
                               record.final_amount?.toString() ||
                                 record.balance?.toString() ||
-                                "0"
-                            )
+                                "0",
+                            ),
                           )}
                         </TableCell>
                         <TableCell>{getStatusBadge(record.status)}</TableCell>
                         <TableCell>
                           {new Date(record.created_at).toLocaleDateString(
-                            "id-ID"
+                            "id-ID",
                           )}
                         </TableCell>
                         <TableCell>
@@ -735,7 +728,6 @@ export default function SavingsManagement() {
           onSave={handleSaveSavings}
         />
 
-        {/* ✅ Client-Side Export Modal */}
         <ExportSavingsModalClientSide
           isOpen={isExportModalOpen}
           onClose={() => setIsExportModalOpen(false)}

@@ -90,7 +90,9 @@ export function MemberLayout({ children }: MemberLayoutProps) {
 
   // ✅ State for real data
   const [userData, setUserData] = useState<UserData | null>(null);
-  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
+  const [dashboardData, setDashboardData] = useState<DashboardData | null>(
+    null,
+  );
   const [loading, setLoading] = useState(true);
   const [upcomingCount, setUpcomingCount] = useState(0);
 
@@ -100,6 +102,7 @@ export function MemberLayout({ children }: MemberLayoutProps) {
     { name: "Simpanan", href: "/member/savings", icon: PiggyBank },
     { name: "Pinjaman", href: "/member/loans", icon: CreditCard },
     { name: "Jasa Pelayanan", href: "/member/payroll", icon: DollarSign },
+    { name: "Pengunduran Diri", href: "/member/resignation", icon: User },
   ];
 
   // ✅ Load user data on mount
@@ -135,7 +138,7 @@ export function MemberLayout({ children }: MemberLayoutProps) {
         "https://ksp.gascpns.id/api/dashboard/member",
         {
           headers: { Authorization: `Bearer ${token}` },
-        }
+        },
       );
 
       console.log("📊 Dashboard data loaded:", response.data);
@@ -146,7 +149,7 @@ export function MemberLayout({ children }: MemberLayoutProps) {
         // Count upcoming installments (overdue or due soon)
         const upcoming = response.data.data.upcoming_installments || [];
         const overdueOrDueSoon = upcoming.filter(
-          (inst: any) => inst.days_until_due <= 7 || inst.days_until_due < 0
+          (inst: any) => inst.days_until_due <= 7 || inst.days_until_due < 0,
         );
         setUpcomingCount(overdueOrDueSoon.length);
       }
@@ -161,14 +164,14 @@ export function MemberLayout({ children }: MemberLayoutProps) {
   const formatCurrency = (amount: number | string) => {
     const num = typeof amount === "string" ? parseFloat(amount) : amount;
     if (isNaN(num)) return "Rp 0";
-    
+
     // Format in millions for compact display
     if (num >= 1000000) {
       return `Rp ${(num / 1000000).toFixed(1)}M`;
     } else if (num >= 1000) {
       return `Rp ${(num / 1000).toFixed(0)}K`;
     }
-    
+
     return new Intl.NumberFormat("id-ID", {
       style: "currency",
       currency: "IDR",
@@ -248,12 +251,18 @@ export function MemberLayout({ children }: MemberLayoutProps) {
   };
 
   // ✅ Get member data (with fallback)
-  const memberName = userData?.full_name || dashboardData?.profile?.full_name || "Member";
-  const memberId = userData?.employee_id || dashboardData?.profile?.employee_id || "N/A";
-  const joinDate = userData?.joined_at || dashboardData?.profile?.joined_at || new Date().toISOString();
-  
+  const memberName =
+    userData?.full_name || dashboardData?.profile?.full_name || "Member";
+  const memberId =
+    userData?.employee_id || dashboardData?.profile?.employee_id || "N/A";
+  const joinDate =
+    userData?.joined_at ||
+    dashboardData?.profile?.joined_at ||
+    new Date().toISOString();
+
   const savingsTotal = dashboardData?.financial_summary?.savings?.total || 0;
-  const loanRemaining = dashboardData?.financial_summary?.loans?.remaining_balance || 0;
+  const loanRemaining =
+    dashboardData?.financial_summary?.loans?.remaining_balance || 0;
 
   // ✅ Get urgent notifications
   const urgentInstallments = (dashboardData?.upcoming_installments || [])
@@ -274,7 +283,9 @@ export function MemberLayout({ children }: MemberLayoutProps) {
       <div
         className={cn(
           "fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform transition-transform duration-200 ease-in-out",
-          isSidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+          isSidebarOpen
+            ? "translate-x-0"
+            : "-translate-x-full lg:translate-x-0",
         )}
       >
         <div className="flex flex-col h-full">
@@ -284,9 +295,7 @@ export function MemberLayout({ children }: MemberLayoutProps) {
               <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
                 <Shield className="w-5 h-5 text-white" />
               </div>
-              <span className="text-lg font-bold text-gray-900">
-                KSU Ceria
-              </span>
+              <span className="text-lg font-bold text-gray-900">KSU Ceria</span>
             </div>
             <Button
               variant="ghost"
@@ -355,7 +364,7 @@ export function MemberLayout({ children }: MemberLayoutProps) {
                     "flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors",
                     isActive
                       ? "bg-blue-100 text-blue-700 border-r-2 border-blue-600"
-                      : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                      : "text-gray-600 hover:bg-gray-100 hover:text-gray-900",
                   )}
                   onClick={() => setIsSidebarOpen(false)}
                 >
@@ -444,9 +453,13 @@ export function MemberLayout({ children }: MemberLayoutProps) {
                             navigate("/member/loans");
                           }}
                         >
-                          <div className={cn("w-full p-2 rounded", status.bgColor)}>
+                          <div
+                            className={cn("w-full p-2 rounded", status.bgColor)}
+                          >
                             <div className="flex items-start gap-3">
-                              <StatusIcon className={cn("h-5 w-5 mt-0.5", status.color)} />
+                              <StatusIcon
+                                className={cn("h-5 w-5 mt-0.5", status.color)}
+                              />
                               <div className="flex-1 min-w-0">
                                 <p className="font-medium text-sm">
                                   {installment.loan_number}
@@ -459,10 +472,15 @@ export function MemberLayout({ children }: MemberLayoutProps) {
                                 </p>
                                 <div className="flex items-center justify-between mt-2">
                                   <p className="text-xs text-gray-500">
-                                    Jatuh tempo: {formatDate(installment.due_date)}
+                                    Jatuh tempo:{" "}
+                                    {formatDate(installment.due_date)}
                                   </p>
                                   <Badge
-                                    variant={installment.days_until_due < 0 ? "destructive" : "secondary"}
+                                    variant={
+                                      installment.days_until_due < 0
+                                        ? "destructive"
+                                        : "secondary"
+                                    }
                                     className="text-xs"
                                   >
                                     {status.label}

@@ -1,5 +1,6 @@
 // =====================================================
 // FIXED: LoanManagement.tsx (Manager)
+// ✅ FIX 1: Early settlement button JSX conditional rendering
 // =====================================================
 
 import React, { useState } from "react";
@@ -7,19 +8,25 @@ import { ManagerLayout } from "@/components/layout/ManagerLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Eye, Edit, CheckCircle, XCircle, RefreshCw } from "lucide-react";
+import EarlySettlementModal from "@/components/modals/EarlySettlementModal";
+import {
+  Plus,
+  Eye,
+  Edit,
+  CheckCircle,
+  XCircle,
+  RefreshCw,
+  Coins,
+} from "lucide-react";
 
-// ✅ Import the hooks
 import useLoans from "@/hooks/useLoans";
 import useInstallments from "@/hooks/useInstallments";
 import useLoanSimulation from "@/hooks/useLoanSimulation";
 
-// ✅ CRITICAL: Import modal components (named exports)
 import { LoanAddModal } from "@/components/modals/LoanAddModal";
 import { LoanDetailModal } from "@/components/modals/LoanDetailModal";
 
 export default function LoanManagement() {
-  // ✅ Use the hooks
   const {
     loans,
     summary,
@@ -32,19 +39,59 @@ export default function LoanManagement() {
     rejectLoan,
     refresh,
   } = useLoans({
-    all: true, // Manager sees all loans
-    autoLoad: true, // Auto load on mount
+    all: true,
+    autoLoad: true,
   });
 
   const { getInstallments, getOverdueInstallments } = useInstallments();
   const { simulate } = useLoanSimulation();
 
-  // ✅ Local state for modals
   const [selectedLoan, setSelectedLoan] = useState(null);
   const [addLoanModal, setAddLoanModal] = useState(false);
   const [detailModal, setDetailModal] = useState(false);
+  const [showEarlySettlementModal, setShowEarlySettlementModal] =
+    useState(false);
+  const [settlementLoanId, setSettlementLoanId] = useState<number | null>(null);
+  const [settlementLoanNumber, setSettlementLoanNumber] = useState<string>("");
 
-  // ✅ Format helpers
+  const getDeductionMethodBadge = (method: string) => {
+    const badges: Record<
+      string,
+      { color: string; text: string; icon: string }
+    > = {
+      salary: {
+        color: "bg-blue-100 text-blue-800",
+        text: "Auto Potong Gaji",
+        icon: "💰",
+      },
+      service_allowance: {
+        color: "bg-purple-100 text-purple-800",
+        text: "Potong Jasa Pelayanan",
+        icon: "🎁",
+      },
+      mixed: {
+        color: "bg-orange-100 text-orange-800",
+        text: "Campuran",
+        icon: "🔄",
+      },
+      none: {
+        color: "bg-gray-100 text-gray-800",
+        text: "Manual",
+        icon: "👤",
+      },
+    };
+
+    const badge = badges[method] || badges.none;
+    return (
+      <span
+        className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${badge.color}`}
+      >
+        <span>{badge.icon}</span>
+        {badge.text}
+      </span>
+    );
+  };
+
   const formatCurrency = (amount: number | string) => {
     const numAmount = typeof amount === "string" ? parseFloat(amount) : amount;
     return new Intl.NumberFormat("id-ID", {
@@ -55,7 +102,7 @@ export default function LoanManagement() {
   };
 
   const getStatusBadge = (status: string) => {
-    const statusMap = {
+    const statusMap: Record<string, { color: string; text: string }> = {
       active: { color: "bg-green-100 text-green-800", text: "Aktif" },
       pending: { color: "bg-yellow-100 text-yellow-800", text: "Pending" },
       approved: { color: "bg-blue-100 text-blue-800", text: "Disetujui" },
@@ -71,7 +118,6 @@ export default function LoanManagement() {
     return <Badge className={config.color}>{config.text}</Badge>;
   };
 
-  // ✅ Handle actions
   const handleCreateLoan = async (formData: any) => {
     try {
       await createLoan({
@@ -83,7 +129,7 @@ export default function LoanManagement() {
         loan_purpose: formData.loan_purpose,
       });
       setAddLoanModal(false);
-      refresh(); // Reload data after create
+      refresh();
     } catch (err) {
       console.error("Error creating loan:", err);
     }
@@ -122,14 +168,12 @@ export default function LoanManagement() {
     }
   };
 
-  // ✅ Handle view detail - FIXED
   const handleViewDetail = (loan: any) => {
     console.log("🔍 Opening detail for loan:", loan);
     setSelectedLoan(loan);
     setDetailModal(true);
   };
 
-  // ✅ Calculate statistics
   const activeLoans = loans.filter((loan) => loan.status === "active");
   const pendingLoans = loans.filter((loan) => loan.status === "pending");
   const overdueLoans = loans.filter((loan) => loan.status === "overdue");
@@ -142,7 +186,6 @@ export default function LoanManagement() {
     return sum + (amount || 0);
   }, 0);
 
-  // ✅ Loading state
   if (loading && loans.length === 0) {
     return (
       <ManagerLayout>
@@ -153,7 +196,6 @@ export default function LoanManagement() {
     );
   }
 
-  // ✅ Render UI
   return (
     <ManagerLayout>
       <div className="space-y-6">
@@ -183,7 +225,7 @@ export default function LoanManagement() {
             <CardContent>
               <div className="text-2xl font-bold text-green-600">
                 {formatCurrency(
-                  summary?.total_outstanding || totalActiveAmount
+                  summary?.total_outstanding || totalActiveAmount,
                 )}
               </div>
               <p className="text-xs text-gray-500">
@@ -245,6 +287,7 @@ export default function LoanManagement() {
                     <th className="text-left py-3 px-4">Tenor</th>
                     <th className="text-left py-3 px-4">Status</th>
                     <th className="text-left py-3 px-4">Tanggal</th>
+                    <th className="text-left py-3 px-4">Metode Potongan</th>
                     <th className="text-left py-3 px-4">Aksi</th>
                   </tr>
                 </thead>
@@ -271,7 +314,15 @@ export default function LoanManagement() {
                       </td>
                       <td className="py-3 px-4 text-sm">
                         {new Date(loan.application_date).toLocaleDateString(
-                          "id-ID"
+                          "id-ID",
+                        )}
+                      </td>
+                      <td className="py-3 px-4">
+                        {getDeductionMethodBadge(loan.deduction_method)}
+                        {loan.deduction_method === "salary" && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            Cicilan dibayar otomatis via potongan gaji
+                          </p>
                         )}
                       </td>
                       <td className="py-3 px-4">
@@ -303,6 +354,24 @@ export default function LoanManagement() {
                           >
                             <Eye className="h-4 w-4" />
                           </Button>
+                          {/* ✅ FIX: Properly wrapped JSX conditional */}
+                          {loan.status === "active" && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setSettlementLoanId(loan.id);
+                                setSettlementLoanNumber(
+                                  loan.loan_number || `#${loan.id}`,
+                                );
+                                setShowEarlySettlementModal(true);
+                              }}
+                              className="text-green-600"
+                              title="Pelunasan Dipercepat"
+                            >
+                              <Coins className="h-4 w-4" />
+                            </Button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -314,7 +383,7 @@ export default function LoanManagement() {
         </Card>
       </div>
 
-      {/* ✅ CRITICAL FIX: Render modal components at the bottom */}
+      {/* Modals */}
       <LoanAddModal
         isOpen={addLoanModal}
         onClose={() => setAddLoanModal(false)}
@@ -327,6 +396,20 @@ export default function LoanManagement() {
         onClose={() => {
           setDetailModal(false);
           setSelectedLoan(null);
+        }}
+      />
+
+      <EarlySettlementModal
+        isOpen={showEarlySettlementModal}
+        onClose={() => {
+          setShowEarlySettlementModal(false);
+          setSettlementLoanId(null);
+          setSettlementLoanNumber("");
+        }}
+        loanId={settlementLoanId}
+        loanNumber={settlementLoanNumber}
+        onSuccess={() => {
+          refresh();
         }}
       />
     </ManagerLayout>

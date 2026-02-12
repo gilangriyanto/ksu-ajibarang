@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { MemberLayout } from "@/components/layout/MemberLayout";
 import {
   Card,
@@ -10,6 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   User,
   Mail,
@@ -23,12 +24,15 @@ import {
   RefreshCw,
   Lock,
   AlertCircle,
+  DollarSign,
 } from "lucide-react";
 
 // ✅ Import hooks and modals
 import useProfile from "@/hooks/useProfile";
 import { EditProfileModal } from "@/components/modals/EditProfileModal";
 import { ChangePasswordModal } from "@/components/modals/ChangePasswordModal";
+import { useSalaryDeductions } from "@/hooks/useSalaryDeductions"; // ⬅️ TAMBAH INI
+import salaryDeductionService from "@/lib/api/salary-deduction.service";
 
 export default function Profile() {
   // ✅ Use profile hook
@@ -44,6 +48,19 @@ export default function Profile() {
   } = useProfile({
     autoLoad: true,
   });
+  // ⬅️ TAMBAH HOOK INI
+  const {
+    deductions,
+    loading: loadingSalary,
+    fetchDeductions,
+  } = useSalaryDeductions();
+
+  // ⬅️ TAMBAH EFFECT INI
+  useEffect(() => {
+    if (profile?.id) {
+      fetchDeductions({ user_id: profile.id });
+    }
+  }, [profile?.id]);
 
   // Modal states
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -201,166 +218,332 @@ export default function Profile() {
           </CardContent>
         </Card>
 
-        {/* Information Cards */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Personal Information */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <User className="h-5 w-5" />
-                <span>Informasi Pribadi</span>
-              </CardTitle>
-              <CardDescription>Data pribadi dan kontak</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 gap-4">
-                <div>
-                  <label className="text-sm font-medium text-gray-500">
-                    Nama Lengkap
-                  </label>
-                  <p className="mt-1 text-sm text-gray-900">
-                    {profile.full_name}
-                  </p>
-                </div>
+        {/* ⬅️ TAMBAH TABS DI SINI (GANTI Information Cards dengan Tabs) */}
+        <Tabs defaultValue="personal" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="personal">Informasi Pribadi</TabsTrigger>
+            <TabsTrigger value="membership">Keanggotaan</TabsTrigger>
+            <TabsTrigger value="security">Keamanan</TabsTrigger>
+            <TabsTrigger value="salary">Potongan Gaji</TabsTrigger>
+          </TabsList>
 
-                <div>
-                  <label className="text-sm font-medium text-gray-500">
-                    Email
-                  </label>
-                  <div className="mt-1 flex items-center space-x-2">
-                    <Mail className="h-4 w-4 text-gray-400" />
-                    <p className="text-sm text-gray-900">{profile.email}</p>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium text-gray-500">
-                    Nomor Telepon
-                  </label>
-                  <div className="mt-1 flex items-center space-x-2">
-                    <Phone className="h-4 w-4 text-gray-400" />
-                    <p className="text-sm text-gray-900">
-                      {profile.formatted_phone || profile.phone_number}
-                    </p>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium text-gray-500">
-                    Alamat
-                  </label>
-                  <div className="mt-1 flex items-start space-x-2">
-                    <MapPin className="h-4 w-4 text-gray-400 mt-0.5" />
-                    <p className="text-sm text-gray-900">{profile.address}</p>
-                  </div>
-                </div>
-
-                {profile.work_unit && (
+          {/* TAB 1: Personal Information */}
+          <TabsContent value="personal">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <User className="h-5 w-5" />
+                  <span>Informasi Pribadi</span>
+                </CardTitle>
+                <CardDescription>Data pribadi dan kontak</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* ... ISI YANG SAMA seperti card Personal Information Anda */}
+                <div className="grid grid-cols-1 gap-4">
                   <div>
                     <label className="text-sm font-medium text-gray-500">
-                      Unit Kerja
+                      Nama Lengkap
+                    </label>
+                    <p className="mt-1 text-sm text-gray-900">
+                      {profile.full_name}
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium text-gray-500">
+                      Email
                     </label>
                     <div className="mt-1 flex items-center space-x-2">
-                      <Briefcase className="h-4 w-4 text-gray-400" />
+                      <Mail className="h-4 w-4 text-gray-400" />
+                      <p className="text-sm text-gray-900">{profile.email}</p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium text-gray-500">
+                      Nomor Telepon
+                    </label>
+                    <div className="mt-1 flex items-center space-x-2">
+                      <Phone className="h-4 w-4 text-gray-400" />
                       <p className="text-sm text-gray-900">
-                        {profile.work_unit}
+                        {profile.formatted_phone || profile.phone_number}
                       </p>
                     </div>
                   </div>
-                )}
 
-                {profile.position && (
                   <div>
                     <label className="text-sm font-medium text-gray-500">
-                      Jabatan
+                      Alamat
+                    </label>
+                    <div className="mt-1 flex items-start space-x-2">
+                      <MapPin className="h-4 w-4 text-gray-400 mt-0.5" />
+                      <p className="text-sm text-gray-900">{profile.address}</p>
+                    </div>
+                  </div>
+
+                  {profile.work_unit && (
+                    <div>
+                      <label className="text-sm font-medium text-gray-500">
+                        Unit Kerja
+                      </label>
+                      <div className="mt-1 flex items-center space-x-2">
+                        <Briefcase className="h-4 w-4 text-gray-400" />
+                        <p className="text-sm text-gray-900">
+                          {profile.work_unit}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {profile.position && (
+                    <div>
+                      <label className="text-sm font-medium text-gray-500">
+                        Jabatan
+                      </label>
+                      <div className="mt-1 flex items-center space-x-2">
+                        <Briefcase className="h-4 w-4 text-gray-400" />
+                        <p className="text-sm text-gray-900">
+                          {profile.position}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* TAB 2: Membership Information */}
+          <TabsContent value="membership">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <CreditCard className="h-5 w-5" />
+                  <span>Informasi Keanggotaan</span>
+                </CardTitle>
+                <CardDescription>Detail keanggotaan koperasi</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* ... ISI YANG SAMA seperti card Membership Information Anda */}
+                <div className="grid grid-cols-1 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-gray-500">
+                      Nomor Anggota
+                    </label>
+                    <p className="mt-1 text-sm text-gray-900 font-mono">
+                      {profile.employee_id}
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium text-gray-500">
+                      Status Anggota
+                    </label>
+                    <div className="mt-1">{getStatusBadge(profile.status)}</div>
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium text-gray-500">
+                      Tanggal Bergabung
                     </label>
                     <div className="mt-1 flex items-center space-x-2">
-                      <Briefcase className="h-4 w-4 text-gray-400" />
+                      <Calendar className="h-4 w-4 text-gray-400" />
                       <p className="text-sm text-gray-900">
-                        {profile.position}
+                        {new Date(profile.joined_at).toLocaleDateString(
+                          "id-ID",
+                          {
+                            day: "numeric",
+                            month: "long",
+                            year: "numeric",
+                          },
+                        )}
                       </p>
                     </div>
                   </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
 
-          {/* Membership Information */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <CreditCard className="h-5 w-5" />
-                <span>Informasi Keanggotaan</span>
-              </CardTitle>
-              <CardDescription>Detail keanggotaan koperasi</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 gap-4">
-                <div>
-                  <label className="text-sm font-medium text-gray-500">
-                    Nomor Anggota
-                  </label>
-                  <p className="mt-1 text-sm text-gray-900 font-mono">
-                    {profile.employee_id}
-                  </p>
-                </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-500">
+                      Masa Keanggotaan
+                    </label>
+                    <p className="mt-1 text-sm text-gray-900">
+                      {profile.membership_duration} bulan
+                    </p>
+                  </div>
 
-                <div>
-                  <label className="text-sm font-medium text-gray-500">
-                    Status Anggota
-                  </label>
-                  <div className="mt-1">{getStatusBadge(profile.status)}</div>
-                </div>
+                  {profile.membership_status && (
+                    <div>
+                      <label className="text-sm font-medium text-gray-500">
+                        Status Keanggotaan
+                      </label>
+                      <div className="mt-1">
+                        {getMembershipStatusBadge(profile.membership_status)}
+                      </div>
+                    </div>
+                  )}
 
-                <div>
-                  <label className="text-sm font-medium text-gray-500">
-                    Tanggal Bergabung
-                  </label>
-                  <div className="mt-1 flex items-center space-x-2">
-                    <Calendar className="h-4 w-4 text-gray-400" />
-                    <p className="text-sm text-gray-900">
-                      {new Date(profile.joined_at).toLocaleDateString("id-ID", {
-                        day: "numeric",
-                        month: "long",
-                        year: "numeric",
-                      })}
+                  <div>
+                    <label className="text-sm font-medium text-gray-500">
+                      Role
+                    </label>
+                    <p className="mt-1 text-sm text-gray-900 capitalize">
+                      {profile.role}
                     </p>
                   </div>
                 </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-                <div>
-                  <label className="text-sm font-medium text-gray-500">
-                    Masa Keanggotaan
-                  </label>
-                  <p className="mt-1 text-sm text-gray-900">
-                    {profile.membership_duration} bulan
-                  </p>
-                </div>
+          {/* TAB 3: Security */}
+          <TabsContent value="security">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Shield className="h-5 w-5" />
+                  <span>Keamanan Akun</span>
+                </CardTitle>
+                <CardDescription>
+                  Pengaturan keamanan dan privasi
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {/* ... ISI YANG SAMA seperti Account Security card Anda */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="text-sm font-medium">Kata Sandi</h4>
+                      <p className="text-sm text-gray-500">
+                        Ubah password untuk keamanan akun
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPasswordModalOpen(true)}
+                    >
+                      <Lock className="h-4 w-4 mr-2" />
+                      Ubah Password
+                    </Button>
+                  </div>
 
-                {profile.membership_status && (
-                  <div>
-                    <label className="text-sm font-medium text-gray-500">
-                      Status Keanggotaan
-                    </label>
-                    <div className="mt-1">
-                      {getMembershipStatusBadge(profile.membership_status)}
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="text-sm font-medium">
+                        Terakhir Diperbarui
+                      </h4>
+                      <p className="text-sm text-gray-500">
+                        {new Date(profile.updated_at).toLocaleDateString(
+                          "id-ID",
+                          {
+                            day: "numeric",
+                            month: "long",
+                            year: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          },
+                        )}
+                      </p>
                     </div>
                   </div>
-                )}
-
-                <div>
-                  <label className="text-sm font-medium text-gray-500">
-                    Role
-                  </label>
-                  <p className="mt-1 text-sm text-gray-900 capitalize">
-                    {profile.role}
-                  </p>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* ⬅️ TAB 4: SALARY DEDUCTION (BARU!) */}
+          <TabsContent value="salary">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <DollarSign className="h-5 w-5" />
+                  <span>Riwayat Potongan Gaji</span>
+                </CardTitle>
+                <CardDescription>
+                  Riwayat potongan gaji 6 bulan terakhir
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {loadingSalary ? (
+                  <div className="flex items-center justify-center py-8">
+                    <RefreshCw className="h-6 w-6 animate-spin text-gray-400" />
+                    <span className="ml-2 text-gray-600">Memuat data...</span>
+                  </div>
+                ) : deductions.length === 0 ? (
+                  <div className="text-center py-8">
+                    <DollarSign className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+                    <p className="text-gray-600 font-medium">
+                      Belum ada data potongan gaji
+                    </p>
+                    <p className="text-sm text-gray-500 mt-1">
+                      Data potongan gaji akan muncul setelah proses payroll
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {deductions.slice(0, 6).map((deduction) => (
+                      <div
+                        key={deduction.id}
+                        className="flex justify-between items-center p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                      >
+                        <div>
+                          <p className="font-medium text-gray-900">
+                            {salaryDeductionService.getPeriodDisplay(
+                              deduction.period_year,
+                              deduction.period_month,
+                            )}
+                          </p>
+                          <div className="mt-1 space-y-1">
+                            <p className="text-sm text-gray-600">
+                              Gaji Kotor:{" "}
+                              <span className="font-medium">
+                                {salaryDeductionService.formatCurrency(
+                                  deduction.gross_salary,
+                                )}
+                              </span>
+                            </p>
+                            <p className="text-sm text-red-600">
+                              Potongan:{" "}
+                              <span className="font-medium">
+                                {salaryDeductionService.formatCurrency(
+                                  deduction.total_deductions,
+                                )}
+                              </span>
+                            </p>
+                            <p className="text-sm text-green-600">
+                              Gaji Bersih:{" "}
+                              <span className="font-bold">
+                                {salaryDeductionService.formatCurrency(
+                                  deduction.net_salary,
+                                )}
+                              </span>
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <span
+                            className={`px-3 py-1 rounded-full text-xs font-medium ${salaryDeductionService.getStatusBadgeColor(
+                              deduction.status,
+                            )}`}
+                          >
+                            {salaryDeductionService.getStatusDisplayName(
+                              deduction.status,
+                            )}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+
+                    {deductions.length > 6 && (
+                      <p className="text-sm text-gray-500 text-center pt-2">
+                        Menampilkan 6 dari {deductions.length} data
+                      </p>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
 
         {/* Account Security */}
         <Card>

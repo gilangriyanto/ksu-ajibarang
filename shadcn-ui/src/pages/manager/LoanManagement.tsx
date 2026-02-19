@@ -1,7 +1,6 @@
-// =====================================================
-// FIXED: LoanManagement.tsx (Manager)
-// ✅ FIX 1: Early settlement button JSX conditional rendering
-// =====================================================
+// pages/manager/LoanManagement.tsx
+// ✅ UPDATED: Added Import Excel & Export Excel buttons
+// ✅ Uses backend endpoints: POST /loans/import, GET /loans/export, GET /loans/import/template
 
 import React, { useState } from "react";
 import { ManagerLayout } from "@/components/layout/ManagerLayout";
@@ -12,11 +11,12 @@ import EarlySettlementModal from "@/components/modals/EarlySettlementModal";
 import {
   Plus,
   Eye,
-  Edit,
   CheckCircle,
   XCircle,
   RefreshCw,
   Coins,
+  Upload,
+  Download,
 } from "lucide-react";
 
 import useLoans from "@/hooks/useLoans";
@@ -25,6 +25,11 @@ import useLoanSimulation from "@/hooks/useLoanSimulation";
 
 import { LoanAddModal } from "@/components/modals/LoanAddModal";
 import { LoanDetailModal } from "@/components/modals/LoanDetailModal";
+import {
+  ImportModal,
+  handleExportFromBackend,
+} from "@/components/modals/ImportExportModal";
+import { toast } from "sonner";
 
 export default function LoanManagement() {
   const {
@@ -38,10 +43,7 @@ export default function LoanManagement() {
     approveLoan,
     rejectLoan,
     refresh,
-  } = useLoans({
-    all: true,
-    autoLoad: true,
-  });
+  } = useLoans({ all: true, autoLoad: true });
 
   const { getInstallments, getOverdueInstallments } = useInstallments();
   const { simulate } = useLoanSimulation();
@@ -53,6 +55,10 @@ export default function LoanManagement() {
     useState(false);
   const [settlementLoanId, setSettlementLoanId] = useState<number | null>(null);
   const [settlementLoanNumber, setSettlementLoanNumber] = useState<string>("");
+
+  // ✅ Import/Export states
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const getDeductionMethodBadge = (method: string) => {
     const badges: Record<
@@ -74,13 +80,8 @@ export default function LoanManagement() {
         text: "Campuran",
         icon: "🔄",
       },
-      none: {
-        color: "bg-gray-100 text-gray-800",
-        text: "Manual",
-        icon: "👤",
-      },
+      none: { color: "bg-gray-100 text-gray-800", text: "Manual", icon: "👤" },
     };
-
     const badge = badges[method] || badges.none;
     return (
       <span
@@ -93,16 +94,16 @@ export default function LoanManagement() {
   };
 
   const formatCurrency = (amount: number | string) => {
-    const numAmount = typeof amount === "string" ? parseFloat(amount) : amount;
+    const n = typeof amount === "string" ? parseFloat(amount) : amount;
     return new Intl.NumberFormat("id-ID", {
       style: "currency",
       currency: "IDR",
       minimumFractionDigits: 0,
-    }).format(numAmount || 0);
+    }).format(n || 0);
   };
 
   const getStatusBadge = (status: string) => {
-    const statusMap: Record<string, { color: string; text: string }> = {
+    const m: Record<string, { color: string; text: string }> = {
       active: { color: "bg-green-100 text-green-800", text: "Aktif" },
       pending: { color: "bg-yellow-100 text-yellow-800", text: "Pending" },
       approved: { color: "bg-blue-100 text-blue-800", text: "Disetujui" },
@@ -110,35 +111,13 @@ export default function LoanManagement() {
       completed: { color: "bg-gray-100 text-gray-800", text: "Lunas" },
       overdue: { color: "bg-red-100 text-red-800", text: "Menunggak" },
     };
-
-    const config = statusMap[status] || {
-      color: "bg-gray-100 text-gray-800",
-      text: status,
-    };
-    return <Badge className={config.color}>{config.text}</Badge>;
-  };
-
-  const handleCreateLoan = async (formData: any) => {
-    try {
-      await createLoan({
-        user_id: formData.user_id,
-        cash_account_id: formData.cash_account_id,
-        principal_amount: formData.principal_amount,
-        tenure_months: formData.tenure_months,
-        application_date: formData.application_date,
-        loan_purpose: formData.loan_purpose,
-      });
-      setAddLoanModal(false);
-      refresh();
-    } catch (err) {
-      console.error("Error creating loan:", err);
-    }
+    const c = m[status] || { color: "bg-gray-100 text-gray-800", text: status };
+    return <Badge className={c.color}>{c.text}</Badge>;
   };
 
   const handleApprove = async (loanId: number) => {
     try {
-      const disbursementDate = new Date().toISOString().split("T")[0];
-      await approveLoan(loanId, disbursementDate);
+      await approveLoan(loanId, new Date().toISOString().split("T")[0]);
       refresh();
     } catch (err) {
       console.error("Error approving loan:", err);
@@ -146,44 +125,44 @@ export default function LoanManagement() {
   };
 
   const handleReject = async (loanId: number) => {
-    try {
-      const reason = prompt("Alasan penolakan:");
-      if (reason) {
+    const reason = prompt("Alasan penolakan:");
+    if (reason) {
+      try {
         await rejectLoan(loanId, reason);
         refresh();
-      }
-    } catch (err) {
-      console.error("Error rejecting loan:", err);
-    }
-  };
-
-  const handleDelete = async (loanId: number) => {
-    if (confirm("Yakin ingin menghapus pengajuan pinjaman ini?")) {
-      try {
-        await deleteLoan(loanId);
-        refresh();
       } catch (err) {
-        console.error("Error deleting loan:", err);
+        console.error("Error rejecting loan:", err);
       }
     }
   };
 
   const handleViewDetail = (loan: any) => {
-    console.log("🔍 Opening detail for loan:", loan);
     setSelectedLoan(loan);
     setDetailModal(true);
   };
 
-  const activeLoans = loans.filter((loan) => loan.status === "active");
-  const pendingLoans = loans.filter((loan) => loan.status === "pending");
-  const overdueLoans = loans.filter((loan) => loan.status === "overdue");
+  // ✅ Export handler
+  const handleExport = async () => {
+    try {
+      setExporting(true);
+      await handleExportFromBackend("loans");
+      toast.success("Export pinjaman berhasil diunduh");
+    } catch (err: any) {
+      toast.error(err.message || "Gagal export data");
+    } finally {
+      setExporting(false);
+    }
+  };
 
-  const totalActiveAmount = activeLoans.reduce((sum, loan) => {
-    const amount =
-      typeof loan.principal_amount === "string"
-        ? parseFloat(loan.principal_amount)
-        : loan.principal_amount;
-    return sum + (amount || 0);
+  const activeLoans = loans.filter((l) => l.status === "active");
+  const pendingLoans = loans.filter((l) => l.status === "pending");
+  const overdueLoans = loans.filter((l) => l.status === "overdue");
+  const totalActiveAmount = activeLoans.reduce((s, l) => {
+    const a =
+      typeof l.principal_amount === "string"
+        ? parseFloat(l.principal_amount)
+        : l.principal_amount;
+    return s + (a || 0);
   }, 0);
 
   if (loading && loans.length === 0) {
@@ -205,18 +184,36 @@ export default function LoanManagement() {
             <h1 className="text-2xl font-bold">Manajemen Pinjaman</h1>
             <p className="text-gray-600">Kelola pinjaman anggota koperasi</p>
           </div>
-          <Button
-            onClick={() => {
-              console.log("➕ Opening add loan modal");
-              setAddLoanModal(true);
-            }}
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Pinjaman Baru
-          </Button>
+          <div className="flex space-x-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowImportModal(true)}
+              className="border-green-200 text-green-700 hover:bg-green-50"
+            >
+              <Upload className="h-4 w-4 mr-2" />
+              Import Excel
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handleExport}
+              disabled={exporting || loans.length === 0}
+              className="border-blue-200 text-blue-700 hover:bg-blue-50"
+            >
+              {exporting ? (
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4 mr-2" />
+              )}
+              Export Excel
+            </Button>
+            <Button onClick={() => setAddLoanModal(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Pinjaman Baru
+            </Button>
+          </div>
         </div>
 
-        {/* Statistics Cards */}
+        {/* Statistics */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <Card>
             <CardHeader>
@@ -233,7 +230,6 @@ export default function LoanManagement() {
               </p>
             </CardContent>
           </Card>
-
           <Card>
             <CardHeader>
               <CardTitle className="text-sm">Pengajuan Pending</CardTitle>
@@ -245,7 +241,6 @@ export default function LoanManagement() {
               <p className="text-xs text-gray-500">Perlu review</p>
             </CardContent>
           </Card>
-
           <Card>
             <CardHeader>
               <CardTitle className="text-sm">Pinjaman Menunggak</CardTitle>
@@ -257,7 +252,6 @@ export default function LoanManagement() {
               <p className="text-xs text-gray-500">Perlu tindakan</p>
             </CardContent>
           </Card>
-
           <Card>
             <CardHeader>
               <CardTitle className="text-sm">Total Pinjaman</CardTitle>
@@ -296,14 +290,12 @@ export default function LoanManagement() {
                     <tr key={loan.id} className="border-b hover:bg-gray-50">
                       <td className="py-3 px-4 font-medium">#{loan.id}</td>
                       <td className="py-3 px-4">
-                        <div>
-                          <p className="font-medium">
-                            {loan.user?.full_name || "N/A"}
-                          </p>
-                          <p className="text-sm text-gray-500">
-                            {loan.user?.employee_id || "N/A"}
-                          </p>
-                        </div>
+                        <p className="font-medium">
+                          {loan.user?.full_name || "N/A"}
+                        </p>
+                        <p className="text-sm text-gray-500">
+                          {loan.user?.employee_id || "N/A"}
+                        </p>
                       </td>
                       <td className="py-3 px-4 font-medium">
                         {formatCurrency(loan.principal_amount)}
@@ -321,7 +313,7 @@ export default function LoanManagement() {
                         {getDeductionMethodBadge(loan.deduction_method)}
                         {loan.deduction_method === "salary" && (
                           <p className="text-xs text-gray-500 mt-1">
-                            Cicilan dibayar otomatis via potongan gaji
+                            Cicilan otomatis via potongan gaji
                           </p>
                         )}
                       </td>
@@ -354,7 +346,6 @@ export default function LoanManagement() {
                           >
                             <Eye className="h-4 w-4" />
                           </Button>
-                          {/* ✅ FIX: Properly wrapped JSX conditional */}
                           {loan.status === "active" && (
                             <Button
                               size="sm"
@@ -389,7 +380,6 @@ export default function LoanManagement() {
         onClose={() => setAddLoanModal(false)}
         onSuccess={refresh}
       />
-
       <LoanDetailModal
         loan={selectedLoan}
         isOpen={detailModal}
@@ -398,7 +388,6 @@ export default function LoanManagement() {
           setSelectedLoan(null);
         }}
       />
-
       <EarlySettlementModal
         isOpen={showEarlySettlementModal}
         onClose={() => {
@@ -408,8 +397,17 @@ export default function LoanManagement() {
         }}
         loanId={settlementLoanId}
         loanNumber={settlementLoanNumber}
+        onSuccess={refresh}
+      />
+
+      {/* ✅ Import Modal */}
+      <ImportModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        type="loans"
         onSuccess={() => {
           refresh();
+          toast.success("Data pinjaman berhasil diimport");
         }}
       />
     </ManagerLayout>

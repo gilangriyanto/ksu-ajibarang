@@ -1,4 +1,11 @@
 // src/pages/kas/LoanManagement.tsx
+// ✅ UPDATED: Added Import Excel, Export Excel, Early Settlement
+//    POST /loans/import (formdata: file)
+//    GET  /loans/export?status=
+//    GET  /loans/import/template
+//    POST /loans/{id}/early-settlement
+//    GET  /loans/{id}/early-settlement/preview
+
 import React, { useState } from "react";
 import { KasLayout } from "@/components/layout/KasLayout";
 import {
@@ -14,19 +21,26 @@ import { Input } from "@/components/ui/input";
 import {
   Plus,
   Eye,
-  Edit,
   CheckCircle,
   XCircle,
   RefreshCw,
   Search,
   AlertCircle,
   Download,
+  Upload,
+  Coins,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/hooks/useAuth";
 import useLoans from "@/hooks/useLoans";
 import { LoanAddModal } from "@/components/modals/LoanAddModal";
 import { LoanDetailModal } from "@/components/modals/LoanDetailModal";
+// ✅ Import, Export, Early Settlement
+import {
+  ImportModal,
+  handleExportFromBackend,
+} from "@/components/modals/ImportExportModal";
+import EarlySettlementModal from "@/components/modals/EarlySettlementModal";
 import { toast } from "sonner";
 
 export default function KasLoanManagement() {
@@ -38,7 +52,16 @@ export default function KasLoanManagement() {
   const [viewLoanModal, setViewLoanModal] = useState(false);
   const [selectedLoan, setSelectedLoan] = useState(null);
 
-  // ✅ Use real API with hooks
+  // ✅ Import/Export states
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [exporting, setExporting] = useState(false);
+
+  // ✅ Early Settlement states
+  const [showEarlySettlementModal, setShowEarlySettlementModal] =
+    useState(false);
+  const [settlementLoanId, setSettlementLoanId] = useState<number | null>(null);
+  const [settlementLoanNumber, setSettlementLoanNumber] = useState<string>("");
+
   const {
     loans,
     summary,
@@ -47,40 +70,34 @@ export default function KasLoanManagement() {
     rejectLoan,
     deleteLoan,
     refresh,
-  } = useLoans({
-    all: true,
-    autoLoad: true,
-  });
+  } = useLoans({ all: true, autoLoad: true });
 
-  // ✅ Filter loans by kas_id (frontend filtering)
-  // Note: Backend bisa tambahin filter cash_account_id nanti
+  // Filter by kas
   const kasLoans = loans.filter((loan) => loan.cash_account_id === kasId);
-
   const activeLoans = kasLoans.filter((loan) => loan.status === "active");
   const pendingLoans = kasLoans.filter((loan) => loan.status === "pending");
   const overdueLoans = kasLoans.filter((loan) => loan.status === "overdue");
 
-  // Search filter
   const filteredLoans = kasLoans.filter((loan) => {
-    const searchLower = searchTerm.toLowerCase();
+    const s = searchTerm.toLowerCase();
     return (
-      loan.user?.full_name?.toLowerCase().includes(searchLower) ||
-      loan.user?.employee_id?.toLowerCase().includes(searchLower) ||
-      loan.id.toString().includes(searchLower)
+      loan.user?.full_name?.toLowerCase().includes(s) ||
+      loan.user?.employee_id?.toLowerCase().includes(s) ||
+      loan.id.toString().includes(s)
     );
   });
 
   const formatCurrency = (amount: number | string) => {
-    const numAmount = typeof amount === "string" ? parseFloat(amount) : amount;
+    const n = typeof amount === "string" ? parseFloat(amount) : amount;
     return new Intl.NumberFormat("id-ID", {
       style: "currency",
       currency: "IDR",
       minimumFractionDigits: 0,
-    }).format(numAmount || 0);
+    }).format(n || 0);
   };
 
   const getStatusBadge = (status: string) => {
-    const statusConfig = {
+    const m: Record<string, { color: string; text: string }> = {
       active: { color: "bg-green-100 text-green-800", text: "Aktif" },
       pending: { color: "bg-yellow-100 text-yellow-800", text: "Pending" },
       completed: { color: "bg-blue-100 text-blue-800", text: "Lunas" },
@@ -88,22 +105,16 @@ export default function KasLoanManagement() {
       approved: { color: "bg-green-100 text-green-800", text: "Disetujui" },
       rejected: { color: "bg-red-100 text-red-800", text: "Ditolak" },
     };
-
-    const config = statusConfig[status as keyof typeof statusConfig] || {
-      color: "bg-gray-100 text-gray-800",
-      text: status,
-    };
-    return <Badge className={config.color}>{config.text}</Badge>;
+    const c = m[status] || { color: "bg-gray-100 text-gray-800", text: status };
+    return <Badge className={c.color}>{c.text}</Badge>;
   };
 
   const handleApprove = async (loanId: number) => {
     try {
-      const disbursementDate = new Date().toISOString().split("T")[0];
-      await approveLoan(loanId, disbursementDate);
+      await approveLoan(loanId, new Date().toISOString().split("T")[0]);
       toast.success("Pinjaman berhasil disetujui");
       refresh();
     } catch (err: any) {
-      console.error("Error approving loan:", err);
       toast.error(err.message || "Gagal menyetujui pinjaman");
     }
   };
@@ -111,27 +122,12 @@ export default function KasLoanManagement() {
   const handleReject = async (loanId: number) => {
     const reason = prompt("Alasan penolakan:");
     if (!reason) return;
-
     try {
       await rejectLoan(loanId, reason);
       toast.success("Pinjaman berhasil ditolak");
       refresh();
     } catch (err: any) {
-      console.error("Error rejecting loan:", err);
       toast.error(err.message || "Gagal menolak pinjaman");
-    }
-  };
-
-  const handleDelete = async (loanId: number) => {
-    if (!confirm("Yakin ingin menghapus pengajuan pinjaman ini?")) return;
-
-    try {
-      await deleteLoan(loanId);
-      toast.success("Pinjaman berhasil dihapus");
-      refresh();
-    } catch (err: any) {
-      console.error("Error deleting loan:", err);
-      toast.error(err.message || "Gagal menghapus pinjaman");
     }
   };
 
@@ -140,28 +136,35 @@ export default function KasLoanManagement() {
     setViewLoanModal(true);
   };
 
-  const handleExport = () => {
-    toast.info(`Mengekspor data pinjaman Kas ${kasId}`);
+  // ✅ Export handler
+  const handleExport = async () => {
+    try {
+      setExporting(true);
+      await handleExportFromBackend("loans");
+      toast.success("Export pinjaman berhasil diunduh");
+    } catch (err: any) {
+      toast.error(err.message || "Gagal export data");
+    } finally {
+      setExporting(false);
+    }
   };
 
-  // Calculate totals for this kas
-  const totalActiveAmount = activeLoans.reduce((sum, loan) => {
-    const amount =
-      typeof loan.principal_amount === "string"
-        ? parseFloat(loan.principal_amount)
-        : loan.principal_amount;
-    return sum + (amount || 0);
-  }, 0);
+  // ✅ Early Settlement handler
+  const handleEarlySettlement = (loan: any) => {
+    setSettlementLoanId(loan.id);
+    setSettlementLoanNumber(loan.loan_number || `#${loan.id}`);
+    setShowEarlySettlementModal(true);
+  };
 
-  const totalRemaining = activeLoans.reduce((sum, loan) => {
-    const remaining =
-      typeof loan.remaining_balance === "string"
-        ? parseFloat(loan.remaining_balance)
-        : loan.remaining_balance || 0;
-    return sum + remaining;
-  }, 0);
+  const totalActiveAmount = activeLoans.reduce(
+    (s, l) => s + (parseFloat(l.principal_amount?.toString()) || 0),
+    0,
+  );
+  const totalRemaining = activeLoans.reduce(
+    (s, l) => s + (parseFloat(l.remaining_balance?.toString()) || 0),
+    0,
+  );
 
-  // ✅ Loading state
   if (loading && loans.length === 0) {
     return (
       <KasLayout>
@@ -185,9 +188,26 @@ export default function KasLoanManagement() {
             <p className="text-gray-600 mt-1">Kelola pinjaman Kas {kasId}</p>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={handleExport}>
-              <Download className="w-4 h-4 mr-2" />
-              Export
+            <Button
+              variant="outline"
+              onClick={handleExport}
+              disabled={exporting || kasLoans.length === 0}
+              className="border-blue-200 text-blue-700 hover:bg-blue-50"
+            >
+              {exporting ? (
+                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Download className="w-4 h-4 mr-2" />
+              )}
+              Export Excel
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setShowImportModal(true)}
+              className="border-green-200 text-green-700 hover:bg-green-50"
+            >
+              <Upload className="w-4 h-4 mr-2" />
+              Import Excel
             </Button>
             <Button
               className="bg-purple-600 hover:bg-purple-700"
@@ -199,7 +219,7 @@ export default function KasLoanManagement() {
           </div>
         </div>
 
-        {/* Statistics Cards */}
+        {/* Statistics */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <Card>
             <CardContent className="p-6">
@@ -218,7 +238,6 @@ export default function KasLoanManagement() {
               </div>
             </CardContent>
           </Card>
-
           <Card>
             <CardContent className="p-6">
               <div className="flex items-center">
@@ -236,7 +255,6 @@ export default function KasLoanManagement() {
               </div>
             </CardContent>
           </Card>
-
           <Card>
             <CardContent className="p-6">
               <div className="flex items-center">
@@ -254,7 +272,6 @@ export default function KasLoanManagement() {
               </div>
             </CardContent>
           </Card>
-
           <Card>
             <CardContent className="p-6">
               <div className="flex items-center">
@@ -290,7 +307,6 @@ export default function KasLoanManagement() {
 
           {/* Active Loans Tab */}
           <TabsContent value="active" className="space-y-4">
-            {/* Search */}
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">Pencarian Pinjaman</CardTitle>
@@ -308,7 +324,6 @@ export default function KasLoanManagement() {
               </CardContent>
             </Card>
 
-            {/* Active Loans Table */}
             <Card>
               <CardHeader>
                 <CardTitle>Daftar Pinjaman Aktif</CardTitle>
@@ -322,7 +337,7 @@ export default function KasLoanManagement() {
                     <thead>
                       <tr className="border-b">
                         <th className="text-left py-3 px-4 font-medium text-gray-600">
-                          ID Pinjaman
+                          ID
                         </th>
                         <th className="text-left py-3 px-4 font-medium text-gray-600">
                           Anggota
@@ -364,14 +379,12 @@ export default function KasLoanManagement() {
                               #{loan.id}
                             </td>
                             <td className="py-3 px-4">
-                              <div>
-                                <p className="font-medium">
-                                  {loan.user?.full_name || "N/A"}
-                                </p>
-                                <p className="text-sm text-gray-500">
-                                  {loan.user?.employee_id || "N/A"}
-                                </p>
-                              </div>
+                              <p className="font-medium">
+                                {loan.user?.full_name || "N/A"}
+                              </p>
+                              <p className="text-sm text-gray-500">
+                                {loan.user?.employee_id || "N/A"}
+                              </p>
                             </td>
                             <td className="py-3 px-4 font-medium">
                               {formatCurrency(loan.principal_amount)}
@@ -384,7 +397,7 @@ export default function KasLoanManagement() {
                             </td>
                             <td className="py-3 px-4 text-sm">
                               {new Date(
-                                loan.application_date
+                                loan.application_date,
                               ).toLocaleDateString("id-ID")}
                             </td>
                             <td className="py-3 px-4">
@@ -393,8 +406,19 @@ export default function KasLoanManagement() {
                                   size="sm"
                                   variant="outline"
                                   onClick={() => handleViewDetail(loan)}
+                                  title="Detail"
                                 >
                                   <Eye className="h-4 w-4" />
+                                </Button>
+                                {/* ✅ Early Settlement Button */}
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleEarlySettlement(loan)}
+                                  className="text-green-600"
+                                  title="Pelunasan Dipercepat"
+                                >
+                                  <Coins className="h-4 w-4" />
                                 </Button>
                               </div>
                             </td>
@@ -447,8 +471,7 @@ export default function KasLoanManagement() {
                                   {formatCurrency(loan.principal_amount)}
                                 </p>
                                 <p className="text-sm text-gray-500">
-                                  {loan.tenure_months} bulan •{" "}
-                                  {loan.interest_rate}%
+                                  {loan.tenure_months} bulan
                                 </p>
                               </div>
                               <div>
@@ -458,7 +481,7 @@ export default function KasLoanManagement() {
                                 <p className="text-xs text-gray-500">
                                   Diajukan:{" "}
                                   {new Date(
-                                    loan.application_date
+                                    loan.application_date,
                                   ).toLocaleDateString("id-ID")}
                                 </p>
                               </div>
@@ -536,17 +559,30 @@ export default function KasLoanManagement() {
                           </td>
                           <td className="py-3 px-4">
                             {new Date(loan.application_date).toLocaleDateString(
-                              "id-ID"
+                              "id-ID",
                             )}
                           </td>
                           <td className="py-3 px-4">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleViewDetail(loan)}
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
+                            <div className="flex space-x-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleViewDetail(loan)}
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              {loan.status === "active" && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleEarlySettlement(loan)}
+                                  className="text-green-600"
+                                  title="Pelunasan Dipercepat"
+                                >
+                                  <Coins className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -565,7 +601,6 @@ export default function KasLoanManagement() {
         onClose={() => setAddLoanModal(false)}
         onSuccess={refresh}
       />
-
       <LoanDetailModal
         loan={selectedLoan}
         isOpen={viewLoanModal}
@@ -573,6 +608,30 @@ export default function KasLoanManagement() {
           setViewLoanModal(false);
           setSelectedLoan(null);
         }}
+      />
+
+      {/* ✅ Import Modal */}
+      <ImportModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        type="loans"
+        onSuccess={() => {
+          refresh();
+          toast.success("Data pinjaman berhasil diimport");
+        }}
+      />
+
+      {/* ✅ Early Settlement Modal */}
+      <EarlySettlementModal
+        isOpen={showEarlySettlementModal}
+        onClose={() => {
+          setShowEarlySettlementModal(false);
+          setSettlementLoanId(null);
+          setSettlementLoanNumber("");
+        }}
+        loanId={settlementLoanId}
+        loanNumber={settlementLoanNumber}
+        onSuccess={refresh}
       />
     </KasLayout>
   );

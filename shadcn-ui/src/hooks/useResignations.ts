@@ -56,9 +56,34 @@ export const useResignations = (params?: UseResignationsParams) => {
       if (page) queryParams.page = page;
       if (per_page) queryParams.per_page = per_page;
 
+      console.log("🔍 Loading resignations with params:", queryParams);
       const response = await resignationService.getResignations(queryParams);
-      const data = response.data || response;
-      setResignations(Array.isArray(data) ? data : []);
+      console.log("📦 Raw resignation response:", response);
+
+      // Handle multiple response structures:
+      // 1. Direct array: [...]
+      // 2. { data: [...] }
+      // 3. { data: { data: [...], current_page, ... } } (Laravel paginate)
+      // 4. { success: true, data: [...] }
+      // 5. { success: true, data: { data: [...] } }
+      let items: Resignation[] = [];
+
+      if (Array.isArray(response)) {
+        items = response;
+      } else if (response?.data) {
+        if (Array.isArray(response.data)) {
+          items = response.data;
+        } else if (response.data?.data && Array.isArray(response.data.data)) {
+          // Laravel paginated nested
+          items = response.data.data;
+        } else if (typeof response.data === "object") {
+          // Maybe the data itself is paginated at top level
+          items = [];
+        }
+      }
+
+      console.log("✅ Parsed resignations:", items.length, "items");
+      setResignations(items);
     } catch (err: any) {
       console.error("Error loading resignations:", err);
       setError(err.message || "Gagal memuat data pengunduran diri");
@@ -250,14 +275,15 @@ export const useResignationStatistics = (year?: number) => {
 };
 
 // ==================== useMemberResignations Hook ====================
-// ✅ UPDATED: Menggunakan GET /resignations?user_id=X
-// Bukan lagi /members/{id}/resignations
+// ✅ UPDATED: Member role - backend auto-filters by JWT token
+// Don't send user_id param (causes issues), just GET /resignations
 
 export const useMemberResignations = (userId: number | null) => {
   const { resignations, loading, error, refetch, memberSubmitResignation } =
     useResignations({
-      user_id: userId || undefined,
-      autoLoad: !!userId,
+      // Don't send user_id - backend filters by JWT for member role
+      // Sending user_id can cause empty results if backend doesn't support it
+      autoLoad: true,
     });
 
   return {

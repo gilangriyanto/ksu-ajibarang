@@ -39,7 +39,7 @@ import type { Installment } from "@/lib/api/loans.service";
 
 function UpcomingInstallments() {
   const { user } = useAuth();
-  const isManager = user?.role === "manajer" || user?.role === "admin";
+  const isManager = user?.role === "manager" || user?.role === "admin";
 
   const { upcomingInstallments, loading, error, getUpcomingInstallments } =
     useInstallments();

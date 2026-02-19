@@ -1,249 +1,162 @@
 // hooks/useSalaryDeductions.ts
-import { useState } from "react";
+// ✅ FIXED: No infinite re-render loop
+// ✅ Stable function references - no circular useCallback dependencies
+// ✅ Backward-compatible with SalaryDeductionManagement.tsx
+
+import { useState, useEffect, useCallback, useRef } from "react";
 import salaryDeductionService, {
   SalaryDeduction,
-  CreateSalaryDeductionData,
+  ProcessDeductionData,
   BatchProcessData,
   SalaryDeductionListParams,
-  AnnualSummary,
-  Statistics,
-} from "../lib/api/salary-deduction.service";
-import { toast } from "sonner";
+} from "@/lib/api/salary-deduction.service";
 
-interface UseSalaryDeductionsReturn {
-  deductions: SalaryDeduction[];
-  currentDeduction: SalaryDeduction | null;
-  annualSummary: AnnualSummary | null;
-  statistics: Statistics | null;
-  pagination: {
-    currentPage: number;
-    totalPages: number;
-    totalItems: number;
-    itemsPerPage: number;
-  };
-  loading: boolean;
-  error: string | null;
+// ==================== For Admin/Manager pages ====================
 
-  fetchDeductions: (params?: SalaryDeductionListParams) => Promise<void>;
-  fetchDeductionById: (id: number) => Promise<void>;
-  processDeduction: (data: CreateSalaryDeductionData) => Promise<boolean>;
-  batchProcess: (data: BatchProcessData) => Promise<boolean>;
-  fetchByPeriod: (year: number, month: number) => Promise<void>;
-  fetchAnnualSummary: (userId: number, year: number) => Promise<void>;
-  fetchStatistics: (year: number, month?: number) => Promise<void>;
-  clearError: () => void;
-}
-
-export const useSalaryDeductions = (): UseSalaryDeductionsReturn => {
+export const useSalaryDeductions = () => {
   const [deductions, setDeductions] = useState<SalaryDeduction[]>([]);
   const [currentDeduction, setCurrentDeduction] =
     useState<SalaryDeduction | null>(null);
-  const [annualSummary, setAnnualSummary] = useState<AnnualSummary | null>(
-    null,
-  );
-  const [statistics, setStatistics] = useState<Statistics | null>(null);
-  const [pagination, setPagination] = useState({
+  const [statistics, setStatistics] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [pagination, setPagination] = useState<any>({
     currentPage: 1,
     totalPages: 1,
     totalItems: 0,
-    itemsPerPage: 10,
   });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  const fetchDeductions = async (params?: SalaryDeductionListParams) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await salaryDeductionService.getSalaryDeductions(params);
-      console.log("📋 Deductions response:", response);
+  const initialLoadDone = useRef(false);
 
-      // Handle nested response
-      let deductionsData = [];
-      if (response.data?.data?.data) {
-        deductionsData = response.data.data.data || [];
-      } else if (response.data?.data) {
-        deductionsData = response.data.data || [];
-      } else if (Array.isArray(response.data)) {
-        deductionsData = response.data;
-      }
+  // ✅ fetchDeductions - page calls this manually with filter params
+  const fetchDeductions = useCallback(
+    async (overrideParams?: SalaryDeductionListParams) => {
+      try {
+        setLoading(true);
+        setError(null);
 
-      setDeductions(deductionsData);
-
-      // Set pagination if available
-      if (response.data?.current_page) {
-        setPagination({
-          currentPage: response.data.current_page || 1,
-          totalPages: response.data.last_page || 1,
-          totalItems: response.data.total || 0,
-          itemsPerPage: response.data.per_page || 10,
-        });
-      }
-    } catch (err: any) {
-      const errorMsg = err.message || "Gagal memuat data potongan gaji";
-      setError(errorMsg);
-      toast.error(errorMsg);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchDeductionById = async (id: number) => {
-    console.log("🔄 Fetching deduction by ID:", id);
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await salaryDeductionService.getDeductionById(id);
-      console.log("✅ Deduction data received:", response);
-
-      // Handle nested response
-      let deductionData = null;
-      if (response.data?.data?.deduction) {
-        deductionData = response.data.data.deduction;
-      } else if (response.data?.deduction) {
-        deductionData = response.data.deduction;
-      } else if (response.data) {
-        deductionData = response.data;
-      } else {
-        deductionData = response;
-      }
-
-      console.log("📦 Final deduction data:", deductionData);
-      setCurrentDeduction(deductionData);
-    } catch (err: any) {
-      const errorMsg = err.message || "Gagal memuat detail potongan gaji";
-      console.error("❌ Error:", err);
-      setError(errorMsg);
-      toast.error(errorMsg);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const processDeduction = async (
-    data: CreateSalaryDeductionData,
-  ): Promise<boolean> => {
-    setLoading(true);
-    setError(null);
-    try {
-      await salaryDeductionService.processSalaryDeduction(data);
-      toast.success("Potongan gaji berhasil diproses!");
-      return true;
-    } catch (err: any) {
-      const errorMsg = err.message || "Gagal memproses potongan gaji";
-      setError(errorMsg);
-      toast.error(errorMsg);
-      return false;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const batchProcess = async (data: BatchProcessData): Promise<boolean> => {
-    setLoading(true);
-    setError(null);
-    try {
-      const response =
-        await salaryDeductionService.batchProcessDeductions(data);
-
-      // Check if there are any failures
-      const result = response.data || response;
-      if (result.failed && result.failed.length > 0) {
-        toast.warning(
-          `Berhasil: ${result.successful?.length || 0}, Gagal: ${result.failed.length}`,
+        const response = await salaryDeductionService.getAll(
+          overrideParams || {},
         );
-      } else {
-        toast.success(
-          `Batch berhasil diproses! Total: ${result.successful?.length || 0} anggota`,
-        );
+        const raw = response.data || response;
+
+        let items: SalaryDeduction[] = [];
+
+        if (Array.isArray(raw)) {
+          items = raw;
+          setPagination({
+            currentPage: 1,
+            totalPages: 1,
+            totalItems: raw.length,
+          });
+        } else if (raw?.data && Array.isArray(raw.data)) {
+          items = raw.data;
+          setPagination({
+            currentPage: raw.current_page || 1,
+            totalPages: raw.last_page || 1,
+            totalItems: raw.total || raw.data.length,
+          });
+        } else {
+          setPagination({ currentPage: 1, totalPages: 1, totalItems: 0 });
+        }
+
+        setDeductions(items);
+
+        // Auto-calculate statistics from loaded data
+        if (items.length > 0) {
+          setStatistics({
+            total_members_processed: items.length,
+            total_gross_salary: items.reduce(
+              (s, d) => s + (Number(d.gross_salary) || 0),
+              0,
+            ),
+            total_deductions: items.reduce(
+              (s, d) =>
+                s +
+                (Number(d.total_deduction) || Number(d.total_deductions) || 0),
+              0,
+            ),
+            total_net_salary: items.reduce(
+              (s, d) => s + (Number(d.net_salary) || 0),
+              0,
+            ),
+          });
+        }
+      } catch (err: any) {
+        console.error("Error loading salary deductions:", err);
+        setError(err.message || "Gagal memuat data potongan gaji");
+        setDeductions([]);
+      } finally {
+        setLoading(false);
       }
+    },
+    [],
+  );
 
-      return true;
-    } catch (err: any) {
-      const errorMsg = err.message || "Gagal memproses batch potongan gaji";
-      setError(errorMsg);
-      toast.error(errorMsg);
-      return false;
-    } finally {
-      setLoading(false);
-    }
-  };
+  // ✅ fetchDeductionById
+  const fetchDeductionById = useCallback(
+    (id: number) => {
+      const found = deductions.find((d) => d.id === id);
+      setCurrentDeduction(found || null);
+      return found || null;
+    },
+    [deductions],
+  );
 
-  const fetchByPeriod = async (year: number, month: number) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await salaryDeductionService.getDeductionsByPeriod(
-        year,
-        month,
-      );
+  // ✅ processDeduction
+  const processDeduction = useCallback(async (data: ProcessDeductionData) => {
+    const response = await salaryDeductionService.processSingle(data);
+    return response;
+  }, []);
 
-      // Handle nested response
-      let deductionsData = [];
-      if (response.data?.data) {
-        deductionsData = response.data.data;
-      } else if (Array.isArray(response.data)) {
-        deductionsData = response.data;
+  // ✅ batchProcess
+  const batchProcess = useCallback(async (data: BatchProcessData) => {
+    const response = await salaryDeductionService.processBatch(data);
+    return response;
+  }, []);
+
+  // ✅ fetchStatistics - page calls as fetchStatistics(year, month)
+  const fetchStatistics = useCallback(
+    async (_year?: number, _month?: number) => {
+      try {
+        const response = await salaryDeductionService.getStatistics();
+        const data = response?.data || response;
+
+        if (data) {
+          setStatistics({
+            total_members_processed:
+              data.total_members_processed ??
+              data.total_members ??
+              data.total ??
+              0,
+            total_gross_salary:
+              data.total_gross_salary ?? data.total_gross ?? 0,
+            total_deductions:
+              data.total_deductions ?? data.total_deduction ?? 0,
+            total_net_salary: data.total_net_salary ?? data.total_net ?? 0,
+            ...data,
+          });
+        }
+      } catch (err) {
+        console.error("Error loading statistics:", err);
+        // Statistics will fallback to calculated values from fetchDeductions
       }
+    },
+    [],
+  );
 
-      setDeductions(deductionsData);
-    } catch (err: any) {
-      const errorMsg = err.message || "Gagal memuat data periode";
-      setError(errorMsg);
-      toast.error(errorMsg);
-    } finally {
-      setLoading(false);
+  // Initial load - runs ONCE
+  useEffect(() => {
+    if (!initialLoadDone.current) {
+      initialLoadDone.current = true;
+      fetchDeductions();
+      fetchStatistics();
     }
-  };
-
-  const fetchAnnualSummary = async (userId: number, year: number) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await salaryDeductionService.getMemberAnnualSummary(
-        userId,
-        year,
-      );
-
-      // Handle nested response
-      const summaryData = response.data?.data || response.data || response;
-      setAnnualSummary(summaryData);
-    } catch (err: any) {
-      const errorMsg = err.message || "Gagal memuat ringkasan tahunan";
-      setError(errorMsg);
-      toast.error(errorMsg);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchStatistics = async (year: number, month?: number) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await salaryDeductionService.getStatistics({
-        year,
-        month,
-      });
-
-      // Handle nested response
-      const statsData = response.data?.data || response.data || response;
-      setStatistics(statsData);
-    } catch (err: any) {
-      const errorMsg = err.message || "Gagal memuat statistik";
-      setError(errorMsg);
-      toast.error(errorMsg);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const clearError = () => setError(null);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return {
     deductions,
     currentDeduction,
-    annualSummary,
     statistics,
     pagination,
     loading,
@@ -252,9 +165,57 @@ export const useSalaryDeductions = (): UseSalaryDeductionsReturn => {
     fetchDeductionById,
     processDeduction,
     batchProcess,
-    fetchByPeriod,
-    fetchAnnualSummary,
     fetchStatistics,
-    clearError,
+    refetch: fetchDeductions,
+    processSingle: processDeduction,
+  };
+};
+
+// ==================== For Member pages ====================
+
+export const useMemberSalaryDeductions = (periodYear?: number) => {
+  const [deductions, setDeductions] = useState<SalaryDeduction[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const loadedRef = useRef(false);
+  const yearRef = useRef(periodYear);
+
+  const loadDeductions = useCallback(async (year?: number) => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const response = await salaryDeductionService.getMyDeductions(year);
+      const data = response.data || response;
+
+      if (Array.isArray(data)) {
+        setDeductions(data);
+      } else if (data?.data && Array.isArray(data.data)) {
+        setDeductions(data.data);
+      } else {
+        setDeductions([]);
+      }
+    } catch (err: any) {
+      console.error("Error loading my salary deductions:", err);
+      setError(err.message || "Gagal memuat data potongan gaji");
+      setDeductions([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!loadedRef.current || yearRef.current !== periodYear) {
+      loadedRef.current = true;
+      yearRef.current = periodYear;
+      loadDeductions(periodYear);
+    }
+  }, [periodYear, loadDeductions]);
+
+  return {
+    deductions,
+    loading,
+    error,
+    refetch: () => loadDeductions(periodYear),
   };
 };

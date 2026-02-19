@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { MemberLayout } from "@/components/layout/MemberLayout";
 import {
   Card,
@@ -27,15 +27,14 @@ import {
   DollarSign,
 } from "lucide-react";
 
-// ✅ Import hooks and modals
 import useProfile from "@/hooks/useProfile";
 import { EditProfileModal } from "@/components/modals/EditProfileModal";
 import { ChangePasswordModal } from "@/components/modals/ChangePasswordModal";
-import { useSalaryDeductions } from "@/hooks/useSalaryDeductions"; // ⬅️ TAMBAH INI
+// ✅ FIXED: Use member-specific hook (hits /my-deductions, not admin endpoint)
+import { useMemberSalaryDeductions } from "@/hooks/useSalaryDeductions";
 import salaryDeductionService from "@/lib/api/salary-deduction.service";
 
 export default function Profile() {
-  // ✅ Use profile hook
   const {
     profile,
     loading,
@@ -48,19 +47,15 @@ export default function Profile() {
   } = useProfile({
     autoLoad: true,
   });
-  // ⬅️ TAMBAH HOOK INI
+
+  // ✅ FIXED: Use member endpoint /salary-deductions/my-deductions
+  // No user_id needed - backend auto-filters by JWT token
+  const currentYear = new Date().getFullYear();
   const {
     deductions,
     loading: loadingSalary,
-    fetchDeductions,
-  } = useSalaryDeductions();
-
-  // ⬅️ TAMBAH EFFECT INI
-  useEffect(() => {
-    if (profile?.id) {
-      fetchDeductions({ user_id: profile.id });
-    }
-  }, [profile?.id]);
+    refetch: refetchSalary,
+  } = useMemberSalaryDeductions(currentYear);
 
   // Modal states
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -90,11 +85,9 @@ export default function Profile() {
   };
 
   const getMembershipStatusBadge = (status?: string) => {
-    // ✅ Handle undefined or null status
     if (!status) {
       return <Badge className="bg-gray-100 text-gray-800">Unknown</Badge>;
     }
-
     if (status.toLowerCase().includes("overdue")) {
       return <Badge className="bg-red-100 text-red-800">{status}</Badge>;
     } else if (status.toLowerCase().includes("good")) {
@@ -103,7 +96,6 @@ export default function Profile() {
     return <Badge className="bg-gray-100 text-gray-800">{status}</Badge>;
   };
 
-  // ✅ Loading state
   if (loading && !profile) {
     return (
       <MemberLayout>
@@ -115,7 +107,6 @@ export default function Profile() {
     );
   }
 
-  // ✅ Error state
   if (error && !profile) {
     return (
       <MemberLayout>
@@ -131,7 +122,6 @@ export default function Profile() {
     );
   }
 
-  // ✅ No profile state
   if (!profile) {
     return (
       <MemberLayout>
@@ -218,7 +208,7 @@ export default function Profile() {
           </CardContent>
         </Card>
 
-        {/* ⬅️ TAMBAH TABS DI SINI (GANTI Information Cards dengan Tabs) */}
+        {/* Tabs */}
         <Tabs defaultValue="personal" className="space-y-6">
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="personal">Informasi Pribadi</TabsTrigger>
@@ -238,7 +228,6 @@ export default function Profile() {
                 <CardDescription>Data pribadi dan kontak</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {/* ... ISI YANG SAMA seperti card Personal Information Anda */}
                 <div className="grid grid-cols-1 gap-4">
                   <div>
                     <label className="text-sm font-medium text-gray-500">
@@ -324,7 +313,6 @@ export default function Profile() {
                 <CardDescription>Detail keanggotaan koperasi</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {/* ... ISI YANG SAMA seperti card Membership Information Anda */}
                 <div className="grid grid-cols-1 gap-4">
                   <div>
                     <label className="text-sm font-medium text-gray-500">
@@ -407,7 +395,6 @@ export default function Profile() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {/* ... ISI YANG SAMA seperti Account Security card Anda */}
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div>
@@ -450,17 +437,32 @@ export default function Profile() {
             </Card>
           </TabsContent>
 
-          {/* ⬅️ TAB 4: SALARY DEDUCTION (BARU!) */}
+          {/* TAB 4: Salary Deduction */}
           <TabsContent value="salary">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <DollarSign className="h-5 w-5" />
-                  <span>Riwayat Potongan Gaji</span>
-                </CardTitle>
-                <CardDescription>
-                  Riwayat potongan gaji 6 bulan terakhir
-                </CardDescription>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center space-x-2">
+                      <DollarSign className="h-5 w-5" />
+                      <span>Riwayat Potongan Gaji</span>
+                    </CardTitle>
+                    <CardDescription>
+                      Riwayat potongan gaji tahun {currentYear}
+                    </CardDescription>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={refetchSalary}
+                    disabled={loadingSalary}
+                  >
+                    <RefreshCw
+                      className={`h-4 w-4 mr-2 ${loadingSalary ? "animate-spin" : ""}`}
+                    />
+                    Refresh
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 {loadingSalary ? (
@@ -480,7 +482,7 @@ export default function Profile() {
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {deductions.slice(0, 6).map((deduction) => (
+                    {deductions.map((deduction) => (
                       <div
                         key={deduction.id}
                         className="flex justify-between items-center p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
@@ -505,7 +507,9 @@ export default function Profile() {
                               Potongan:{" "}
                               <span className="font-medium">
                                 {salaryDeductionService.formatCurrency(
-                                  deduction.total_deductions,
+                                  deduction.total_deduction ||
+                                    deduction.total_deductions ||
+                                    0,
                                 )}
                               </span>
                             </p>
@@ -532,64 +536,12 @@ export default function Profile() {
                         </div>
                       </div>
                     ))}
-
-                    {deductions.length > 6 && (
-                      <p className="text-sm text-gray-500 text-center pt-2">
-                        Menampilkan 6 dari {deductions.length} data
-                      </p>
-                    )}
                   </div>
                 )}
               </CardContent>
             </Card>
           </TabsContent>
         </Tabs>
-
-        {/* Account Security */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <Shield className="h-5 w-5" />
-              <span>Keamanan Akun</span>
-            </CardTitle>
-            <CardDescription>Pengaturan keamanan dan privasi</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="text-sm font-medium">Kata Sandi</h4>
-                  <p className="text-sm text-gray-500">
-                    Ubah password untuk keamanan akun
-                  </p>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPasswordModalOpen(true)}
-                >
-                  <Lock className="h-4 w-4 mr-2" />
-                  Ubah Password
-                </Button>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="text-sm font-medium">Terakhir Diperbarui</h4>
-                  <p className="text-sm text-gray-500">
-                    {new Date(profile.updated_at).toLocaleDateString("id-ID", {
-                      day: "numeric",
-                      month: "long",
-                      year: "numeric",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
       </div>
 
       {/* Modals */}

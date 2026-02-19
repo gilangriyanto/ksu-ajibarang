@@ -17,7 +17,7 @@ export interface CashAccount {
   is_active: boolean;
   created_at: string;
   updated_at: string;
-  
+
   // Relations (optional)
   active_managers?: Manager[];
   current_savings_rate?: InterestRate | null;
@@ -151,7 +151,7 @@ const cashAccountsService = {
    */
   getManagers: async (cashAccountId: number) => {
     const response = await apiClient.get(
-      `/cash-accounts/${cashAccountId}/managers`
+      `/cash-accounts/${cashAccountId}/managers`,
     );
     return response.data;
   },
@@ -162,7 +162,7 @@ const cashAccountsService = {
   assignManager: async (cashAccountId: number, data: AssignManagerData) => {
     const response = await apiClient.post(
       `/cash-accounts/${cashAccountId}/managers`,
-      data
+      data,
     );
     return response.data;
   },
@@ -172,7 +172,7 @@ const cashAccountsService = {
    */
   removeManager: async (cashAccountId: number, managerId: number) => {
     const response = await apiClient.delete(
-      `/cash-accounts/${cashAccountId}/managers/${managerId}`
+      `/cash-accounts/${cashAccountId}/managers/${managerId}`,
     );
     return response.data;
   },
@@ -191,7 +191,7 @@ const cashAccountsService = {
    */
   getManagedAccounts: async (managerId: number) => {
     const response = await apiClient.get(
-      `/cash-accounts/managers/${managerId}/accounts`
+      `/cash-accounts/managers/${managerId}/accounts`,
     );
     return response.data;
   },
@@ -216,9 +216,9 @@ const cashAccountsService = {
   getTypeName: (type: string): string => {
     const types: Record<string, string> = {
       I: "Kas Umum",
-      II: "Kas Sosial",
-      III: "Kas Pengadaan",
-      IV: "Kas Hadiah",
+      II: "Kas Logistik",
+      III: "Kas Sebrakan",
+      IV: "Kas Kantin",
       V: "Bank",
     };
     return types[type] || type;
@@ -228,7 +228,7 @@ const cashAccountsService = {
    * Helper: Get type badge color for shadcn/ui Badge
    */
   getTypeBadgeColor: (
-    type: string
+    type: string,
   ): "default" | "secondary" | "destructive" | "outline" => {
     const colors: Record<
       string,

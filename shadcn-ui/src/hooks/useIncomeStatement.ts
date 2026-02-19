@@ -1,93 +1,64 @@
-// src/hooks/useIncomeStatement.ts
-import { useState, useEffect } from "react";
-import { generalLedgerService } from "@/lib/api/generalLedger.service";
-import {
-  transformToIncomeStatement,
-  calculateIncomeStatementTotals,
+// hooks/useIncomeStatement.ts
+// ✅ REWRITTEN: Uses /journals/income-statement endpoint directly
+// ✅ No longer transforms general ledger data
+// ✅ Backend provides all categorization and totals
+
+import { useState, useEffect, useCallback } from "react";
+import incomeStatementService, {
   IncomeStatementData,
-} from "@/utils/incomeStatementTransformer";
-import { useToast } from "@/hooks/use-toast";
+  IncomeStatementAccount,
+} from "@/lib/api/income-statement.service";
 
 interface UseIncomeStatementReturn {
-  incomeStatementData: IncomeStatementData | null;
-  totals: ReturnType<typeof calculateIncomeStatementTotals> | null;
+  data: IncomeStatementData | null;
   isLoading: boolean;
   error: string | null;
-  refetch: () => Promise<void>;
+  refetch: () => void;
 }
 
-/**
- * Custom hook for managing income statement data
- * @param currentStart - Current period start date (YYYY-MM-DD)
- * @param currentEnd - Current period end date (YYYY-MM-DD)
- * @param previousStart - Previous period start date (YYYY-MM-DD)
- * @param previousEnd - Previous period end date (YYYY-MM-DD)
- */
 export const useIncomeStatement = (
-  currentStart: string,
-  currentEnd: string,
-  previousStart: string,
-  previousEnd: string
+  startDate: string,
+  endDate: string,
+  compare: boolean = true,
 ): UseIncomeStatementReturn => {
-  const [incomeStatementData, setIncomeStatementData] =
-    useState<IncomeStatementData | null>(null);
-  const [totals, setTotals] = useState<ReturnType<
-    typeof calculateIncomeStatementTotals
-  > | null>(null);
+  const [data, setData] = useState<IncomeStatementData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { toast } = useToast();
 
-  const fetchIncomeStatementData = async () => {
+  const fetchData = useCallback(async () => {
+    if (!startDate || !endDate) return;
+
     try {
       setIsLoading(true);
       setError(null);
 
-      // Fetch general ledger data for both periods
-      const { current, previous } =
-        await generalLedgerService.getComparativeGeneralLedger(
-          currentStart,
-          currentEnd,
-          previousStart,
-          previousEnd
-        );
-
-      // Transform to income statement format
-      const transformedData = transformToIncomeStatement(
-        current.data,
-        previous.data
+      const response = await incomeStatementService.getIncomeStatement(
+        startDate,
+        endDate,
+        compare,
       );
 
-      // Calculate totals
-      const calculatedTotals = calculateIncomeStatementTotals(transformedData);
-
-      setIncomeStatementData(transformedData);
-      setTotals(calculatedTotals);
+      // Handle nested response
+      const incomeData = response?.data || response;
+      console.log("🟡 Income statement data:", incomeData);
+      setData(incomeData as IncomeStatementData);
     } catch (err: any) {
-      const errorMessage =
-        err.response?.data?.message || "Gagal memuat data laporan laba rugi";
-      setError(errorMessage);
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-      });
+      console.error("❌ Error loading income statement:", err);
+      setError(err.message || "Gagal memuat laporan laba rugi");
+      setData(null);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [startDate, endDate, compare]);
 
   useEffect(() => {
-    if (currentStart && currentEnd && previousStart && previousEnd) {
-      fetchIncomeStatementData();
-    }
-  }, [currentStart, currentEnd, previousStart, previousEnd]);
+    fetchData();
+  }, [fetchData]);
 
   return {
-    incomeStatementData,
-    totals,
+    data,
     isLoading,
     error,
-    refetch: fetchIncomeStatementData,
+    refetch: fetchData,
   };
 };

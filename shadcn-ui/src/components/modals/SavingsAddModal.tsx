@@ -1,6 +1,6 @@
 // components/modals/SavingsAddModal.tsx
-// ✅ UPDATED VERSION: With Dynamic Saving Types from API
-// ✅ BACKWARD COMPATIBLE: Still works with old savings_type enum if API fails
+// ✅ REWRITTEN: Payload matches Postman collection EXACTLY
+// ✅ POST /savings body: { user_id, cash_account_id, saving_type_id|savings_type, amount, transaction_date, notes }
 
 import React, { useState, useEffect } from "react";
 import {
@@ -23,36 +23,25 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import {
-  PiggyBank,
-  DollarSign,
-  Loader2,
-  Info,
-  AlertCircle,
-} from "lucide-react";
+import { PiggyBank, Loader2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import apiClient from "@/lib/api/api-client";
-import savingsService, { SavingType } from "@/lib/api/savings.service";
 
+// =====================================================
+// Types
+// =====================================================
 interface Member {
   id: number;
   full_name: string;
   employee_id: string;
-  email: string;
 }
 
-interface NewSavings {
-  user_id: number;
-  cash_account_id: number;
-  transaction_date: string;
-  amount: number;
+interface SavingTypeFromAPI {
+  id: number;
+  code: string;
+  name: string;
   description?: string;
-
-  // ✅ NEW: Use saving_type_id (prefer this)
-  saving_type_id?: number;
-
-  // ✅ OLD: Fallback to savings_type if API fails
-  savings_type?: string;
+  is_active?: boolean;
 }
 
 interface SavingsAddModalProps {
@@ -61,34 +50,58 @@ interface SavingsAddModalProps {
   onSuccess: () => void;
 }
 
+// Fallback: when /saving-types returns empty
+const FALLBACK_TYPES = [
+  { code: "principal", name: "Simpanan Pokok" },
+  { code: "mandatory", name: "Simpanan Wajib" },
+  { code: "voluntary", name: "Simpanan Sukarela" },
+  { code: "holiday", name: "Simpanan Hari Raya" },
+];
+
 export function SavingsAddModal({
   isOpen,
   onClose,
   onSuccess,
 }: SavingsAddModalProps) {
-  const [formData, setFormData] = useState<NewSavings>({
-    user_id: 0,
-    cash_account_id: 1,
-    transaction_date: new Date().toISOString().split("T")[0],
-    amount: 0,
-    description: "",
-    saving_type_id: undefined,
-    savings_type: undefined,
-  });
-
+  // =====================================================
+  // State
+  // =====================================================
   const [members, setMembers] = useState<Member[]>([]);
-  const [savingTypes, setSavingTypes] = useState<SavingType[]>([]); // ✅ NEW
+  const [savingTypes, setSavingTypes] = useState<SavingTypeFromAPI[]>([]);
+  const [useFallback, setUseFallback] = useState(false);
   const [loadingMembers, setLoadingMembers] = useState(false);
-  const [loadingSavingTypes, setLoadingSavingTypes] = useState(false); // ✅ NEW
-  const [useFallback, setUseFallback] = useState(false); // ✅ NEW: Flag for fallback mode
+  const [loadingSavingTypes, setLoadingSavingTypes] = useState(false);
+
+  // Form fields — stored as strings from Select, parsed to number on submit
+  const [selectedUserId, setSelectedUserId] = useState("");
+  const [selectedTypeValue, setSelectedTypeValue] = useState(""); // saving_type_id (number as string) OR savings_type code (string)
+  const [selectedCashAccountId, setSelectedCashAccountId] = useState("1");
+  const [transactionDate, setTransactionDate] = useState(
+    new Date().toISOString().split("T")[0],
+  );
+  const [amount, setAmount] = useState("");
+  const [notes, setNotes] = useState("");
+
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [backendError, setBackendError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // ✅ Load members and saving types on mount
+  // =====================================================
+  // Load data
+  // =====================================================
   useEffect(() => {
     if (isOpen) {
       loadMembers();
-      loadSavingTypes(); // ✅ NEW
+      loadSavingTypes();
+      // Reset form
+      setSelectedUserId("");
+      setSelectedTypeValue("");
+      setSelectedCashAccountId("1");
+      setTransactionDate(new Date().toISOString().split("T")[0]);
+      setAmount("");
+      setNotes("");
+      setErrors({});
+      setBackendError("");
     }
   }, [isOpen]);
 
@@ -98,236 +111,180 @@ export function SavingsAddModal({
       const response = await apiClient.get("/members", {
         params: { status: "active" },
       });
-      console.log("📋 Members loaded:", response.data.data?.length || 0);
-      setMembers(response.data.data || []);
-    } catch (err: any) {
-      console.error("❌ Error loading members:", err);
-      toast.error("Gagal memuat data anggota");
+      const data = response.data?.data || response.data || [];
+      setMembers(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("Error loading members:", err);
     } finally {
       setLoadingMembers(false);
     }
   };
 
-  /**
-   * ✅ NEW: Load saving types from API
-   */
   const loadSavingTypes = async () => {
     try {
       setLoadingSavingTypes(true);
-      console.log("🔄 Loading saving types from API...");
+      let typesData: SavingTypeFromAPI[] = [];
 
-      const response = await savingsService.getSavingTypes({ is_active: true });
+      try {
+        const response = await apiClient.get("/saving-types");
+        console.log("📦 /saving-types response:", response.data);
+        const raw = response.data?.data || response.data;
+        typesData = Array.isArray(raw) ? raw : [];
+      } catch {
+        typesData = [];
+      }
 
-      const typesData = response.data?.data || response.data || [];
-      console.log(`✅ Loaded ${typesData.length} saving types:`, typesData);
+      if (typesData.length === 0) {
+        try {
+          const response = await apiClient.get("/saving-types/defaults");
+          const raw = response.data?.data || response.data;
+          typesData = Array.isArray(raw) ? raw : [];
+        } catch {
+          /* ignore */
+        }
+      }
 
-      setSavingTypes(typesData);
-      setUseFallback(false); // Success, use API data
-    } catch (err: any) {
-      console.error("❌ Error loading saving types:", err);
-      console.warn("⚠️ Falling back to hardcoded saving types");
+      console.log(`✅ Got ${typesData.length} saving types from API`);
 
-      // ✅ FALLBACK: Use hardcoded enum if API fails
+      if (typesData.length > 0) {
+        setSavingTypes(typesData);
+        setUseFallback(false);
+      } else {
+        setSavingTypes([]);
+        setUseFallback(true);
+      }
+    } catch {
       setUseFallback(true);
-      toast.warning("Menggunakan daftar jenis simpanan default");
     } finally {
       setLoadingSavingTypes(false);
     }
   };
 
-  /**
-   * ✅ FALLBACK: Hardcoded saving types (for old system compatibility)
-   */
-  const fallbackSavingTypes = [
-    {
-      id: "principal",
-      name: "Simpanan Pokok",
-      code: "principal",
-      description: "Setoran awal keanggotaan",
-    },
-    {
-      id: "mandatory",
-      name: "Simpanan Wajib",
-      code: "mandatory",
-      description: "Setoran bulanan wajib",
-    },
-    {
-      id: "voluntary",
-      name: "Simpanan Sukarela",
-      code: "voluntary",
-      description: "Setoran sukarela kapan saja",
-    },
-    {
-      id: "holiday",
-      name: "Simpanan Hari Raya",
-      code: "holiday",
-      description: "Setoran untuk hari raya",
-    },
-  ];
-
-  const validateForm = () => {
-    const newErrors: Record<string, string> = {};
-
-    if (!formData.user_id || formData.user_id === 0) {
-      newErrors.user_id = "Anggota harus dipilih";
-    }
-
-    // ✅ NEW: Validate saving_type_id OR savings_type
-    if (!useFallback) {
-      // Using API: validate saving_type_id
-      if (!formData.saving_type_id) {
-        newErrors.saving_type_id = "Jenis simpanan harus dipilih";
-      }
-    } else {
-      // Using fallback: validate savings_type
-      if (!formData.savings_type) {
-        newErrors.savings_type = "Jenis simpanan harus dipilih";
-      }
-    }
-
-    if (!formData.cash_account_id) {
-      newErrors.cash_account_id = "Kas harus dipilih";
-    }
-
-    if (!formData.transaction_date) {
-      newErrors.transaction_date = "Tanggal transaksi harus diisi";
-    }
-
-    if (!formData.amount || formData.amount <= 0) {
-      newErrors.amount = "Jumlah simpanan harus lebih dari 0";
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+  // =====================================================
+  // Validate
+  // =====================================================
+  const validateForm = (): boolean => {
+    const e: Record<string, string> = {};
+    if (!selectedUserId) e.user_id = "Anggota harus dipilih";
+    if (!selectedTypeValue) e.type = "Jenis simpanan harus dipilih";
+    if (!selectedCashAccountId) e.cash_account_id = "Kas harus dipilih";
+    if (!transactionDate) e.transaction_date = "Tanggal harus diisi";
+    const amt = Number(amount);
+    if (!amount || isNaN(amt) || amt <= 0)
+      e.amount = "Jumlah harus lebih dari 0";
+    setErrors(e);
+    return Object.keys(e).length === 0;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!validateForm()) {
-      toast.error("Periksa kembali form Anda");
-      return;
-    }
+  // =====================================================
+  // Submit — match Postman EXACTLY
+  // =====================================================
+  const handleSubmit = async (ev: React.FormEvent) => {
+    ev.preventDefault();
+    if (!validateForm()) return;
 
     setIsSubmitting(true);
+    setBackendError("");
 
     try {
-      // ✅ Build payload based on mode (API or fallback)
-      const payload: any = {
-        user_id: formData.user_id,
-        cash_account_id: formData.cash_account_id,
-        transaction_date: formData.transaction_date,
-        amount: formData.amount,
-        description: formData.description || "",
+      // ✅ Build payload matching Postman collection EXACTLY:
+      //
+      // NEW style (saving_type_id):
+      //   { user_id: 5, cash_account_id: 1, saving_type_id: 1, amount: 500000, transaction_date: "2026-02-01", notes: "..." }
+      //
+      // OLD style (savings_type string):
+      //   { user_id: 3, cash_account_id: 1, savings_type: "mandatory", amount: 100000, transaction_date: "2026-02-13", notes: "..." }
+
+      const payload: Record<string, any> = {
+        user_id: Number(selectedUserId),
+        cash_account_id: Number(selectedCashAccountId),
+        amount: Number(amount),
+        transaction_date: transactionDate,
+        notes: notes || "",
       };
 
       if (!useFallback) {
-        // ✅ NEW: Using API - send saving_type_id
-        payload.saving_type_id = formData.saving_type_id;
-        console.log("📤 Sending data with saving_type_id:", payload);
+        // API mode — saving_type_id is a number
+        payload.saving_type_id = Number(selectedTypeValue);
       } else {
-        // ✅ OLD: Using fallback - send savings_type
-        payload.savings_type = formData.savings_type;
-        console.log("📤 Sending data with savings_type (fallback):", payload);
+        // Fallback mode — savings_type is a string code like "mandatory"
+        payload.savings_type = selectedTypeValue;
       }
 
-      await savingsService.create(payload);
+      // ✅ Log exact payload before sending
+      console.log(
+        "📤 POST /savings payload:",
+        JSON.stringify(payload, null, 2),
+      );
+      console.log("📤 Types:", {
+        user_id: typeof payload.user_id,
+        cash_account_id: typeof payload.cash_account_id,
+        saving_type_id: typeof payload.saving_type_id,
+        savings_type: typeof payload.savings_type,
+        amount: typeof payload.amount,
+      });
 
-      console.log("✅ Savings created successfully");
+      const response = await apiClient.post("/savings", payload);
+      console.log("✅ Savings created:", response.data);
+
       toast.success("Simpanan berhasil ditambahkan");
-
       onSuccess();
-      handleClose();
+      onClose();
     } catch (error: any) {
-      console.error("❌ Error adding savings:", error);
-      console.error("❌ Error response:", error.response?.data);
+      console.error("❌ Error creating savings:", error);
 
-      if (error.response?.data?.errors) {
-        const apiErrors = error.response.data.errors;
+      // ✅ Extract and display FULL backend error for debugging
+      const respData = error.response?.data;
+      console.error("🔴 Backend response:", JSON.stringify(respData, null, 2));
+
+      if (respData?.errors) {
+        // Validation errors — show each field
+        const apiErrors = respData.errors;
         const formErrors: Record<string, string> = {};
-        Object.keys(apiErrors).forEach((key) => {
-          formErrors[key] = Array.isArray(apiErrors[key])
-            ? apiErrors[key][0]
-            : apiErrors[key];
+        const errorMessages: string[] = [];
+
+        Object.entries(apiErrors).forEach(([key, val]: [string, any]) => {
+          const msg = Array.isArray(val) ? val[0] : String(val);
+          formErrors[key] = msg;
+          errorMessages.push(`${key}: ${msg}`);
         });
+
         setErrors(formErrors);
-        toast.error("Validasi gagal. Periksa kembali form Anda");
+        // ✅ Show ALL validation errors for debugging
+        setBackendError(`Validation Error:\n${errorMessages.join("\n")}`);
+        toast.error(errorMessages[0] || "Validasi gagal");
       } else {
-        const errorMessage =
-          error.response?.data?.message ||
-          error.message ||
-          "Gagal menambahkan simpanan";
-        toast.error(errorMessage);
+        const msg =
+          respData?.message || error.message || "Gagal menambahkan simpanan";
+        setBackendError(msg);
+        toast.error(msg);
       }
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleInputChange = (
-    field: keyof NewSavings,
-    value: string | number,
-  ) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-    if (errors[field]) {
-      setErrors((prev) => {
-        const newErrors = { ...prev };
-        delete newErrors[field];
-        return newErrors;
-      });
-    }
-  };
-
-  const getSavingTypeName = (typeOrCode: string) => {
-    // Try to find in API data first
-    const apiType = savingTypes.find(
-      (t) => t.id.toString() === typeOrCode || t.code === typeOrCode,
-    );
-    if (apiType) return apiType.name;
-
-    // Fallback to hardcoded names
-    const nameMap: Record<string, string> = {
-      principal: "Simpanan Pokok",
-      mandatory: "Simpanan Wajib",
-      voluntary: "Simpanan Sukarela",
-      holiday: "Simpanan Hari Raya",
-    };
-    return nameMap[typeOrCode] || typeOrCode;
-  };
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("id-ID", {
+  // =====================================================
+  // Helpers
+  // =====================================================
+  const formatCurrency = (amt: number) =>
+    new Intl.NumberFormat("id-ID", {
       style: "currency",
       currency: "IDR",
       minimumFractionDigits: 0,
-    }).format(amount);
-  };
+    }).format(amt);
 
-  const handleClose = () => {
-    setFormData({
-      user_id: 0,
-      cash_account_id: 1,
-      transaction_date: new Date().toISOString().split("T")[0],
-      amount: 0,
-      description: "",
-      saving_type_id: undefined,
-      savings_type: undefined,
-    });
-    setErrors({});
-    setIsSubmitting(false);
-    onClose();
-  };
+  const selectedMember = members.find((m) => m.id === Number(selectedUserId));
+  const selectedTypeName = useFallback
+    ? FALLBACK_TYPES.find((t) => t.code === selectedTypeValue)?.name
+    : savingTypes.find((t) => String(t.id) === selectedTypeValue)?.name;
 
-  const selectedMember = members.find((m) => m.id === formData.user_id);
-
-  // ✅ Get selected saving type (from API or fallback)
-  const selectedSavingType = !useFallback
-    ? savingTypes.find((t) => t.id === formData.saving_type_id)
-    : fallbackSavingTypes.find((t) => t.id === formData.savings_type);
-
+  // =====================================================
+  // Render
+  // =====================================================
   return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[500px]">
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center space-x-2">
             <PiggyBank className="h-5 w-5" />
@@ -338,27 +295,25 @@ export function SavingsAddModal({
           </DialogDescription>
         </DialogHeader>
 
-        {/* ✅ Info Alert: Show which mode we're using */}
-        {useFallback && (
-          <Alert className="bg-yellow-50 border-yellow-200">
-            <AlertCircle className="h-4 w-4 text-yellow-600" />
-            <AlertDescription className="text-yellow-800 text-sm">
-              Menggunakan daftar jenis simpanan default (mode kompatibilitas)
+        {/* ✅ Show backend error prominently for debugging */}
+        {backendError && (
+          <Alert className="border-red-200 bg-red-50">
+            <AlertCircle className="h-4 w-4 text-red-600" />
+            <AlertDescription className="text-red-800 whitespace-pre-wrap text-xs font-mono">
+              {backendError}
             </AlertDescription>
           </Alert>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Member Selection */}
+          {/* ===== Anggota ===== */}
           <div className="space-y-2">
-            <Label htmlFor="member">
+            <Label>
               Pilih Anggota <span className="text-red-500">*</span>
             </Label>
             <Select
-              value={formData.user_id > 0 ? formData.user_id.toString() : ""}
-              onValueChange={(value) =>
-                handleInputChange("user_id", parseInt(value))
-              }
+              value={selectedUserId}
+              onValueChange={setSelectedUserId}
               disabled={loadingMembers}
             >
               <SelectTrigger className={errors.user_id ? "border-red-500" : ""}>
@@ -367,17 +322,11 @@ export function SavingsAddModal({
                 />
               </SelectTrigger>
               <SelectContent>
-                {members.length === 0 ? (
-                  <div className="p-2 text-sm text-gray-500">
-                    Tidak ada anggota aktif
-                  </div>
-                ) : (
-                  members.map((member) => (
-                    <SelectItem key={member.id} value={member.id.toString()}>
-                      {member.employee_id} - {member.full_name}
-                    </SelectItem>
-                  ))
-                )}
+                {members.map((m) => (
+                  <SelectItem key={m.id} value={String(m.id)}>
+                    {m.employee_id} - {m.full_name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
             {errors.user_id && (
@@ -385,103 +334,57 @@ export function SavingsAddModal({
             )}
           </div>
 
-          {/* ✅ NEW: Dynamic Savings Type Selection */}
+          {/* ===== Jenis Simpanan ===== */}
           <div className="space-y-2">
-            <Label htmlFor="savingsType">
+            <Label>
               Jenis Simpanan <span className="text-red-500">*</span>
             </Label>
             <Select
-              value={
-                !useFallback
-                  ? formData.saving_type_id?.toString() || ""
-                  : formData.savings_type || ""
-              }
-              onValueChange={(value) => {
-                if (!useFallback) {
-                  // API mode: set saving_type_id
-                  handleInputChange("saving_type_id", parseInt(value));
-                } else {
-                  // Fallback mode: set savings_type
-                  handleInputChange("savings_type", value);
-                }
-              }}
+              value={selectedTypeValue}
+              onValueChange={setSelectedTypeValue}
               disabled={loadingSavingTypes}
             >
-              <SelectTrigger
-                className={
-                  errors.saving_type_id || errors.savings_type
-                    ? "border-red-500"
-                    : ""
-                }
-              >
+              <SelectTrigger className={errors.type ? "border-red-500" : ""}>
                 <SelectValue
                   placeholder={
-                    loadingSavingTypes
-                      ? "Memuat jenis simpanan..."
-                      : "Pilih jenis simpanan"
+                    loadingSavingTypes ? "Memuat..." : "Pilih jenis simpanan"
                   }
                 />
               </SelectTrigger>
               <SelectContent>
-                {!useFallback ? (
-                  // ✅ NEW: Load from API
-                  savingTypes.length === 0 ? (
-                    <div className="p-2 text-sm text-gray-500">
-                      Tidak ada jenis simpanan tersedia
-                    </div>
-                  ) : (
-                    savingTypes.map((type) => (
-                      <SelectItem key={type.id} value={type.id.toString()}>
-                        <div className="flex flex-col">
-                          <span className="font-medium">{type.name}</span>
-                          {type.description && (
-                            <span className="text-xs text-gray-500">
-                              {type.description}
-                            </span>
-                          )}
-                          {type.is_mandatory && (
-                            <span className="text-xs text-orange-600">
-                              Wajib
-                            </span>
-                          )}
-                        </div>
+                {useFallback
+                  ? FALLBACK_TYPES.map((t) => (
+                      <SelectItem key={t.code} value={t.code}>
+                        {t.name}
                       </SelectItem>
                     ))
-                  )
-                ) : (
-                  // ✅ OLD: Fallback to hardcoded enum
-                  fallbackSavingTypes.map((type) => (
-                    <SelectItem key={type.id} value={type.id}>
-                      <div className="flex flex-col">
-                        <span className="font-medium">{type.name}</span>
-                        {type.description && (
-                          <span className="text-xs text-gray-500">
-                            {type.description}
-                          </span>
-                        )}
-                      </div>
-                    </SelectItem>
-                  ))
-                )}
+                  : savingTypes.map((t) => (
+                      <SelectItem key={t.id} value={String(t.id)}>
+                        {t.name}
+                        {t.description ? ` — ${t.description}` : ""}
+                      </SelectItem>
+                    ))}
               </SelectContent>
             </Select>
-            {(errors.saving_type_id || errors.savings_type) && (
-              <p className="text-sm text-red-600">
-                {errors.saving_type_id || errors.savings_type}
-              </p>
+            {errors.type && (
+              <p className="text-sm text-red-600">{errors.type}</p>
+            )}
+            {errors.saving_type_id && (
+              <p className="text-sm text-red-600">{errors.saving_type_id}</p>
+            )}
+            {errors.savings_type && (
+              <p className="text-sm text-red-600">{errors.savings_type}</p>
             )}
           </div>
 
-          {/* Cash Account */}
+          {/* ===== Kas ===== */}
           <div className="space-y-2">
-            <Label htmlFor="cashAccount">
+            <Label>
               Kas <span className="text-red-500">*</span>
             </Label>
             <Select
-              value={formData.cash_account_id.toString()}
-              onValueChange={(value) =>
-                handleInputChange("cash_account_id", parseInt(value))
-              }
+              value={selectedCashAccountId}
+              onValueChange={setSelectedCashAccountId}
             >
               <SelectTrigger
                 className={errors.cash_account_id ? "border-red-500" : ""}
@@ -500,18 +403,15 @@ export function SavingsAddModal({
             )}
           </div>
 
-          {/* Transaction Date */}
+          {/* ===== Tanggal ===== */}
           <div className="space-y-2">
-            <Label htmlFor="transactionDate">
+            <Label>
               Tanggal Transaksi <span className="text-red-500">*</span>
             </Label>
             <Input
-              id="transactionDate"
               type="date"
-              value={formData.transaction_date}
-              onChange={(e) =>
-                handleInputChange("transaction_date", e.target.value)
-              }
+              value={transactionDate}
+              onChange={(e) => setTransactionDate(e.target.value)}
               max={new Date().toISOString().split("T")[0]}
               className={errors.transaction_date ? "border-red-500" : ""}
             />
@@ -520,20 +420,19 @@ export function SavingsAddModal({
             )}
           </div>
 
-          {/* Amount */}
+          {/* ===== Jumlah ===== */}
           <div className="space-y-2">
-            <Label htmlFor="amount">
+            <Label>
               Jumlah Simpanan <span className="text-red-500">*</span>
             </Label>
             <div className="relative">
-              <DollarSign className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+              <span className="absolute left-3 top-3 text-sm text-gray-500 font-medium">
+                Rp
+              </span>
               <Input
-                id="amount"
                 type="number"
-                value={formData.amount || ""}
-                onChange={(e) =>
-                  handleInputChange("amount", parseInt(e.target.value) || 0)
-                }
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
                 placeholder="0"
                 className={`pl-10 ${errors.amount ? "border-red-500" : ""}`}
                 min="0"
@@ -545,20 +444,19 @@ export function SavingsAddModal({
             )}
           </div>
 
-          {/* Description */}
+          {/* ===== Notes ===== */}
           <div className="space-y-2">
-            <Label htmlFor="description">Keterangan</Label>
+            <Label>Keterangan</Label>
             <Textarea
-              id="description"
-              value={formData.description}
-              onChange={(e) => handleInputChange("description", e.target.value)}
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
               placeholder="Keterangan tambahan (opsional)"
               rows={3}
             />
           </div>
 
-          {/* Summary */}
-          {formData.amount > 0 && selectedMember && selectedSavingType && (
+          {/* ===== Ringkasan ===== */}
+          {Number(amount) > 0 && selectedMember && selectedTypeName && (
             <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
               <h4 className="font-medium text-blue-900 mb-2">
                 Ringkasan Simpanan
@@ -572,25 +470,22 @@ export function SavingsAddModal({
                 </div>
                 <div className="flex justify-between">
                   <span className="text-blue-700">Jenis:</span>
-                  <span className="font-medium">{selectedSavingType.name}</span>
+                  <span className="font-medium">{selectedTypeName}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-blue-700">Jumlah:</span>
                   <span className="font-medium text-green-600">
-                    {formatCurrency(formData.amount)}
+                    {formatCurrency(Number(amount))}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-blue-700">Tanggal:</span>
                   <span className="font-medium">
-                    {new Date(formData.transaction_date).toLocaleDateString(
-                      "id-ID",
-                      {
-                        day: "numeric",
-                        month: "long",
-                        year: "numeric",
-                      },
-                    )}
+                    {new Date(transactionDate).toLocaleDateString("id-ID", {
+                      day: "numeric",
+                      month: "long",
+                      year: "numeric",
+                    })}
                   </span>
                 </div>
               </div>
@@ -601,7 +496,7 @@ export function SavingsAddModal({
             <Button
               type="button"
               variant="outline"
-              onClick={handleClose}
+              onClick={onClose}
               disabled={isSubmitting}
             >
               Batal

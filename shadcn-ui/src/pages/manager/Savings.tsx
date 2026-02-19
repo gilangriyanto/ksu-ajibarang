@@ -1,5 +1,8 @@
-// src/pages/manager/SavingsManagement.tsx
-// ✅ UPDATED: Use savingsService helper methods for proper type display
+// pages/manager/SavingsManagement.tsx
+// ✅ UPDATED: Added Import Excel (backend endpoint) & Export Excel (backend endpoint)
+// ✅ POST /savings/import (formdata: file)
+// ✅ GET /savings/export?savings_type=&user_id=&start_date=&end_date=
+// ✅ GET /savings/import/template
 
 import React, { useState, useEffect } from "react";
 import { ManagerLayout } from "@/components/layout/ManagerLayout";
@@ -54,11 +57,16 @@ import {
   XCircle,
   Clock,
   AlertCircle,
+  Upload,
 } from "lucide-react";
 import { SavingsAddModal } from "@/components/modals/SavingsAddModal";
 import SavingsDetailModal from "@/components/modals/SavingsDetailModal";
 import { SavingsEditModal } from "@/components/modals/SavingsEditModal";
-import { ExportSavingsModalClientSide } from "@/components/modals/ExportSavingsModalClientSide";
+// ✅ NEW: Import modal & export helper from backend
+import {
+  ImportModal,
+  handleExportFromBackend,
+} from "@/components/modals/ImportExportModal";
 import { toast } from "sonner";
 import savingsService, {
   Saving,
@@ -73,9 +81,12 @@ export default function SavingsManagement() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [recordToDelete, setRecordToDelete] = useState<Saving | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+
+  // ✅ NEW: Import/Export states
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   // API State
   const [savings, setSavings] = useState<Saving[]>([]);
@@ -84,7 +95,6 @@ export default function SavingsManagement() {
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Load data on mount
   useEffect(() => {
     loadAllData();
   }, []);
@@ -93,12 +103,9 @@ export default function SavingsManagement() {
     setLoading(true);
     setError(null);
     try {
-      console.log("🔄 Loading all data...");
       await loadSavings();
       await loadSummaryFromTypeEndpoints();
-      console.log("✅ All data loaded successfully");
     } catch (err: any) {
-      console.error("❌ Error loading data:", err);
       setError(err.message || "Gagal memuat data simpanan");
       toast.error("Gagal memuat data simpanan");
     } finally {
@@ -107,37 +114,17 @@ export default function SavingsManagement() {
   };
 
   const loadSavings = async () => {
-    try {
-      console.log("📋 Loading all savings...");
-      const response = await savingsService.getAll({ all: true });
-
-      let savingsData: Saving[] = [];
-      if (response.data?.data && Array.isArray(response.data.data)) {
-        savingsData = response.data.data;
-      } else if (Array.isArray(response.data)) {
-        savingsData = response.data;
-      } else if (Array.isArray(response)) {
-        savingsData = response;
-      }
-
-      console.log("📋 Parsed savings array:", savingsData.length, "items");
-      setSavings(savingsData);
-
-      if (savingsData.length === 0) {
-        console.warn("⚠️ No savings data found");
-      } else {
-        console.log(`✅ Successfully loaded ${savingsData.length} savings`);
-      }
-    } catch (err: any) {
-      console.error("❌ Error loading savings:", err);
-      throw new Error("Gagal memuat data simpanan");
-    }
+    const response = await savingsService.getAll({ all: true });
+    let savingsData: Saving[] = [];
+    if (response.data?.data && Array.isArray(response.data.data))
+      savingsData = response.data.data;
+    else if (Array.isArray(response.data)) savingsData = response.data;
+    else if (Array.isArray(response)) savingsData = response;
+    setSavings(savingsData);
   };
 
   const loadSummaryFromTypeEndpoints = async () => {
     try {
-      console.log("📊 Loading summary from type endpoints...");
-
       const [mandatoryRes, voluntaryRes, principalRes, holidayRes] =
         await Promise.all([
           savingsService.getByType.mandatory().catch(() => ({ data: [] })),
@@ -146,69 +133,51 @@ export default function SavingsManagement() {
           savingsService.getByType.holiday().catch(() => ({ data: [] })),
         ]);
 
-      const mandatoryData = Array.isArray(mandatoryRes?.data?.data)
-        ? mandatoryRes.data.data
-        : Array.isArray(mandatoryRes?.data)
-          ? mandatoryRes.data
-          : [];
-
-      const voluntaryData = Array.isArray(voluntaryRes?.data?.data)
-        ? voluntaryRes.data.data
-        : Array.isArray(voluntaryRes?.data)
-          ? voluntaryRes.data
-          : [];
-
-      const principalData = Array.isArray(principalRes?.data?.data)
-        ? principalRes.data.data
-        : Array.isArray(principalRes?.data)
-          ? principalRes.data
-          : [];
-
-      const holidayData = Array.isArray(holidayRes?.data?.data)
-        ? holidayRes.data.data
-        : Array.isArray(holidayRes?.data)
-          ? holidayRes.data
-          : [];
-
-      const calculateTotal = (data: Saving[]) => {
-        return data.reduce((sum, item) => {
-          const amount = parseFloat(
-            item.final_amount?.toString() || item.amount?.toString() || "0",
-          );
-          return sum + amount;
-        }, 0);
+      const extract = (res: any) => {
+        if (Array.isArray(res?.data?.data)) return res.data.data;
+        if (Array.isArray(res?.data)) return res.data;
+        return [];
       };
 
-      const total_mandatory = calculateTotal(mandatoryData);
-      const total_voluntary = calculateTotal(voluntaryData);
-      const total_principal = calculateTotal(principalData);
-      const total_holiday = calculateTotal(holidayData);
+      const mandatoryData = extract(mandatoryRes);
+      const voluntaryData = extract(voluntaryRes);
+      const principalData = extract(principalRes);
+      const holidayData = extract(holidayRes);
+
+      const calcTotal = (data: Saving[]) =>
+        data.reduce(
+          (sum, item) =>
+            sum +
+            parseFloat(
+              item.final_amount?.toString() || item.amount?.toString() || "0",
+            ),
+          0,
+        );
+
+      const total_mandatory = calcTotal(mandatoryData);
+      const total_voluntary = calcTotal(voluntaryData);
+      const total_principal = calcTotal(principalData);
+      const total_holiday = calcTotal(holidayData);
       const total_balance =
         total_mandatory + total_voluntary + total_principal + total_holiday;
-
       const allSavings = [
         ...mandatoryData,
         ...voluntaryData,
         ...principalData,
         ...holidayData,
       ];
-      const uniqueUserIds = new Set(allSavings.map((s) => s.user_id));
-      const active_members = uniqueUserIds.size;
-      const total_deposits = allSavings.length;
+      const active_members = new Set(allSavings.map((s) => s.user_id)).size;
 
-      const calculatedSummary: SavingsSummary = {
+      setSummary({
         total_balance,
         total_principal,
         total_mandatory,
         total_voluntary,
         total_holiday,
-        total_deposits,
+        total_deposits: allSavings.length,
         active_members,
-      };
-
-      setSummary(calculatedSummary);
-    } catch (err: any) {
-      console.error("❌ Error loading summary:", err);
+      });
+    } catch {
       setSummary({
         total_balance: 0,
         total_principal: 0,
@@ -226,20 +195,32 @@ export default function SavingsManagement() {
     try {
       await loadAllData();
       toast.success("Data berhasil diperbarui");
-    } catch (err) {
+    } catch {
       toast.error("Gagal memperbarui data");
     } finally {
       setRefreshing(false);
     }
   };
 
+  // ✅ NEW: Export handler with filters
+  const handleExport = async () => {
+    try {
+      setExporting(true);
+      const filters: Record<string, string> = {};
+      if (typeFilter !== "all") filters.savings_type = typeFilter;
+      await handleExportFromBackend("savings", filters);
+      toast.success("Export simpanan berhasil diunduh");
+    } catch (err: any) {
+      toast.error(err.message || "Gagal export data");
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const filteredRecords = savings.filter((record) => {
     const userName = record.user?.full_name || record.user_name || "";
     const userCode = record.user?.employee_id || record.user_code || "";
-
-    // ✅ FIXED: Use helper method to get type code
     const savingTypeCode = savingsService.getSavingTypeCode(record);
-
     const matchesSearch =
       userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       userCode.toLowerCase().includes(searchTerm.toLowerCase());
@@ -249,19 +230,16 @@ export default function SavingsManagement() {
     return matchesSearch && matchesType && matchesStatus;
   });
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("id-ID", {
+  const formatCurrency = (amount: number) =>
+    new Intl.NumberFormat("id-ID", {
       style: "currency",
       currency: "IDR",
       minimumFractionDigits: 0,
     }).format(amount);
-  };
 
-  // ✅ UPDATED: Use service helper method with proper Badge component
   const getSavingsTypeBadge = (saving: Saving) => {
     const typeName = savingsService.getSavingTypeName(saving);
     const badgeColor = savingsService.getSavingTypeBadgeColor(saving);
-
     return <Badge className={badgeColor}>{typeName}</Badge>;
   };
 
@@ -293,20 +271,18 @@ export default function SavingsManagement() {
     }
   };
 
-  const handleViewRecord = (record: Saving) => {
-    setSelectedRecord(record);
+  const handleViewRecord = (r: Saving) => {
+    setSelectedRecord(r);
     setIsDetailModalOpen(true);
   };
-
-  const handleEditRecord = (record: Saving) => {
-    setSelectedRecord(record);
+  const handleEditRecord = (r: Saving) => {
+    setSelectedRecord(r);
     setIsEditModalOpen(true);
   };
 
   const handleSaveSavings = async (updatedSavings: any) => {
     try {
-      // ✅ Build update payload properly
-      const updatePayload: any = {
+      const payload: any = {
         user_id: updatedSavings.user_id,
         cash_account_id: updatedSavings.cash_account_id,
         transaction_date: updatedSavings.transaction_date,
@@ -317,56 +293,46 @@ export default function SavingsManagement() {
         description: updatedSavings.description || updatedSavings.notes,
         status: updatedSavings.status,
       };
-
-      // ✅ Add saving_type_id OR savings_type
-      if (updatedSavings.saving_type_id) {
-        updatePayload.saving_type_id = updatedSavings.saving_type_id;
-      } else if (updatedSavings.savings_type) {
-        updatePayload.savings_type = updatedSavings.savings_type;
-      }
-
-      console.log("📤 Updating savings with payload:", updatePayload);
-
-      await savingsService.update(updatedSavings.id, updatePayload);
-
+      if (updatedSavings.saving_type_id)
+        payload.saving_type_id = updatedSavings.saving_type_id;
+      else if (updatedSavings.savings_type)
+        payload.savings_type = updatedSavings.savings_type;
+      await savingsService.update(updatedSavings.id, payload);
       toast.success("Data simpanan berhasil diperbarui");
       await loadAllData();
       setIsEditModalOpen(false);
       setSelectedRecord(null);
     } catch (err: any) {
-      console.error("❌ Error updating savings:", err);
-      const errorMsg =
-        err.data?.message || err.message || "Gagal memperbarui simpanan";
-      toast.error(errorMsg);
+      toast.error(
+        err.data?.message || err.message || "Gagal memperbarui simpanan",
+      );
     }
   };
 
-  const handleApprove = async (record: Saving) => {
+  const handleApprove = async (r: Saving) => {
     try {
-      await savingsService.approve(record.id, "Disetujui oleh manager");
+      await savingsService.approve(r.id, "Disetujui oleh manager");
       toast.success("Simpanan berhasil disetujui");
       await loadAllData();
     } catch (err: any) {
-      const errorMsg =
-        err.data?.message || err.message || "Gagal menyetujui simpanan";
-      toast.error(errorMsg);
+      toast.error(
+        err.data?.message || err.message || "Gagal menyetujui simpanan",
+      );
     }
   };
 
-  const handleReject = async (record: Saving) => {
+  const handleReject = async (r: Saving) => {
     try {
-      await savingsService.reject(record.id, "Ditolak oleh manager");
+      await savingsService.reject(r.id, "Ditolak oleh manager");
       toast.success("Simpanan berhasil ditolak");
       await loadAllData();
     } catch (err: any) {
-      const errorMsg =
-        err.data?.message || err.message || "Gagal menolak simpanan";
-      toast.error(errorMsg);
+      toast.error(err.data?.message || err.message || "Gagal menolak simpanan");
     }
   };
 
-  const handleDeleteRecord = (record: Saving) => {
-    setRecordToDelete(record);
+  const handleDeleteRecord = (r: Saving) => {
+    setRecordToDelete(r);
     setIsDeleteDialogOpen(true);
   };
 
@@ -407,7 +373,7 @@ export default function SavingsManagement() {
           </Alert>
         )}
 
-        {/* Header */}
+        {/* Header - ✅ UPDATED with Import & Export buttons */}
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">
@@ -428,12 +394,24 @@ export default function SavingsManagement() {
             </Button>
             <Button
               variant="outline"
-              onClick={() => setIsExportModalOpen(true)}
-              className="bg-green-50 hover:bg-green-100 text-green-700 border-green-200"
-              disabled={savings.length === 0}
+              onClick={() => setShowImportModal(true)}
+              className="border-green-200 text-green-700 hover:bg-green-50"
             >
-              <Download className="h-4 w-4 mr-2" />
-              Export CSV
+              <Upload className="h-4 w-4 mr-2" />
+              Import Excel
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handleExport}
+              disabled={exporting || savings.length === 0}
+              className="border-blue-200 text-blue-700 hover:bg-blue-50"
+            >
+              {exporting ? (
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4 mr-2" />
+              )}
+              Export Excel
             </Button>
             <Button onClick={() => setIsAddModalOpen(true)}>
               <Plus className="h-4 w-4 mr-2" />
@@ -458,7 +436,6 @@ export default function SavingsManagement() {
                 <p className="text-xs text-gray-500">Keseluruhan</p>
               </CardContent>
             </Card>
-
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-gray-600">
@@ -472,7 +449,6 @@ export default function SavingsManagement() {
                 <p className="text-xs text-gray-500">Bulanan</p>
               </CardContent>
             </Card>
-
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-gray-600">
@@ -486,7 +462,6 @@ export default function SavingsManagement() {
                 <p className="text-xs text-gray-500">Fleksibel</p>
               </CardContent>
             </Card>
-
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-gray-600">
@@ -500,7 +475,6 @@ export default function SavingsManagement() {
                 <p className="text-xs text-gray-500">Satu kali</p>
               </CardContent>
             </Card>
-
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-gray-600">
@@ -517,7 +491,7 @@ export default function SavingsManagement() {
           </div>
         )}
 
-        {/* Main Content */}
+        {/* Main Table */}
         <Card>
           <CardHeader>
             <div className="flex justify-between items-center">
@@ -595,23 +569,16 @@ export default function SavingsManagement() {
                     filteredRecords.map((record) => (
                       <TableRow key={record.id}>
                         <TableCell>
-                          <div>
-                            <div className="font-medium">
-                              {record.user?.full_name ||
-                                record.user_name ||
-                                "-"}
-                            </div>
-                            <div className="text-sm text-gray-500">
-                              {record.user?.employee_id ||
-                                record.user_code ||
-                                "-"}
-                            </div>
+                          <div className="font-medium">
+                            {record.user?.full_name || record.user_name || "-"}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {record.user?.employee_id ||
+                              record.user_code ||
+                              "-"}
                           </div>
                         </TableCell>
-                        <TableCell>
-                          {/* ✅ FIXED: Use service helper */}
-                          {getSavingsTypeBadge(record)}
-                        </TableCell>
+                        <TableCell>{getSavingsTypeBadge(record)}</TableCell>
                         <TableCell className="font-medium text-green-600">
                           {formatCurrency(
                             parseFloat(record.amount?.toString() || "0"),
@@ -670,7 +637,7 @@ export default function SavingsManagement() {
                               size="sm"
                               onClick={() => handleEditRecord(record)}
                               className="h-8 w-8 p-0 hover:bg-green-50"
-                              title="Edit Simpanan"
+                              title="Edit"
                             >
                               <Edit className="h-4 w-4 text-green-600" />
                             </Button>
@@ -679,7 +646,7 @@ export default function SavingsManagement() {
                               size="sm"
                               onClick={() => handleDeleteRecord(record)}
                               className="h-8 w-8 p-0 hover:bg-red-50"
-                              title="Hapus Simpanan"
+                              title="Hapus"
                             >
                               <Trash2 className="h-4 w-4 text-red-600" />
                             </Button>
@@ -700,11 +667,10 @@ export default function SavingsManagement() {
           onClose={() => setIsAddModalOpen(false)}
           onSuccess={async () => {
             setIsAddModalOpen(false);
-            await new Promise((resolve) => setTimeout(resolve, 500));
+            await new Promise((r) => setTimeout(r, 500));
             await loadAllData();
           }}
         />
-
         <SavingsDetailModal
           savings={selectedRecord}
           isOpen={isDetailModalOpen}
@@ -712,12 +678,11 @@ export default function SavingsManagement() {
             setIsDetailModalOpen(false);
             setSelectedRecord(null);
           }}
-          onEdit={(savings) => {
+          onEdit={(s) => {
             setIsDetailModalOpen(false);
-            handleEditRecord(savings);
+            handleEditRecord(s);
           }}
         />
-
         <SavingsEditModal
           savings={selectedRecord}
           isOpen={isEditModalOpen}
@@ -728,13 +693,18 @@ export default function SavingsManagement() {
           onSave={handleSaveSavings}
         />
 
-        <ExportSavingsModalClientSide
-          isOpen={isExportModalOpen}
-          onClose={() => setIsExportModalOpen(false)}
-          savings={savings}
+        {/* ✅ NEW: Import Modal (backend endpoint) */}
+        <ImportModal
+          isOpen={showImportModal}
+          onClose={() => setShowImportModal(false)}
+          type="savings"
+          onSuccess={() => {
+            loadAllData();
+            toast.success("Data simpanan berhasil diimport");
+          }}
         />
 
-        {/* Delete Confirmation Dialog */}
+        {/* Delete Dialog */}
         <AlertDialog
           open={isDeleteDialogOpen}
           onOpenChange={setIsDeleteDialogOpen}

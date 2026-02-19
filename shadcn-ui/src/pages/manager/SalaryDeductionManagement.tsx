@@ -527,36 +527,55 @@ const SalaryDeductionManagement = () => {
         </div>
 
         {/* Pagination */}
-        {pagination.totalPages > 1 && (
-          <div className="px-6 py-4 border-t flex flex-col sm:flex-row items-center justify-between gap-4">
-            <p className="text-sm text-gray-600">
-              Menampilkan {deductions.length} dari {pagination.totalItems} data
-            </p>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => handlePageChange(pagination.currentPage - 1)}
-                disabled={pagination.currentPage === 1}
-                className="flex items-center gap-1 px-3 py-2 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                <ChevronLeft className="w-4 h-4" />
-                <span className="hidden sm:inline">Prev</span>
-              </button>
+        {pagination &&
+          (pagination.totalPages || pagination.last_page || 0) > 1 && (
+            <div className="px-6 py-4 border-t flex flex-col sm:flex-row items-center justify-between gap-4">
+              <p className="text-sm text-gray-600">
+                Menampilkan {deductions.length} dari{" "}
+                {pagination.totalItems || pagination.total || 0} data
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() =>
+                    handlePageChange(
+                      (pagination.currentPage || pagination.current_page || 1) -
+                        1,
+                    )
+                  }
+                  disabled={
+                    (pagination.currentPage || pagination.current_page || 1) ===
+                    1
+                  }
+                  className="flex items-center gap-1 px-3 py-2 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  <span className="hidden sm:inline">Prev</span>
+                </button>
 
-              <span className="px-4 py-2 text-sm text-gray-700">
-                Hal {pagination.currentPage} dari {pagination.totalPages}
-              </span>
+                <span className="px-4 py-2 text-sm text-gray-700">
+                  Hal {pagination.currentPage || pagination.current_page || 1}{" "}
+                  dari {pagination.totalPages || pagination.last_page || 1}
+                </span>
 
-              <button
-                onClick={() => handlePageChange(pagination.currentPage + 1)}
-                disabled={pagination.currentPage === pagination.totalPages}
-                className="flex items-center gap-1 px-3 py-2 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                <span className="hidden sm:inline">Next</span>
-                <ChevronRight className="w-4 h-4" />
-              </button>
+                <button
+                  onClick={() =>
+                    handlePageChange(
+                      (pagination.currentPage || pagination.current_page || 1) +
+                        1,
+                    )
+                  }
+                  disabled={
+                    (pagination.currentPage || pagination.current_page || 1) ===
+                    (pagination.totalPages || pagination.last_page || 1)
+                  }
+                  className="flex items-center gap-1 px-3 py-2 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  <span className="hidden sm:inline">Next</span>
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
             </div>
-          </div>
-        )}
+          )}
       </div>
 
       {/* Modals */}

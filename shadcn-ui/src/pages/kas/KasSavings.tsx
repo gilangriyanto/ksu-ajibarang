@@ -1,4 +1,9 @@
 // src/pages/kas/Savings.tsx
+// ✅ UPDATED: Import & Export now use real backend endpoints
+//    POST /savings/import (formdata: file)
+//    GET  /savings/export?savings_type=
+//    GET  /savings/import/template
+
 import React, { useState } from "react";
 import { KasLayout } from "@/components/layout/KasLayout";
 import {
@@ -44,6 +49,11 @@ import { useSavings } from "@/hooks/useSavings";
 import { SavingsAddModal } from "@/components/modals/SavingsAddModal";
 import { SavingsDetailViewModal } from "@/components/modals/SavingsDetailViewModal";
 import { SavingsEditModal } from "@/components/modals/SavingsEditModal";
+// ✅ Import modal & export helper
+import {
+  ImportModal,
+  handleExportFromBackend,
+} from "@/components/modals/ImportExportModal";
 import { toast } from "sonner";
 
 export default function KasSavings() {
@@ -56,20 +66,17 @@ export default function KasSavings() {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedSaving, setSelectedSaving] = useState(null);
-  const [savingTypes, setSavingTypes] = useState<SavingType[]>([]);
-  const [loadingTypes, setLoadingTypes] = useState(false);
 
-  // ✅ Use real API with hooks
-  const { savings, loading, deleteSaving, refresh } = useSavings({
-    all: true,
-  });
+  // ✅ Import/Export states
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
-  // ✅ Filter savings by kas_id (frontend filtering)
+  const { savings, loading, deleteSaving, refresh } = useSavings({ all: true });
+
   const kasSavings = savings.filter(
     (saving) => saving.cash_account_id === kasId,
   );
 
-  // Filter by type
   const filteredSavings = kasSavings.filter((saving) => {
     const matchesSearch =
       saving.user?.full_name
@@ -84,12 +91,12 @@ export default function KasSavings() {
   });
 
   const formatCurrency = (amount: number | string) => {
-    const numAmount = typeof amount === "string" ? parseFloat(amount) : amount;
+    const n = typeof amount === "string" ? parseFloat(amount) : amount;
     return new Intl.NumberFormat("id-ID", {
       style: "currency",
       currency: "IDR",
       minimumFractionDigits: 0,
-    }).format(numAmount || 0);
+    }).format(n || 0);
   };
 
   const getSavingsTypeBadge = (type: string) => {
@@ -108,7 +115,6 @@ export default function KasSavings() {
         text: "Simpanan Hari Raya",
       },
     };
-
     const config = typeMap[type as keyof typeof typeMap] || {
       color: "bg-gray-100 text-gray-800",
       text: type,
@@ -122,7 +128,6 @@ export default function KasSavings() {
       pending: { color: "bg-yellow-100 text-yellow-800", text: "Pending" },
       rejected: { color: "bg-red-100 text-red-800", text: "Ditolak" },
     };
-
     const config = statusMap[status as keyof typeof statusMap] || {
       color: "bg-gray-100 text-gray-800",
       text: status,
@@ -134,7 +139,6 @@ export default function KasSavings() {
     setSelectedSaving(saving);
     setIsDetailModalOpen(true);
   };
-
   const handleEditSaving = (saving: any) => {
     setSelectedSaving(saving);
     setIsEditModalOpen(true);
@@ -142,45 +146,45 @@ export default function KasSavings() {
 
   const handleDeleteSaving = async (savingId: number) => {
     if (!confirm("Yakin ingin menghapus simpanan ini?")) return;
-
     try {
       await deleteSaving(savingId);
       toast.success("Simpanan berhasil dihapus");
     } catch (err: any) {
-      console.error("Error deleting saving:", err);
       toast.error(err.message || "Gagal menghapus simpanan");
     }
   };
 
-  const handleExport = () => {
-    toast.info(`Mengekspor data simpanan Kas ${kasId}`);
+  // ✅ Export handler - uses backend endpoint
+  const handleExport = async () => {
+    try {
+      setExporting(true);
+      const filters: Record<string, string> = {};
+      if (typeFilter !== "all") filters.savings_type = typeFilter;
+      await handleExportFromBackend("savings", filters);
+      toast.success("Export simpanan berhasil diunduh");
+    } catch (err: any) {
+      toast.error(err.message || "Gagal export data");
+    } finally {
+      setExporting(false);
+    }
   };
 
-  const handleImport = () => {
-    toast.info(`Mengimpor data simpanan Kas ${kasId}`);
-  };
-
-  // Calculate totals by type for this kas
+  // Calculate totals
   const totalMandatory = kasSavings
     .filter((s) => s.savings_type === "mandatory")
     .reduce((sum, s) => sum + parseFloat(s.amount.toString()), 0);
-
   const totalVoluntary = kasSavings
     .filter((s) => s.savings_type === "voluntary")
     .reduce((sum, s) => sum + parseFloat(s.amount.toString()), 0);
-
   const totalPrincipal = kasSavings
     .filter((s) => s.savings_type === "principal")
     .reduce((sum, s) => sum + parseFloat(s.amount.toString()), 0);
-
   const totalHoliday = kasSavings
     .filter((s) => s.savings_type === "holiday")
     .reduce((sum, s) => sum + parseFloat(s.amount.toString()), 0);
-
   const totalSavings =
     totalMandatory + totalVoluntary + totalPrincipal + totalHoliday;
 
-  // ✅ Loading state
   if (loading && savings.length === 0) {
     return (
       <KasLayout>
@@ -204,13 +208,26 @@ export default function KasSavings() {
             <p className="text-gray-600">Kelola simpanan anggota Kas {kasId}</p>
           </div>
           <div className="flex space-x-2">
-            <Button variant="outline" onClick={handleExport}>
-              <Download className="h-4 w-4 mr-2" />
-              Export
+            <Button
+              variant="outline"
+              onClick={handleExport}
+              disabled={exporting || kasSavings.length === 0}
+              className="border-blue-200 text-blue-700 hover:bg-blue-50"
+            >
+              {exporting ? (
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4 mr-2" />
+              )}
+              Export Excel
             </Button>
-            <Button variant="outline" onClick={handleImport}>
+            <Button
+              variant="outline"
+              onClick={() => setShowImportModal(true)}
+              className="border-green-200 text-green-700 hover:bg-green-50"
+            >
               <Upload className="h-4 w-4 mr-2" />
-              Import
+              Import Excel
             </Button>
             <Button
               onClick={() => setIsAddModalOpen(true)}
@@ -237,7 +254,6 @@ export default function KasSavings() {
               <p className="text-xs text-gray-500">Keseluruhan</p>
             </CardContent>
           </Card>
-
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-gray-600">
@@ -251,7 +267,6 @@ export default function KasSavings() {
               <p className="text-xs text-gray-500">Bulanan</p>
             </CardContent>
           </Card>
-
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-gray-600">
@@ -265,7 +280,6 @@ export default function KasSavings() {
               <p className="text-xs text-gray-500">Fleksibel</p>
             </CardContent>
           </Card>
-
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-gray-600">
@@ -279,7 +293,6 @@ export default function KasSavings() {
               <p className="text-xs text-gray-500">Satu kali</p>
             </CardContent>
           </Card>
-
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-gray-600">
@@ -295,7 +308,7 @@ export default function KasSavings() {
           </Card>
         </div>
 
-        {/* Main Content - Table */}
+        {/* Main Content */}
         <Card>
           <CardHeader>
             <div className="flex justify-between items-center">
@@ -361,13 +374,11 @@ export default function KasSavings() {
                     filteredSavings.map((saving) => (
                       <TableRow key={saving.id}>
                         <TableCell>
-                          <div>
-                            <div className="font-medium">
-                              {saving.user?.full_name || "N/A"}
-                            </div>
-                            <div className="text-sm text-gray-500">
-                              {saving.user?.employee_id || "N/A"}
-                            </div>
+                          <div className="font-medium">
+                            {saving.user?.full_name || "N/A"}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {saving.user?.employee_id || "N/A"}
                           </div>
                         </TableCell>
                         <TableCell>
@@ -398,7 +409,7 @@ export default function KasSavings() {
                               size="sm"
                               onClick={() => handleEditSaving(saving)}
                               className="h-8 w-8 p-0 hover:bg-green-50"
-                              title="Edit Simpanan"
+                              title="Edit"
                             >
                               <Edit className="h-4 w-4 text-green-600" />
                             </Button>
@@ -407,7 +418,7 @@ export default function KasSavings() {
                               size="sm"
                               onClick={() => handleDeleteSaving(saving.id)}
                               className="h-8 w-8 p-0 hover:bg-red-50"
-                              title="Hapus Simpanan"
+                              title="Hapus"
                             >
                               <Trash2 className="h-4 w-4 text-red-600" />
                             </Button>
@@ -422,7 +433,7 @@ export default function KasSavings() {
           </CardContent>
         </Card>
 
-        {/* Info Note */}
+        {/* Info */}
         <Card className="bg-blue-50 border-blue-200">
           <CardContent className="p-4">
             <div className="flex items-start space-x-3">
@@ -445,9 +456,8 @@ export default function KasSavings() {
       <SavingsAddModal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
-        onAdd={refresh}
+        onSuccess={refresh}
       />
-
       <SavingsDetailViewModal
         account={selectedSaving}
         isOpen={isDetailModalOpen}
@@ -456,7 +466,6 @@ export default function KasSavings() {
           setSelectedSaving(null);
         }}
       />
-
       <SavingsEditModal
         savings={selectedSaving}
         isOpen={isEditModalOpen}
@@ -464,9 +473,19 @@ export default function KasSavings() {
           setIsEditModalOpen(false);
           setSelectedSaving(null);
         }}
-        onSave={(updatedSaving) => {
-          console.log("✅ Savings updated:", updatedSaving);
+        onSave={(updated) => {
           refresh();
+        }}
+      />
+
+      {/* ✅ Import Modal */}
+      <ImportModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        type="savings"
+        onSuccess={() => {
+          refresh();
+          toast.success("Data simpanan berhasil diimport");
         }}
       />
     </KasLayout>

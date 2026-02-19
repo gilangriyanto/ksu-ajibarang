@@ -49,7 +49,9 @@ import KasDashboard from "./pages/kas/KasDashboard";
 import KasLoanManagement from "./pages/kas/KasLoanManagement";
 import KasSavings from "./pages/kas/KasSavings";
 import KasAccounting from "./pages/kas/KasAccounting";
-import KasSettings from "./pages/kas/KasSettings"; // ✅ NEW: Settings untuk manage interest rates
+import KasSettings from "./pages/kas/KasSettings";
+// ✅ NEW: Dedicated Cash Transfer page for Manager Kas (uses KasLayout, NOT ManagerLayout)
+import KasCashTransfer from "./pages/kas/KasCashTransfer";
 
 const queryClient = new QueryClient();
 
@@ -131,15 +133,6 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
-            {/* ✅ NEW: Member Cash Transfer Route */}
-            {/* <Route
-              path="/member/cash-transfers"
-              element={
-                <ProtectedRoute allowedRoles={["anggota"]}>
-                  <MemberCashTransfer />
-                </ProtectedRoute>
-              }
-            /> */}
 
             {/* ==========================================
                 ADMIN ROUTES (role="admin")
@@ -195,7 +188,6 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
-            {/* ✅ NEW: Saving Types Management Route */}
             <Route
               path="/manager/saving-types"
               element={
@@ -336,7 +328,6 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
-            {/* ✅ NEW: Manager Cash Transfer Route */}
             <Route
               path="/manager/cash-transfers"
               element={
@@ -392,7 +383,6 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
-            {/* ✅ NEW: KasSettings Route */}
             <Route
               path="/kas/:kasId/settings"
               element={
@@ -403,13 +393,13 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
-            {/* ✅ NEW: Cash Transfer for Manager Kas */}
+            {/* ✅ FIXED: KasCashTransfer (dedicated page for kas role, no ManagerLayout conflict) */}
             <Route
               path="/kas/:kasId/cash-transfers"
               element={
                 <ProtectedRoute allowedRoles={["manager"]} requireKasId={true}>
                   <KasLayout>
-                    <CashTransferManagement />
+                    <KasCashTransfer />
                   </KasLayout>
                 </ProtectedRoute>
               }

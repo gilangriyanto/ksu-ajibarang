@@ -171,7 +171,4 @@ const chartOfAccountsService = {
   },
 };
 
-// Named exports for types
-export type { ChartOfAccount, COASummary, CreateCOARequest };
-
 export default chartOfAccountsService;

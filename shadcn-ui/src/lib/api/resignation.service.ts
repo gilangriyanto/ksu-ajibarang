@@ -1,8 +1,9 @@
 // lib/api/resignation.service.ts
-// 🔧 UPDATED: Sesuai Postman Collection Member Resignation (UPDATED)
-// ✅ Member submit tanpa user_id (otomatis dari JWT)
-// ✅ resignation_date opsional (default = hari ini)
-// ✅ Max H+90, min hari ini
+// ✅ UPDATED: Sesuai Postman Collection terbaru
+// ✅ POST /resignations body: { user_id, reason }
+// ✅ POST /resignations/{id}/process body: { status, admin_notes }
+// ✅ POST /resignations/{id}/withdraw body: { cash_account_id, notes }
+// ✅ GET /members/{id}/resignations for member history
 
 import apiClient from "@/lib/api/api-client";
 
@@ -18,16 +19,10 @@ export interface Resignation {
     email?: string;
     phone_number?: string;
   };
-
-  // Resignation Info
   reason: string;
   resignation_date: string;
   request_date: string;
-
-  // Status: pending → approved → completed | rejected
   status: "pending" | "approved" | "rejected" | "completed";
-
-  // Settlement Calculation
   total_savings?: number;
   total_loans?: number;
   return_amount?: number;
@@ -45,8 +40,6 @@ export interface Resignation {
       remaining_balance: number;
     };
   };
-
-  // Admin Process
   processed_by?: number;
   processed_by_user?: {
     id: number;
@@ -56,8 +49,6 @@ export interface Resignation {
   processed_at?: string;
   admin_notes?: string;
   rejection_reason?: string;
-
-  // Timestamps
   created_at: string;
   updated_at: string;
 }
@@ -68,25 +59,15 @@ export interface ResignationStatistics {
   approved: number;
   rejected: number;
   completed: number;
-  by_month?: Array<{
-    month: number;
-    month_name: string;
-    count: number;
-  }>;
-  by_year?: Array<{
-    year: number;
-    count: number;
-  }>;
 }
 
-// ✅ UPDATED: Member submit - user_id OPSIONAL (otomatis dari JWT)
-// ✅ UPDATED: resignation_date OPSIONAL (default = hari ini)
+// ✅ Member submit - tanpa user_id (otomatis dari JWT)
 export interface MemberCreateResignationData {
   reason: string;
-  resignation_date?: string; // Opsional, default hari ini, max H+90
+  resignation_date?: string;
 }
 
-// ✅ Admin submit - user_id WAJIB
+// ✅ Admin submit - wajib user_id
 export interface AdminCreateResignationData {
   user_id: number;
   reason: string;
@@ -97,10 +78,15 @@ export type CreateResignationData =
   | MemberCreateResignationData
   | AdminCreateResignationData;
 
+// ✅ UPDATED: Process uses "status" field, not "action"
 export interface ProcessResignationData {
-  action: "approve" | "reject";
+  status: "approved" | "rejected";
   admin_notes?: string;
-  rejection_reason?: string;
+}
+
+export interface WithdrawResignationData {
+  cash_account_id: number;
+  notes?: string;
 }
 
 export interface ResignationListParams {
@@ -119,10 +105,7 @@ class ResignationService {
   private baseUrl = "/resignations";
 
   /**
-   * 1️⃣ GET /api/resignations
-   * List resignations with filters
-   * - Admin/Manager: semua data
-   * - Member: filter by user_id sendiri
+   * GET /resignations
    */
   async getResignations(params?: ResignationListParams) {
     try {
@@ -137,28 +120,18 @@ class ResignationService {
   }
 
   /**
-   * 2️⃣ POST /api/resignations
-   * Create resignation request
-   *
-   * 🔧 UPDATED:
-   * - Member: hanya kirim { reason } atau { reason, resignation_date }
-   *   → user_id otomatis dari JWT token
-   *   → resignation_date default = hari ini
-   * - Admin/Manager: kirim { user_id, reason, resignation_date }
-   *   → user_id WAJIB saat submit untuk member lain
+   * POST /resignations
+   * Body: { user_id, reason } or { reason } (member)
    */
   async createResignation(data: CreateResignationData) {
     try {
       console.log("📤 POST /resignations", data);
-
-      // Format date jika ada
       const formattedData: any = { ...data };
       if (formattedData.resignation_date) {
         formattedData.resignation_date = this.formatDateForBackend(
           formattedData.resignation_date,
         );
       }
-
       const response = await apiClient.post(this.baseUrl, formattedData);
       console.log("✅ Resignation created:", response.data);
       return response.data;
@@ -168,56 +141,53 @@ class ResignationService {
     }
   }
 
-  /**
-   * 2a️⃣ Member submit sendiri (shortcut)
-   * Hanya kirim reason + optional date
-   */
+  /** Member submit (tanpa user_id) */
   async memberSubmitResignation(reason: string, resignationDate?: string) {
     const data: MemberCreateResignationData = { reason };
-    if (resignationDate) {
-      data.resignation_date = resignationDate;
-    }
+    if (resignationDate) data.resignation_date = resignationDate;
     return this.createResignation(data);
   }
 
-  /**
-   * 2b️⃣ Admin submit untuk member lain (shortcut)
-   * Wajib sertakan user_id
-   */
+  /** Admin submit (wajib user_id) */
   async adminSubmitResignation(
     userId: number,
     reason: string,
     resignationDate?: string,
   ) {
-    const data: AdminCreateResignationData = {
-      user_id: userId,
-      reason,
-    };
-    if (resignationDate) {
-      data.resignation_date = resignationDate;
-    }
+    const data: AdminCreateResignationData = { user_id: userId, reason };
+    if (resignationDate) data.resignation_date = resignationDate;
     return this.createResignation(data);
   }
 
   /**
-   * 3️⃣ GET /api/resignations/{id}
-   * Get resignation detail with financial summary
+   * GET /resignations/{id}
    */
   async getResignationById(id: number) {
     try {
-      console.log(`📤 GET /resignations/${id}`);
       const response = await apiClient.get(`${this.baseUrl}/${id}`);
-      console.log("✅ Resignation detail loaded:", response.data);
       return response.data;
     } catch (error: any) {
-      console.error("❌ Error fetching resignation detail:", error);
       throw this.handleError(error);
     }
   }
 
   /**
-   * 4️⃣ POST /api/resignations/{id}/process
-   * Approve or Reject resignation (Admin/Manager only)
+   * GET /resignations/statistics
+   */
+  async getStatistics(params?: { year?: number }) {
+    try {
+      const response = await apiClient.get(`${this.baseUrl}/statistics`, {
+        params,
+      });
+      return response.data;
+    } catch (error: any) {
+      throw this.handleError(error);
+    }
+  }
+
+  /**
+   * POST /resignations/{id}/process
+   * ✅ UPDATED: Uses { status: "approved"|"rejected", admin_notes }
    */
   async processResignation(id: number, data: ProcessResignationData) {
     try {
@@ -234,65 +204,59 @@ class ResignationService {
     }
   }
 
+  async approveResignation(id: number, admin_notes?: string) {
+    return this.processResignation(id, { status: "approved", admin_notes });
+  }
+
+  async rejectResignation(id: number, admin_notes?: string) {
+    return this.processResignation(id, { status: "rejected", admin_notes });
+  }
+
   /**
-   * 5️⃣ GET /api/resignations/statistics
-   * Get resignation statistics (Admin/Manager only)
+   * POST /resignations/{id}/withdraw
+   * ✅ NEW: Process withdrawal/pencairan
    */
-  async getStatistics(params?: { year?: number }) {
+  async processWithdrawal(id: number, data: WithdrawResignationData) {
     try {
-      console.log("📤 GET /resignations/statistics", params);
-      const response = await apiClient.get(`${this.baseUrl}/statistics`, {
-        params,
-      });
-      console.log("✅ Statistics loaded:", response.data);
+      console.log(`📤 POST /resignations/${id}/withdraw`, data);
+      const response = await apiClient.post(
+        `${this.baseUrl}/${id}/withdraw`,
+        data,
+      );
+      console.log("✅ Withdrawal processed:", response.data);
       return response.data;
     } catch (error: any) {
-      console.error("❌ Error fetching statistics:", error);
+      console.error("❌ Error processing withdrawal:", error);
       throw this.handleError(error);
     }
   }
 
-  // ==================== HELPER: Approve/Reject ====================
-
-  async approveResignation(id: number, admin_notes?: string) {
-    return this.processResignation(id, {
-      action: "approve",
-      admin_notes,
-    });
+  /**
+   * GET /members/{memberId}/resignations
+   */
+  async getMemberResignations(memberId: number) {
+    try {
+      const response = await apiClient.get(`/members/${memberId}/resignations`);
+      return response.data;
+    } catch (error: any) {
+      throw this.handleError(error);
+    }
   }
 
-  async rejectResignation(
-    id: number,
-    rejection_reason: string,
-    admin_notes?: string,
-  ) {
-    return this.processResignation(id, {
-      action: "reject",
-      rejection_reason,
-      admin_notes,
-    });
-  }
-
-  // ==================== UTILITY HELPERS ====================
+  // ==================== HELPERS ====================
 
   private formatDateForBackend(dateString: string): string {
     const date = new Date(dateString + "T00:00:00");
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
   }
 
   private handleError(error: any): Error {
     if (error.response) {
       const message = error.response.data?.message || error.message;
       const errors = error.response.data?.errors;
-
       if (errors) {
-        const errorMessages = Object.values(errors).flat().join(", ");
-        return new Error(errorMessages);
+        return new Error(Object.values(errors).flat().join(", "));
       }
-
       return new Error(message);
     }
     return error;
@@ -314,13 +278,13 @@ class ResignationService {
   }
 
   getStatusDisplayName(status: string): string {
-    const statusMap: Record<string, string> = {
+    const map: Record<string, string> = {
       pending: "Menunggu",
       approved: "Disetujui",
       rejected: "Ditolak",
       completed: "Selesai",
     };
-    return statusMap[status] || status;
+    return map[status] || status;
   }
 
   formatCurrency(amount: number): string {
@@ -339,18 +303,12 @@ class ResignationService {
     });
   }
 
-  /**
-   * Helper: Get max resignation date (H+90)
-   */
   getMaxResignationDate(): string {
-    const maxDate = new Date();
-    maxDate.setDate(maxDate.getDate() + 90);
-    return maxDate.toISOString().split("T")[0];
+    const d = new Date();
+    d.setDate(d.getDate() + 90);
+    return d.toISOString().split("T")[0];
   }
 
-  /**
-   * Helper: Get today's date formatted
-   */
   getTodayDate(): string {
     return new Date().toISOString().split("T")[0];
   }

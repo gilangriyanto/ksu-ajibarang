@@ -34,6 +34,7 @@ import type {
   AdminDashboardData,
   ManagerDashboardData,
 } from "@/lib/api/dashboard.service";
+import { KasLayout } from "@/components/layout/KasLayout";
 
 function KasDashboard() {
   const { user } = useAuth();
@@ -102,16 +103,19 @@ function KasDashboard() {
   // Loading state
   if (loading && !dashboardData) {
     return (
+      <KasLayout>
       <div className="flex items-center justify-center h-64">
         <RefreshCw className="h-8 w-8 animate-spin text-gray-400" />
         <span className="ml-2 text-gray-600">Memuat dashboard...</span>
       </div>
+      </KasLayout>
     );
   }
 
   // Error state
   if (error && !dashboardData) {
     return (
+      <KasLayout>
       <div className="flex flex-col items-center justify-center h-64">
         <AlertCircle className="h-12 w-12 text-red-500 mb-4" />
         <p className="text-gray-600 mb-4">{error}</p>
@@ -120,16 +124,19 @@ function KasDashboard() {
           Coba Lagi
         </Button>
       </div>
+      </KasLayout>
     );
   }
 
   // No data state
   if (!dashboardData) {
     return (
+      <KasLayout>
       <div className="flex flex-col items-center justify-center h-64">
         <DollarSign className="h-12 w-12 text-gray-400 mb-4" />
         <p className="text-gray-600">Data dashboard tidak tersedia</p>
       </div>
+      </KasLayout>
     );
   }
 
@@ -164,6 +171,7 @@ function KasDashboard() {
     ];
 
     return (
+      <KasLayout>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -614,6 +622,7 @@ function KasDashboard() {
           </CardContent>
         </Card>
       </div>
+      </KasLayout>
     );
   }
 
@@ -629,6 +638,7 @@ function KasDashboard() {
   } = managerData;
 
   return (
+    <KasLayout>
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -942,6 +952,7 @@ function KasDashboard() {
         </CardContent>
       </Card>
     </div>
+    </KasLayout>
   );
 }
 

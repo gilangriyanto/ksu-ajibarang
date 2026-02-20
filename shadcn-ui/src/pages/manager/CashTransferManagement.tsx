@@ -64,8 +64,8 @@ const CashTransferManagement = () => {
     fetchTransfers({
       page: currentPage,
       per_page: 10,
-      status: statusFilter as any,
-      search: searchQuery,
+      ...(statusFilter ? { status: statusFilter as any } : {}),
+      ...(searchQuery ? { search: searchQuery } : {}),
       sort_by: "created_at",
       sort_order: "desc",
     });

@@ -187,9 +187,6 @@ export function LoanDetailModal({
                   Bayar Cicilan
                 </Button>
               )}
-              <Button variant="ghost" size="sm" onClick={onClose}>
-                <X className="h-4 w-4" />
-              </Button>
             </div>
           </div>
         </DialogHeader>

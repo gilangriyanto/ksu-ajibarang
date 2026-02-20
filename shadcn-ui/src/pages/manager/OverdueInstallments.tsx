@@ -27,6 +27,7 @@ import useInstallments from "@/hooks/useInstallments";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import InstallmentDetailModal from "@/components/modals/InstallmentDetailModal";
+import { ManagerLayout } from "@/components/layout/ManagerLayout";
 
 // ✅ Use types from loans.service.ts
 import type { Installment } from "@/lib/api/loans.service";
@@ -153,8 +154,9 @@ function OverdueInstallments() {
   };
 
   return (
-    <div className="space-y-6 p-6">
-      {/* Header */}
+    <ManagerLayout>
+      <div className="space-y-6 p-6">
+        {/* Header */}
       <div className="flex items-center gap-4 mb-6">
         <Button
           variant="outline"
@@ -435,6 +437,7 @@ function OverdueInstallments() {
         />
       )}
     </div>
+    </ManagerLayout>
   );
 }
 

@@ -57,6 +57,7 @@ import cashTransferService, {
   CashTransferStatistics,
   CreateCashTransferData,
 } from "@/lib/api/cash-transfer.service";
+import { KasLayout } from "@/components/layout/KasLayout";
 
 // ==================== KAS ACCOUNTS ====================
 const KAS_ACCOUNTS = [
@@ -263,16 +264,19 @@ export default function KasCashTransfer() {
 
   if (loading) {
     return (
+      <KasLayout>
       <div className="flex items-center justify-center h-64">
         <RefreshCw className="h-8 w-8 animate-spin text-gray-400" />
         <span className="ml-2 text-gray-600">Memuat data transfer...</span>
       </div>
+      </KasLayout>
     );
   }
 
   // ==================== RENDER ====================
 
   return (
+    <KasLayout>
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -785,5 +789,6 @@ export default function KasCashTransfer() {
         </DialogContent>
       </Dialog>
     </div>
+    </KasLayout>
   );
 }

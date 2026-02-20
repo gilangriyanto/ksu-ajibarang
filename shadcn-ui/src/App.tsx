@@ -5,7 +5,6 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
-import { ManagerLayout } from "@/components/layout/ManagerLayout";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 import MemberDashboard from "./pages/MemberDashboard";
@@ -44,7 +43,6 @@ import CashTransferManagement from "./pages/manager/CashTransferManagement";
 // import MemberCashTransfer from "./pages/member/MemberCashTransfer";
 
 // ✅ Kas Layout & Dashboard - Used by Manager Kas (role="manager")
-import KasLayout from "./components/layout/KasLayout";
 import KasDashboard from "./pages/kas/KasDashboard";
 import KasLoanManagement from "./pages/kas/KasLoanManagement";
 import KasSavings from "./pages/kas/KasSavings";
@@ -142,9 +140,7 @@ const App = () => (
               path="/manager"
               element={
                 <ProtectedRoute allowedRoles={["admin"]}>
-                  <ManagerLayout>
                     <ManagerDashboard />
-                  </ManagerLayout>
                 </ProtectedRoute>
               }
             />
@@ -152,9 +148,7 @@ const App = () => (
               path="/manager/members"
               element={
                 <ProtectedRoute allowedRoles={["admin"]}>
-                  <ManagerLayout>
                     <MemberManagement />
-                  </ManagerLayout>
                 </ProtectedRoute>
               }
             />
@@ -162,9 +156,7 @@ const App = () => (
               path="/manager/kas"
               element={
                 <ProtectedRoute allowedRoles={["admin"]}>
-                  <ManagerLayout>
                     <CashAccountsPage />
-                  </ManagerLayout>
                 </ProtectedRoute>
               }
             />
@@ -172,9 +164,7 @@ const App = () => (
               path="/manager/kas/:id"
               element={
                 <ProtectedRoute allowedRoles={["admin"]}>
-                  <ManagerLayout>
                     <CashAccountDetailPage />
-                  </ManagerLayout>
                 </ProtectedRoute>
               }
             />
@@ -182,9 +172,7 @@ const App = () => (
               path="/manager/savings"
               element={
                 <ProtectedRoute allowedRoles={["admin"]}>
-                  <ManagerLayout>
                     <Savings />
-                  </ManagerLayout>
                 </ProtectedRoute>
               }
             />
@@ -192,9 +180,7 @@ const App = () => (
               path="/manager/saving-types"
               element={
                 <ProtectedRoute allowedRoles={["admin"]}>
-                  <ManagerLayout>
                     <SavingTypesManagement />
-                  </ManagerLayout>
                 </ProtectedRoute>
               }
             />
@@ -202,9 +188,7 @@ const App = () => (
               path="/manager/loans"
               element={
                 <ProtectedRoute allowedRoles={["admin"]}>
-                  <ManagerLayout>
                     <LoanManagement />
-                  </ManagerLayout>
                 </ProtectedRoute>
               }
             />
@@ -212,9 +196,7 @@ const App = () => (
               path="/manager/cicilan-terlambat"
               element={
                 <ProtectedRoute allowedRoles={["admin"]}>
-                  <ManagerLayout>
                     <ManagerOverdueInstallments />
-                  </ManagerLayout>
                 </ProtectedRoute>
               }
             />
@@ -222,9 +204,7 @@ const App = () => (
               path="/manager/cicilan-mendatang"
               element={
                 <ProtectedRoute allowedRoles={["admin"]}>
-                  <ManagerLayout>
                     <ManagerUpcomingInstallments />
-                  </ManagerLayout>
                 </ProtectedRoute>
               }
             />
@@ -232,9 +212,7 @@ const App = () => (
               path="/manager/payroll"
               element={
                 <ProtectedRoute allowedRoles={["admin"]}>
-                  <ManagerLayout>
                     <PayrollManagement />
-                  </ManagerLayout>
                 </ProtectedRoute>
               }
             />
@@ -242,9 +220,7 @@ const App = () => (
               path="/manager/accounting"
               element={
                 <ProtectedRoute allowedRoles={["admin"]}>
-                  <ManagerLayout>
                     <Accounting />
-                  </ManagerLayout>
                 </ProtectedRoute>
               }
             />
@@ -252,9 +228,7 @@ const App = () => (
               path="/manager/accounts"
               element={
                 <ProtectedRoute allowedRoles={["admin"]}>
-                  <ManagerLayout>
                     <AccountManagement />
-                  </ManagerLayout>
                 </ProtectedRoute>
               }
             />
@@ -262,9 +236,7 @@ const App = () => (
               path="/manager/resignations"
               element={
                 <ProtectedRoute allowedRoles={["admin"]}>
-                  <ManagerLayout>
                     <ResignationManagement />
-                  </ManagerLayout>
                 </ProtectedRoute>
               }
             />
@@ -272,9 +244,7 @@ const App = () => (
               path="/manager/salary-deductions"
               element={
                 <ProtectedRoute allowedRoles={["admin"]}>
-                  <ManagerLayout>
                     <SalaryDeductionManagement />
-                  </ManagerLayout>
                 </ProtectedRoute>
               }
             />
@@ -282,9 +252,7 @@ const App = () => (
               path="/manager/assets"
               element={
                 <ProtectedRoute allowedRoles={["admin"]}>
-                  <ManagerLayout>
                     <AssetManagement />
-                  </ManagerLayout>
                 </ProtectedRoute>
               }
             />
@@ -292,9 +260,7 @@ const App = () => (
               path="/manager/balance-sheet"
               element={
                 <ProtectedRoute allowedRoles={["admin"]}>
-                  <ManagerLayout>
                     <BalanceSheet />
-                  </ManagerLayout>
                 </ProtectedRoute>
               }
             />
@@ -302,9 +268,7 @@ const App = () => (
               path="/manager/reports"
               element={
                 <ProtectedRoute allowedRoles={["admin"]}>
-                  <ManagerLayout>
                     <Reports />
-                  </ManagerLayout>
                 </ProtectedRoute>
               }
             />
@@ -312,9 +276,7 @@ const App = () => (
               path="/manager/settings"
               element={
                 <ProtectedRoute allowedRoles={["admin"]}>
-                  <ManagerLayout>
                     <Settings />
-                  </ManagerLayout>
                 </ProtectedRoute>
               }
             />
@@ -322,9 +284,7 @@ const App = () => (
               path="/manager/income-statement"
               element={
                 <ProtectedRoute allowedRoles={["admin"]}>
-                  <ManagerLayout>
                     <IncomeStatement />
-                  </ManagerLayout>
                 </ProtectedRoute>
               }
             />
@@ -332,9 +292,7 @@ const App = () => (
               path="/manager/cash-transfers"
               element={
                 <ProtectedRoute allowedRoles={["admin"]}>
-                  <ManagerLayout>
                     <CashTransferManagement />
-                  </ManagerLayout>
                 </ProtectedRoute>
               }
             />
@@ -347,9 +305,7 @@ const App = () => (
               path="/kas/:kasId"
               element={
                 <ProtectedRoute allowedRoles={["manager"]} requireKasId={true}>
-                  <KasLayout>
                     <KasDashboard />
-                  </KasLayout>
                 </ProtectedRoute>
               }
             />
@@ -357,9 +313,7 @@ const App = () => (
               path="/kas/:kasId/loans"
               element={
                 <ProtectedRoute allowedRoles={["manager"]} requireKasId={true}>
-                  <KasLayout>
                     <KasLoanManagement />
-                  </KasLayout>
                 </ProtectedRoute>
               }
             />
@@ -367,9 +321,7 @@ const App = () => (
               path="/kas/:kasId/savings"
               element={
                 <ProtectedRoute allowedRoles={["manager"]} requireKasId={true}>
-                  <KasLayout>
                     <KasSavings />
-                  </KasLayout>
                 </ProtectedRoute>
               }
             />
@@ -377,9 +329,7 @@ const App = () => (
               path="/kas/:kasId/accounting"
               element={
                 <ProtectedRoute allowedRoles={["manager"]} requireKasId={true}>
-                  <KasLayout>
                     <KasAccounting />
-                  </KasLayout>
                 </ProtectedRoute>
               }
             />
@@ -387,9 +337,7 @@ const App = () => (
               path="/kas/:kasId/settings"
               element={
                 <ProtectedRoute allowedRoles={["manager"]} requireKasId={true}>
-                  <KasLayout>
                     <KasSettings />
-                  </KasLayout>
                 </ProtectedRoute>
               }
             />
@@ -398,9 +346,7 @@ const App = () => (
               path="/kas/:kasId/cash-transfers"
               element={
                 <ProtectedRoute allowedRoles={["manager"]} requireKasId={true}>
-                  <KasLayout>
                     <KasCashTransfer />
-                  </KasLayout>
                 </ProtectedRoute>
               }
             />

@@ -20,6 +20,7 @@ import apiClient from "../../lib/api/api-client";
 import ProcessDeductionModal from "../../components/modals/ProcessDeductionModal";
 import BatchProcessModal from "../../components/modals/BatchProcessModal";
 import DeductionDetailModal from "../../components/modals/DeductionDetailModal";
+import { ManagerLayout } from "../../components/layout/ManagerLayout";
 
 interface Member {
   id: number;
@@ -212,6 +213,7 @@ const SalaryDeductionManagement = () => {
   };
 
   return (
+    <ManagerLayout>
     <div className="p-6 space-y-6">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
@@ -614,6 +616,7 @@ const SalaryDeductionManagement = () => {
         loading={loading}
       />
     </div>
+    </ManagerLayout>
   );
 };
 

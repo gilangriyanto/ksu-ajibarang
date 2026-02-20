@@ -66,6 +66,9 @@ export interface CashTransferListParams {
   end_date?: string;
   page?: number;
   per_page?: number;
+  search?: string;
+  sort_by?: string;
+  sort_order?: "asc" | "desc";
 }
 
 // ==================== SERVICE ====================

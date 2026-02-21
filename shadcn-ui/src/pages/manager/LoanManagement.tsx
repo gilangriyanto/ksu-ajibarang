@@ -1,6 +1,6 @@
 // pages/manager/LoanManagement.tsx
 // ✅ UPDATED: Added Import Excel & Export Excel buttons
-// ✅ Uses backend endpoints: POST /loans/import, GET /loans/export, GET /loans/import/template
+// ✅ ADDED: Bayar Cicilan feature for admin/manager
 
 import React, { useState } from "react";
 import { ManagerLayout } from "@/components/layout/ManagerLayout";
@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import EarlySettlementModal from "@/components/modals/EarlySettlementModal";
+import { LoanPaymentModal } from "@/components/modals/LoanPaymentModal";
 import {
   Plus,
   Eye,
@@ -17,6 +18,7 @@ import {
   Coins,
   Upload,
   Download,
+  CreditCard,
 } from "lucide-react";
 
 import useLoans from "@/hooks/useLoans";
@@ -30,6 +32,7 @@ import {
   handleExportFromBackend,
 } from "@/components/modals/ImportExportModal";
 import { toast } from "sonner";
+import apiClient from "@/lib/api/api-client";
 
 export default function LoanManagement() {
   const {
@@ -59,6 +62,11 @@ export default function LoanManagement() {
   // ✅ Import/Export states
   const [showImportModal, setShowImportModal] = useState(false);
   const [exporting, setExporting] = useState(false);
+
+  // ✅ NEW: Bayar Cicilan states
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentLoan, setPaymentLoan] = useState<any>(null);
+  const [upcomingInstallment, setUpcomingInstallment] = useState<any>(null);
 
   const getDeductionMethodBadge = (method: string) => {
     const badges: Record<
@@ -109,6 +117,7 @@ export default function LoanManagement() {
       approved: { color: "bg-blue-100 text-blue-800", text: "Disetujui" },
       rejected: { color: "bg-red-100 text-red-800", text: "Ditolak" },
       completed: { color: "bg-gray-100 text-gray-800", text: "Lunas" },
+      paid_off: { color: "bg-gray-100 text-gray-800", text: "Lunas" },
       overdue: { color: "bg-red-100 text-red-800", text: "Menunggak" },
     };
     const c = m[status] || { color: "bg-gray-100 text-gray-800", text: status };
@@ -141,6 +150,30 @@ export default function LoanManagement() {
     setDetailModal(true);
   };
 
+  // ✅ NEW: Bayar Cicilan handler
+  const handlePayInstallment = async (loan: any) => {
+    setPaymentLoan(loan);
+    setUpcomingInstallment(null);
+    setShowPaymentModal(true);
+
+    try {
+      const response = await apiClient.get(`/loans/${loan.id}/installments`);
+      const installments = response.data?.data || response.data || [];
+      const pending = (Array.isArray(installments) ? installments : [])
+        .filter((i: any) => i.status === "pending" || i.status === "overdue")
+        .sort((a: any, b: any) => a.installment_number - b.installment_number);
+
+      if (pending.length > 0) {
+        setUpcomingInstallment(pending[0]);
+      } else {
+        toast.info("Semua cicilan sudah lunas");
+      }
+    } catch (err: any) {
+      console.error("Error fetching installments:", err);
+      toast.error("Gagal memuat data cicilan");
+    }
+  };
+
   // ✅ Export handler
   const handleExport = async () => {
     try {
@@ -154,7 +187,9 @@ export default function LoanManagement() {
     }
   };
 
-  const activeLoans = loans.filter((l) => l.status === "active");
+  const activeLoans = loans.filter(
+    (l) => l.status === "active" || l.status === "approved",
+  );
   const pendingLoans = loans.filter((l) => l.status === "pending");
   const overdueLoans = loans.filter((l) => l.status === "overdue");
   const totalActiveAmount = activeLoans.reduce((s, l) => {
@@ -346,7 +381,21 @@ export default function LoanManagement() {
                           >
                             <Eye className="h-4 w-4" />
                           </Button>
-                          {loan.status === "active" && (
+                          {/* ✅ NEW: Bayar Cicilan — for active/approved loans */}
+                          {(loan.status === "active" ||
+                            loan.status === "approved") && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handlePayInstallment(loan)}
+                              className="text-orange-600 border-orange-200 hover:bg-orange-50"
+                              title="Bayar Cicilan"
+                            >
+                              <CreditCard className="h-4 w-4" />
+                            </Button>
+                          )}
+                          {(loan.status === "active" ||
+                            loan.status === "approved") && (
                             <Button
                               size="sm"
                               variant="outline"
@@ -409,6 +458,19 @@ export default function LoanManagement() {
           refresh();
           toast.success("Data pinjaman berhasil diimport");
         }}
+      />
+
+      {/* ✅ NEW: Payment Modal */}
+      <LoanPaymentModal
+        loan={paymentLoan}
+        isOpen={showPaymentModal}
+        onClose={() => {
+          setShowPaymentModal(false);
+          setPaymentLoan(null);
+          setUpcomingInstallment(null);
+        }}
+        onSuccess={refresh}
+        upcomingInstallment={upcomingInstallment}
       />
     </ManagerLayout>
   );

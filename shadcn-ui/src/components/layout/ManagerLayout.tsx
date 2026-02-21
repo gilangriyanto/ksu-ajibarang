@@ -161,6 +161,12 @@ export function ManagerLayout({ children }: ManagerLayoutProps) {
       current: location.pathname === "/manager/accounting",
     },
     {
+      name: "Laporan Arus Kas",
+      href: "/manager/cash-flow",
+      icon: DollarSign,
+      current: location.pathname === "/manager/cash-flow",
+    },
+    {
       name: "Neraca",
       href: "/manager/balance-sheet",
       icon: BarChart3,

@@ -21,10 +21,12 @@ import Accounting from "./pages/manager/Accounting";
 import AccountManagement from "./pages/manager/AccountManagement";
 import AssetManagement from "./pages/manager/AssetManagement";
 import BalanceSheet from "./pages/manager/BalanceSheet";
+import GeneralLedger from "./pages/manager/GeneralLedger";
 import IncomeStatement from "./pages/manager/IncomeStatement";
 import SalaryDeductionManagement from "./pages/manager/SalaryDeductionManagement";
 import Reports from "./pages/manager/Reports";
 import Settings from "./pages/manager/Settings";
+import ManagementUsers from "./pages/manager/ManagementUsers";
 
 // ✅ Import Manajemen Kas
 import CashAccountsPage from "./pages/manager/kas";
@@ -41,6 +43,9 @@ import MemberResignation from "./pages/member/MemberResignation";
 // ✅ Import Cash Transfer Pages
 import CashTransferManagement from "./pages/manager/CashTransferManagement";
 // import MemberCashTransfer from "./pages/member/MemberCashTransfer";
+
+// ✅ Import Activity Log
+import ActivityLog from "./pages/manager/ActivityLog";
 
 // ✅ Kas Layout & Dashboard - Used by Manager Kas (role="manager")
 import KasDashboard from "./pages/kas/KasDashboard";
@@ -242,6 +247,14 @@ const App = () => (
               }
             />
             <Route
+              path="/manager/activity-logs"
+              element={
+                <ProtectedRoute allowedRoles={["admin"]}>
+                  <ActivityLog />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/manager/salary-deductions"
               element={
                 <ProtectedRoute allowedRoles={["admin"]}>
@@ -266,6 +279,14 @@ const App = () => (
               }
             />
             <Route
+              path="/manager/general-ledger"
+              element={
+                <ProtectedRoute allowedRoles={["admin"]}>
+                  <GeneralLedger />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/manager/cash-flow"
               element={
                 <ProtectedRoute allowedRoles={["admin"]}>
@@ -286,6 +307,14 @@ const App = () => (
               element={
                 <ProtectedRoute allowedRoles={["admin"]}>
                   <Settings />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/manager/staff"
+              element={
+                <ProtectedRoute allowedRoles={["admin"]}>
+                  <ManagementUsers />
                 </ProtectedRoute>
               }
             />

@@ -37,17 +37,29 @@ import {
   Building,
   CreditCard,
   Wallet,
+  ChevronDown,
+  ChevronUp
 } from "lucide-react";
 import apiClient from "@/lib/api/api-client";
 
 // =====================================================
 // Types
 // =====================================================
+interface TransactionDetail {
+  id?: number;
+  date?: string;
+  description: string;
+  amount: number;
+  reference_no?: string;
+  reference_type?: string;
+}
+
 interface AccountItem {
   account_id?: number;
   code: string;
   name: string;
   amount: number;
+  transactions?: TransactionDetail[];
 }
 
 interface IncomeStatementData {
@@ -169,10 +181,19 @@ function formatPeriodDisplay(period: string) {
 // Extract accounts array from various response shapes
 function extractAccounts(data: any): AccountItem[] {
   if (!data) return [];
-  if (Array.isArray(data)) return data;
-  if (Array.isArray(data.accounts)) return data.accounts;
-  if (Array.isArray(data.items)) return data.items;
-  return [];
+  
+  let rawAccounts: any[] = [];
+  if (Array.isArray(data)) rawAccounts = data;
+  else if (Array.isArray(data.accounts)) rawAccounts = data.accounts;
+  else if (Array.isArray(data.items)) rawAccounts = data.items;
+  
+  return rawAccounts.map((item: any) => ({
+    ...item,
+    code: item.code || item.account_code || '',
+    name: item.name || item.account_name || '',
+    amount: item.amount || item.balance || 0,
+    transactions: item.transactions || []
+  }));
 }
 
 // =====================================================
@@ -191,6 +212,14 @@ export default function IncomeStatement() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [rawDebug, setRawDebug] = useState<string>("");
+  const [expandedAccounts, setExpandedAccounts] = useState<Record<string, boolean>>({});
+
+  const toggleAccount = (code: string) => {
+    setExpandedAccounts(prev => ({
+      ...prev,
+      [code]: !prev[code]
+    }));
+  };
 
   // =====================================================
   // Fetch BOTH endpoints
@@ -320,10 +349,10 @@ export default function IncomeStatement() {
           assets: d?.assets || [],
           liabilities: d?.liabilities || [],
           equity: d?.equity || [],
-          total_assets: safe(d?.total_assets),
-          total_liabilities: safe(d?.total_liabilities),
-          total_equity: safe(d?.total_equity),
-          is_balanced: d?.is_balanced,
+          total_assets: safe(d?.total_assets || d?.summary?.total_assets),
+          total_liabilities: safe(d?.total_liabilities || d?.summary?.total_liabilities || d?.summary?.total_liabilities_and_equity),
+          total_equity: safe(d?.total_equity || d?.summary?.total_equity || d?.equity?.total),
+          is_balanced: d?.is_balanced !== undefined ? d.is_balanced : d?.summary?.is_balanced,
         });
       } else {
         console.warn(
@@ -612,30 +641,65 @@ export default function IncomeStatement() {
                         (r) => r.code === item.code,
                       );
                       const v = variance(safe(item.amount), safe(prev?.amount));
+                      const isExpanded = expandedAccounts[item.code];
+                      const hasTransactions = item.transactions && item.transactions.length > 0;
+
                       return (
                         <div
                           key={item.code || idx}
-                          className="flex justify-between items-center py-2 border-b border-gray-100"
+                          className="border-b border-gray-100 last:border-0"
                         >
-                          <div>
-                            <span className="text-sm text-gray-600">
-                              {item.code}
-                            </span>
-                            <p className="font-medium">{item.name}</p>
-                          </div>
-                          <div className="text-right">
-                            <p className="font-medium">
-                              {formatCurrency(safe(item.amount))}
-                            </p>
-                            {comp && prev && (
-                              <p
-                                className={`text-xs ${v.diff >= 0 ? "text-green-600" : "text-red-600"}`}
-                              >
-                                {v.diff >= 0 ? "+" : ""}
-                                {formatCurrency(v.diff)} ({v.pct.toFixed(1)}%)
+                          <div 
+                            className={`flex justify-between items-center py-3 ${hasTransactions ? 'cursor-pointer hover:bg-gray-50' : ''}`}
+                            onClick={() => hasTransactions && toggleAccount(item.code)}
+                          >
+                            <div className="flex items-center gap-2">
+                              {hasTransactions && (
+                                <div className="text-gray-400">
+                                  {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                                </div>
+                              )}
+                              <div>
+                                <span className="text-sm text-gray-600">
+                                  {item.code}
+                                </span>
+                                <p className="font-medium">{item.name}</p>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <p className="font-medium">
+                                {formatCurrency(safe(item.amount))}
                               </p>
-                            )}
+                              {comp && prev && (
+                                <p
+                                  className={`text-xs ${v.diff >= 0 ? "text-green-600" : "text-red-600"}`}
+                                >
+                                  {v.diff >= 0 ? "+" : ""}
+                                  {formatCurrency(v.diff)} ({v.pct.toFixed(1)}%)
+                                </p>
+                              )}
+                            </div>
                           </div>
+                          
+                          {/* Transaction Details */}
+                          {isExpanded && hasTransactions && (
+                            <div className="bg-gray-50 p-4 rounded-md mb-3 text-sm">
+                              <div className="space-y-2">
+                                {item.transactions!.map((trx, tIdx) => (
+                                  <div key={trx.id || tIdx} className="flex justify-between items-start py-1 border-b border-gray-200 last:border-0">
+                                    <div className="flex-1 pr-4">
+                                      <p className="font-medium text-gray-800">{trx.description}</p>
+                                      {trx.date && <span className="text-xs text-gray-500 mr-2">{new Date(trx.date).toLocaleDateString('id-ID')}</span>}
+                                      {trx.reference_no && <span className="text-xs text-gray-400 bg-gray-200 px-1 rounded">{trx.reference_no}</span>}
+                                    </div>
+                                    <div className="text-right">
+                                      <p className="text-gray-900">{formatCurrency(trx.amount)}</p>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       );
                     })
@@ -665,30 +729,65 @@ export default function IncomeStatement() {
                         (e) => e.code === item.code,
                       );
                       const v = variance(safe(item.amount), safe(prev?.amount));
+                      const isExpanded = expandedAccounts[item.code];
+                      const hasTransactions = item.transactions && item.transactions.length > 0;
+
                       return (
                         <div
                           key={item.code || idx}
-                          className="flex justify-between items-center py-2 border-b border-gray-100"
+                          className="border-b border-gray-100 last:border-0"
                         >
-                          <div>
-                            <span className="text-sm text-gray-600">
-                              {item.code}
-                            </span>
-                            <p className="font-medium">{item.name}</p>
-                          </div>
-                          <div className="text-right">
-                            <p className="font-medium">
-                              ({formatCurrency(safe(item.amount))})
-                            </p>
-                            {comp && prev && (
-                              <p
-                                className={`text-xs ${v.diff <= 0 ? "text-green-600" : "text-red-600"}`}
-                              >
-                                {v.diff >= 0 ? "+" : ""}
-                                {formatCurrency(v.diff)} ({v.pct.toFixed(1)}%)
+                          <div 
+                            className={`flex justify-between items-center py-3 ${hasTransactions ? 'cursor-pointer hover:bg-gray-50' : ''}`}
+                            onClick={() => hasTransactions && toggleAccount(item.code)}
+                          >
+                            <div className="flex items-center gap-2">
+                              {hasTransactions && (
+                                <div className="text-gray-400">
+                                  {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                                </div>
+                              )}
+                              <div>
+                                <span className="text-sm text-gray-600">
+                                  {item.code}
+                                </span>
+                                <p className="font-medium">{item.name}</p>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <p className="font-medium">
+                                ({formatCurrency(safe(item.amount))})
                               </p>
-                            )}
+                              {comp && prev && (
+                                <p
+                                  className={`text-xs ${v.diff <= 0 ? "text-green-600" : "text-red-600"}`}
+                                >
+                                  {v.diff >= 0 ? "+" : ""}
+                                  {formatCurrency(v.diff)} ({v.pct.toFixed(1)}%)
+                                </p>
+                              )}
+                            </div>
                           </div>
+
+                          {/* Transaction Details */}
+                          {isExpanded && hasTransactions && (
+                            <div className="bg-gray-50 p-4 rounded-md mb-3 text-sm">
+                              <div className="space-y-2">
+                                {item.transactions!.map((trx, tIdx) => (
+                                  <div key={trx.id || tIdx} className="flex justify-between items-start py-1 border-b border-gray-200 last:border-0">
+                                    <div className="flex-1 pr-4">
+                                      <p className="font-medium text-gray-800">{trx.description}</p>
+                                      {trx.date && <span className="text-xs text-gray-500 mr-2">{new Date(trx.date).toLocaleDateString('id-ID')}</span>}
+                                      {trx.reference_no && <span className="text-xs text-gray-400 bg-gray-200 px-1 rounded">{trx.reference_no}</span>}
+                                    </div>
+                                    <div className="text-right">
+                                      <p className="text-gray-900">{formatCurrency(trx.amount)}</p>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       );
                     })

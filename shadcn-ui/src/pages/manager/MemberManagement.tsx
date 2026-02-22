@@ -267,6 +267,7 @@ const ViewMemberModal = ({ isOpen, onClose, member }: { isOpen: boolean; onClose
 // ==================== MODAL: EDIT MEMBER ====================
 const EditMemberModal = ({ isOpen, onClose, member }: { isOpen: boolean; onClose: () => void; member: Member | null }) => {
   const [formData, setFormData] = useState({
+    employee_id: '',
     full_name: '',
     email: '',
     phone_number: '',
@@ -282,6 +283,7 @@ const EditMemberModal = ({ isOpen, onClose, member }: { isOpen: boolean; onClose
   useEffect(() => {
     if (member && isOpen) {
       setFormData({
+        employee_id: member.employee_id || '',
         full_name: member.full_name || '',
         email: member.email || '',
         phone_number: member.phone_number || '',
@@ -311,6 +313,7 @@ const EditMemberModal = ({ isOpen, onClose, member }: { isOpen: boolean; onClose
       setErrorMsg('');
       
       await memberService.updateMember(member.id, {
+        employee_id: formData.employee_id.trim() || undefined,
         full_name: formData.full_name.trim(),
         email: formData.email.trim() || null,
         phone_number: formData.phone_number.trim(),
@@ -364,6 +367,17 @@ const EditMemberModal = ({ isOpen, onClose, member }: { isOpen: boolean; onClose
         )}
 
         <div className="grid gap-4 py-4">
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="edit-employee-id" className="text-right">ID Anggota</Label>
+            <Input 
+              id="edit-employee-id" 
+              className="col-span-3 font-mono"
+              value={formData.employee_id}
+              onChange={(e) => setFormData({...formData, employee_id: e.target.value})}
+              disabled={loading || success}
+              placeholder="Kosongkan jika tidak ingin diubah"
+            />
+          </div>
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="edit-name" className="text-right">Nama Lengkap</Label>
             <Input 

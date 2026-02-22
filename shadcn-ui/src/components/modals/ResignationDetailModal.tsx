@@ -116,7 +116,7 @@ export function ResignationDetailModal({
                 <Label className="text-gray-600">Tanggal Pengajuan:</Label>
                 <p className="font-medium flex items-center">
                   <Calendar className="h-3 w-3 mr-1 text-gray-400" />
-                  {formatDate(resignation.request_date)}
+                  {formatDate(resignation.request_date || resignation.created_at)}
                 </p>
               </div>
               <div className="col-span-2">

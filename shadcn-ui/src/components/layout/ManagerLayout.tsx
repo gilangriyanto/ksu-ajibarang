@@ -35,6 +35,9 @@ import {
   ArrowLeftRight,
   Activity,
   Loader2,
+  Database,
+  Clock,
+  UserMinus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import authService, { User } from "@/lib/api/auth.service";
@@ -122,11 +125,39 @@ export function ManagerLayout({ children }: ManagerLayoutProps) {
       icon: LayoutDashboard,
       current: location.pathname === "/manager",
     },
+    // --- ANGGOTA & PINJAMAN ---
+    {
+      name: "ANGGOTA & PINJAMAN",
+      isHeader: true,
+      href: "",
+      icon: Settings,
+      current: false,
+    },
     {
       name: "Manajemen Anggota",
       href: "/manager/members",
       icon: Users,
       current: location.pathname === "/manager/members",
+    },
+    {
+      name: "Pengunduran Diri",
+      href: "/manager/resignations",
+      icon: UserMinus, // Updated icon to avoid duplication
+      current: location.pathname === "/manager/resignations",
+    },
+    {
+      name: "Manajemen Pinjaman",
+      href: "/manager/loans",
+      icon: CreditCard,
+      current: location.pathname === "/manager/loans",
+    },
+    // --- KAS & SIMPANAN ---
+    {
+      name: "KAS & SIMPANAN",
+      isHeader: true,
+      href: "",
+      icon: Settings,
+      current: false,
     },
     {
       name: "Manajemen Kas",
@@ -138,7 +169,7 @@ export function ManagerLayout({ children }: ManagerLayoutProps) {
       badge: null,
     },
     {
-      name: "Transfer Kas", // ✅ NEW: Cash Transfer Menu
+      name: "Transfer Kas",
       href: "/manager/cash-transfers",
       icon: ArrowLeftRight,
       current: location.pathname === "/manager/cash-transfers",
@@ -152,14 +183,16 @@ export function ManagerLayout({ children }: ManagerLayoutProps) {
     {
       name: "Jenis Simpanan",
       href: "/manager/saving-types",
-      icon: PiggyBank,
+      icon: Database, // Updated icon
       current: location.pathname === "/manager/saving-types",
     },
+    // --- PENGGAJIAN & ASET ---
     {
-      name: "Manajemen Pinjaman",
-      href: "/manager/loans",
-      icon: CreditCard,
-      current: location.pathname === "/manager/loans",
+      name: "PENGGAJIAN & ASET",
+      isHeader: true,
+      href: "",
+      icon: Settings,
+      current: false,
     },
     {
       name: "Jasa Pelayanan",
@@ -176,7 +209,7 @@ export function ManagerLayout({ children }: ManagerLayoutProps) {
     {
       name: "Manajemen Akun",
       href: "/manager/accounts",
-      icon: Wallet,
+      icon: UserCog, // Updated icon
       current: location.pathname === "/manager/accounts",
     },
     {
@@ -185,16 +218,24 @@ export function ManagerLayout({ children }: ManagerLayoutProps) {
       icon: Building,
       current: location.pathname === "/manager/assets",
     },
+    // --- AKUNTANSI & LAPORAN ---
+    {
+      name: "AKUNTANSI & LAPORAN",
+      isHeader: true,
+      href: "",
+      icon: Settings,
+      current: false,
+    },
     {
       name: "Akuntansi & Jurnal",
       href: "/manager/accounting",
-      icon: Calculator,
+      icon: FileText, // Updated icon
       current: location.pathname === "/manager/accounting",
     },
     {
       name: "Laporan Arus Kas",
       href: "/manager/cash-flow",
-      icon: DollarSign,
+      icon: TrendingUp, // Updated icon
       current: location.pathname === "/manager/cash-flow",
     },
     {
@@ -206,28 +247,28 @@ export function ManagerLayout({ children }: ManagerLayoutProps) {
     {
       name: "Laporan Laba Rugi",
       href: "/manager/income-statement",
-      icon: TrendingUp,
+      icon: Activity, // Updated icon
       current: location.pathname === "/manager/income-statement",
-    },
-    {
-      name: "Pengunduran Diri",
-      href: "/manager/resignations",
-      icon: TrendingUp,
-      current: location.pathname === "/manager/resignations",
     },
     // --- PENGATURAN & RIWAYAT ---
     {
       name: "PENGATURAN & RIWAYAT",
       isHeader: true,
       href: "",
-      icon: Settings, // Dummy icon
+      icon: Settings,
       current: false,
     },
     {
       name: "Log Aktivitas",
       href: "/manager/activity-logs",
-      icon: Activity,
+      icon: Clock, // Updated icon
       current: location.pathname === "/manager/activity-logs",
+    },
+    {
+      name: "Manajemen Staff",
+      href: "/manager/staff",
+      icon: Shield,
+      current: location.pathname === "/manager/staff",
     },
   ];
 
@@ -391,15 +432,15 @@ export function ManagerLayout({ children }: ManagerLayoutProps) {
                   </div>
                 )}
 
-                {/* Statistics - can be made dynamic later */}
+                {/* Statistics */}
                 <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
                   <div className="bg-white/10 rounded p-2">
                     <p className="opacity-75">Total Anggota</p>
-                    <p className="font-semibold">150</p>
+                    <p className="font-semibold">{dashboardData?.overview?.members?.total || 0}</p>
                   </div>
                   <div className="bg-white/10 rounded p-2">
                     <p className="opacity-75">Pinjaman Aktif</p>
-                    <p className="font-semibold">45</p>
+                    <p className="font-semibold">{dashboardData?.overview?.loans?.active_count || 0}</p>
                   </div>
                 </div>
               </CardContent>
@@ -436,6 +477,11 @@ export function ManagerLayout({ children }: ManagerLayoutProps) {
               >
                 <Icon className="w-5 h-5 mr-3 flex-shrink-0" />
                 <span className="truncate">{item.name}</span>
+                {item.name === "Dashboard" && alerts.length > 0 && (
+                  <Badge className="ml-auto bg-red-500 text-white text-[10px] px-1.5 py-0.5 flex-shrink-0 leading-none h-4 flex items-center justify-center">
+                    {alerts.length > 9 ? '9+' : alerts.length}
+                  </Badge>
+                )}
               </Link>
             );
           })}

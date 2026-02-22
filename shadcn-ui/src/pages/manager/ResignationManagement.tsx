@@ -368,7 +368,7 @@ export default function ResignationManagement() {
                           <div className="text-sm">
                             <p className="flex items-center text-gray-600">
                               <Calendar className="h-3 w-3 mr-1" />
-                              {formatDate(resignation.request_date)}
+                              {formatDate(resignation.request_date || resignation.created_at)}
                             </p>
                             <p className="text-xs text-gray-500">
                               Efektif:{" "}

@@ -195,6 +195,11 @@ export function KasLayout({ children }: KasLayoutProps) {
               >
                 {Icon && <Icon className="w-5 h-5 mr-3 flex-shrink-0" />}
                 <span className="truncate">{item.name}</span>
+                {item.name === "Dashboard" && kasData.notifications > 0 && (
+                  <Badge className="ml-auto bg-red-500 text-white text-[10px] px-1.5 py-0.5 flex-shrink-0 leading-none h-4">
+                    {kasData.notifications > 9 ? '9+' : kasData.notifications}
+                  </Badge>
+                )}
               </Link>
             );
           })}

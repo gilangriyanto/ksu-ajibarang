@@ -255,7 +255,7 @@ export function Sidebar() {
   const { user } = useAuth();
 
   const navigation =
-    user?.role === "member" ? memberNavigation : managerNavigation;
+    user?.role === "anggota" ? memberNavigation : managerNavigation;
 
   return (
     <nav className="flex-1 px-2 py-4 space-y-1">

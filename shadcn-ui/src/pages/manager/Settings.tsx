@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { ManagerLayout } from "@/components/layout/ManagerLayout";
 import {
   Card,
@@ -30,7 +30,11 @@ import {
   Shield,
   Database,
   Save,
+  Loader2,
 } from "lucide-react";
+import { settingService } from "@/lib/api/setting.service";
+import { toast } from "sonner";
+import { AccountingPeriodsList } from "./AccountingPeriods";
 
 interface CooperativeSettings {
   name: string;
@@ -109,6 +113,66 @@ export default function Settings() {
     session_timeout: 30,
   });
 
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Load backend settings
+  useEffect(() => {
+    fetchSettings();
+  }, []);
+
+  const fetchSettings = async () => {
+    setIsLoading(true);
+    try {
+      const response = await settingService.getSettings();
+      // Map API payload back to the component states
+      if (response.cooperative) {
+        setCooperativeSettings((prev) => ({ ...prev, ...response.cooperative }));
+      }
+      if (response.loan) {
+        setLoanSettings((prev) => ({
+          ...prev,
+          max_loan_amount: Number(response.loan.max_loan_amount) || prev.max_loan_amount,
+          min_loan_amount: Number(response.loan.min_loan_amount) || prev.min_loan_amount,
+          default_interest_rate: Number(response.loan.default_interest_rate) || prev.default_interest_rate,
+          max_loan_term: Number(response.loan.max_loan_term) || prev.max_loan_term,
+          min_loan_term: Number(response.loan.min_loan_term) || prev.min_loan_term,
+          processing_fee_rate: Number(response.loan.processing_fee_rate) || prev.processing_fee_rate,
+          late_payment_penalty: Number(response.loan.late_payment_penalty) || prev.late_payment_penalty,
+        }));
+      }
+      if (response.savings) {
+        // Assume API structure aligns with new frontend spec
+        setSavingsSettings((prev) => ({
+          ...prev,
+          mandatory: {
+            amount: Number(response.savings.mandatory?.amount) || prev.mandatory.amount,
+            interest_rate: Number(response.savings.mandatory?.interest_rate) || prev.mandatory.interest_rate,
+          },
+          voluntary: {
+            amount: Number(response.savings.voluntary?.amount) || prev.voluntary.amount,
+            interest_rate: Number(response.savings.voluntary?.interest_rate) || prev.voluntary.interest_rate,
+          },
+          principal: {
+            amount: Number(response.savings.principal?.amount) || prev.principal.amount,
+            interest_rate: Number(response.savings.principal?.interest_rate) || prev.principal.interest_rate,
+          },
+          holiday: {
+            amount: Number(response.savings.holiday?.amount) || prev.holiday.amount,
+            interest_rate: Number(response.savings.holiday?.interest_rate) || prev.holiday.interest_rate,
+          },
+          minimum_balance: Number(response.savings.minimum_balance) || prev.minimum_balance,
+          max_withdrawal_per_day: Number(response.savings.max_withdrawal_per_day) || prev.max_withdrawal_per_day,
+        }));
+      }
+    } catch (error) {
+      console.error("Failed to fetch settings:", error);
+      toast.error("Gagal memuat data pengaturan");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("id-ID", {
       style: "currency",
@@ -116,48 +180,56 @@ export default function Settings() {
     }).format(amount);
   };
 
-  const handleSaveCooperative = () => {
-    // Save cooperative settings
-    console.log("Saving cooperative settings:", cooperativeSettings);
+  const handleSaveCooperative = async () => {
+    try {
+      setIsSaving(true);
+      await settingService.updateSettings("cooperative", cooperativeSettings);
+      toast.success("Pengaturan informasi koperasi berhasil disimpan");
+    } catch (error) {
+      console.error("Error saving cooperative settings:", error);
+      toast.error("Gagal menyimpan pengaturan koperasi");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleSaveLoan = () => {
-    // Save loan settings
-    console.log("Saving loan settings:", loanSettings);
+  const handleSaveLoan = async () => {
+    try {
+      setIsSaving(true);
+      await settingService.updateSettings("loan", loanSettings as unknown as Record<string, any>);
+      toast.success("Pengaturan pinjaman berhasil disimpan");
+    } catch (error) {
+      console.error("Error saving loan settings:", error);
+      toast.error("Gagal menyimpan pengaturan pinjaman");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleSaveSavings = async () => {
     try {
-      const dataToSave = {
-        interest_rates: {
-          mandatory: savingsSettings.mandatory.interest_rate,
-          voluntary: savingsSettings.voluntary.interest_rate,
-          principal: savingsSettings.principal.interest_rate,
-          holiday: savingsSettings.holiday.interest_rate,
-        },
-        minimum_balance: savingsSettings.minimum_balance,
-        max_withdrawal_per_day: savingsSettings.max_withdrawal_per_day,
-      };
-
-      console.log("Saving savings settings:", dataToSave);
-
-      // TODO: Uncomment saat API sudah siap
-      // const response = await fetch('/api/settings/savings', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify(dataToSave)
-      // });
-      // if (!response.ok) throw new Error('Failed to save');
-
-      alert("Pengaturan simpanan berhasil disimpan");
+      setIsSaving(true);
+      await settingService.updateSettings("savings", savingsSettings);
+      toast.success("Pengaturan simpanan berhasil disimpan");
     } catch (error) {
       console.error("Error saving savings settings:", error);
-      alert("Gagal menyimpan pengaturan simpanan");
+      toast.error("Gagal menyimpan pengaturan simpanan");
+    } finally {
+      setIsSaving(false);
     }
   };
 
-  const handleSaveSystem = () => {
-    // Save system settings
+  const handleSaveSystem = async () => {
+    // try {
+    //   setIsSaving(true);
+    //   await settingService.updateSettings("system", systemSettings);
+    //   toast.success("Pengaturan sistem berhasil disimpan");
+    // } catch (error) {
+    //   console.error("Error saving system settings:", error);
+    //   toast.error("Gagal menyimpan pengaturan sistem");
+    // } finally {
+    //   setIsSaving(false);
+    // }
     console.log("Saving system settings:", systemSettings);
   };
 
@@ -223,24 +295,31 @@ export default function Settings() {
         </div>
 
         <Tabs defaultValue="cooperative" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger
               value="cooperative"
               className="flex items-center space-x-2"
             >
               <Building className="h-4 w-4" />
-              <span>Koperasi</span>
+              <span className="hidden sm:inline">Koperasi</span>
             </TabsTrigger>
             <TabsTrigger value="loan" className="flex items-center space-x-2">
               <Percent className="h-4 w-4" />
-              <span>Pinjaman</span>
+              <span className="hidden sm:inline">Pinjaman</span>
             </TabsTrigger>
             <TabsTrigger
               value="savings"
               className="flex items-center space-x-2"
             >
               <Database className="h-4 w-4" />
-              <span>Simpanan</span>
+              <span className="hidden sm:inline">Simpanan</span>
+            </TabsTrigger>
+            <TabsTrigger
+               value="accounting"
+               className="flex items-center space-x-2"
+            >
+               <SettingsIcon className="h-4 w-4" />
+               <span className="hidden sm:inline">Periode Akuntansi</span>
             </TabsTrigger>
             {/* <TabsTrigger value="system" className="flex items-center space-x-2">
               <SettingsIcon className="h-4 w-4" />
@@ -248,7 +327,14 @@ export default function Settings() {
             </TabsTrigger> */}
           </TabsList>
 
-          <TabsContent value="cooperative" className="space-y-6">
+          {isLoading && (
+            <div className="flex justify-center items-center py-12">
+              <Loader2 className="w-8 h-8 animate-spin text-green-600" />
+            </div>
+          )}
+
+          {!isLoading && (
+            <TabsContent value="cooperative" className="space-y-6">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
@@ -357,15 +443,17 @@ export default function Settings() {
                   />
                 </div>
                 <div className="flex justify-end">
-                  <Button onClick={handleSaveCooperative}>
-                    <Save className="mr-2 h-4 w-4" />
+                  <Button onClick={handleSaveCooperative} disabled={isSaving}>
+                    {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                     Simpan Pengaturan
                   </Button>
                 </div>
               </CardContent>
             </Card>
           </TabsContent>
+          )}
 
+          {!isLoading && (
           <TabsContent value="loan" className="space-y-6">
             <Card>
               <CardHeader>
@@ -462,15 +550,17 @@ export default function Settings() {
 
                 {/* Save Button */}
                 <div className="flex justify-end pt-4 border-t">
-                  <Button onClick={handleSaveLoan} className="gap-2">
-                    <Save className="h-4 w-4" />
+                  <Button onClick={handleSaveLoan} className="gap-2" disabled={isSaving}>
+                    {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                     Simpan Pengaturan
                   </Button>
                 </div>
               </CardContent>
             </Card>
           </TabsContent>
+          )}
 
+          {!isLoading && (
           <TabsContent value="savings" className="space-y-6">
             <Card>
               <CardHeader>
@@ -628,14 +718,34 @@ export default function Settings() {
 
                 {/* Save Button */}
                 <div className="flex justify-end pt-4 border-t">
-                  <Button onClick={handleSaveSavings} className="gap-2">
-                    <Save className="h-4 w-4" />
+                  <Button onClick={handleSaveSavings} className="gap-2" disabled={isSaving}>
+                    {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                     Simpan Pengaturan
                   </Button>
                 </div>
               </CardContent>
             </Card>
           </TabsContent>
+          )}
+
+          {!isLoading && (
+          <TabsContent value="accounting" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <SettingsIcon className="h-5 w-5" />
+                  <span>Periode Akuntansi</span>
+                </CardTitle>
+                <CardDescription>
+                  Manajemen masa berlaku jurnal dan pembukuan koperasi
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                 <AccountingPeriodsList />
+              </CardContent>
+            </Card>
+          </TabsContent>
+          )}
 
           {/* <TabsContent value="system" className="space-y-6">
             <Card>

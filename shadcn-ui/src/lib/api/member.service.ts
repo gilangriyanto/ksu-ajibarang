@@ -11,7 +11,7 @@ export interface Member {
   phone_number: string | null;
   formatted_phone?: string;
   address: string | null;
-  role: "admin" | "manajer" | "anggota";
+  role: "admin" | "manager" | "anggota";
   status: "active" | "inactive" | "suspended";
   joined_at: string;
   membership_duration?: string;
@@ -97,6 +97,7 @@ export interface MemberListParams {
 }
 
 export interface UpdateMemberRequest {
+  employee_id?: string;
   full_name?: string;
   email?: string | null;
   phone_number?: string;
@@ -135,7 +136,7 @@ export interface CreateMemberRequest {
   password_confirmation: string;
   phone_number?: string;
   address?: string;
-  role?: "admin" | "manajer" | "anggota"; // ✅ Added role field
+  role?: "admin" | "manager" | "anggota"; // ✅ Added role field
   employee_id?: string; // Optional, will be auto-generated if not provided
   work_unit?: string;
   position?: string;
@@ -505,6 +506,40 @@ class MemberService {
       }
 
       throw new Error("Gagal mengupdate status anggota");
+    }
+  }
+
+  /**
+   * Get list of management users (Admin & Manager)
+   * Admin & Manager only
+   */
+  async getManagementUsers(
+    params?: MemberListParams
+  ): Promise<Member[] | PaginatedResponse<Member>> {
+    try {
+      const response = await apiClient.get<
+        ApiResponse<Member[] | PaginatedResponse<Member>>
+      >("/members/management", { params });
+
+      if (response.data.success) {
+        return response.data.data;
+      }
+
+      throw new Error(
+        response.data.message || "Failed to fetch management users"
+      );
+    } catch (error: any) {
+      console.error("Get management users error:", error);
+
+      if (error.response?.status === 403) {
+        throw new Error("Akses ditolak.");
+      }
+
+      if (error.response?.data?.message) {
+        throw new Error(error.response.data.message);
+      }
+
+      throw new Error("Gagal mengambil data staff");
     }
   }
 }

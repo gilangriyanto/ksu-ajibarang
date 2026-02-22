@@ -187,14 +187,18 @@ class ResignationService {
 
   /**
    * POST /resignations/{id}/process
-   * ✅ UPDATED: Uses { status: "approved"|"rejected", admin_notes }
+   * ✅ UPDATED: Sends action instead of status so the backend validation passes
    */
   async processResignation(id: number, data: ProcessResignationData) {
     try {
       console.log(`📤 POST /resignations/${id}/process`, data);
+      const payload = {
+        action: data.status === "approved" ? "approve" : "reject",
+        admin_notes: data.admin_notes
+      };
       const response = await apiClient.post(
         `${this.baseUrl}/${id}/process`,
-        data,
+        payload,
       );
       console.log("✅ Resignation processed:", response.data);
       return response.data;
@@ -246,7 +250,7 @@ class ResignationService {
   // ==================== HELPERS ====================
 
   private formatDateForBackend(dateString: string): string {
-    const date = new Date(dateString + "T00:00:00");
+    const date = new Date(dateString.includes("T") ? dateString : dateString + "T00:00:00");
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
   }
 
@@ -296,7 +300,9 @@ class ResignationService {
   }
 
   formatDate(dateString: string): string {
-    return new Date(dateString + "T00:00:00").toLocaleDateString("id-ID", {
+    if (!dateString) return "-";
+    const date = dateString.includes("T") ? new Date(dateString) : new Date(dateString + "T00:00:00");
+    return date.toLocaleDateString("id-ID", {
       day: "numeric",
       month: "long",
       year: "numeric",

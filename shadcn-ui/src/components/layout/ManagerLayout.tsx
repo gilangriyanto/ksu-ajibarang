@@ -4,6 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   LayoutDashboard,
   Users,
   PiggyBank,
@@ -22,12 +29,17 @@ import {
   Wallet,
   DollarSign,
   UserCog,
+  Info,
+  AlertTriangle,
+  AlertCircle,
+  ArrowLeftRight,
+  Activity,
   Loader2,
-  ArrowLeftRight, // ✅ NEW: Icon untuk Cash Transfer
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import authService, { User } from "@/lib/api/auth.service";
 import { toast } from "sonner";
+import { useAdminDashboard } from "@/hooks/useDashboard";
 
 interface ManagerLayoutProps {
   children: React.ReactNode;
@@ -42,6 +54,25 @@ export function ManagerLayout({ children }: ManagerLayoutProps) {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loadingUser, setLoadingUser] = useState(true);
   const [userError, setUserError] = useState<string | null>(null);
+  
+  // ✅ Get alerts for the notification bell
+  const { data: dashboardData } = useAdminDashboard();
+  
+  // ✅ Fix backend alerts with wrong links
+  const fixAlertLinks = (alertsList: any[]) => {
+    return alertsList.map((alert: any) => {
+      const fixedAlert = { ...alert };
+      if (fixedAlert.link) {
+        if (fixedAlert.link.includes("/installments/overdue")) fixedAlert.link = "/manager/cicilan-terlambat";
+        if (fixedAlert.link.includes("/installments/upcoming")) fixedAlert.link = "/manager/cicilan-mendatang";
+        if (fixedAlert.link.includes("/loans") && fixedAlert.link.includes("status=pending")) fixedAlert.link = "/manager/loans";
+        if (fixedAlert.link === "/loans" || fixedAlert.link.startsWith("/loans?")) fixedAlert.link = "/manager/loans";
+      }
+      return fixedAlert;
+    });
+  };
+
+  const alerts = dashboardData?.alerts ? fixAlertLinks(dashboardData.alerts) : [];
 
   // ✅ Fetch current user on mount
   useEffect(() => {
@@ -183,6 +214,20 @@ export function ManagerLayout({ children }: ManagerLayoutProps) {
       href: "/manager/resignations",
       icon: TrendingUp,
       current: location.pathname === "/manager/resignations",
+    },
+    // --- PENGATURAN & RIWAYAT ---
+    {
+      name: "PENGATURAN & RIWAYAT",
+      isHeader: true,
+      href: "",
+      icon: Settings, // Dummy icon
+      current: false,
+    },
+    {
+      name: "Log Aktivitas",
+      href: "/manager/activity-logs",
+      icon: Activity,
+      current: location.pathname === "/manager/activity-logs",
     },
   ];
 
@@ -364,12 +409,23 @@ export function ManagerLayout({ children }: ManagerLayoutProps) {
 
         {/* Navigation - Scrollable */}
         <nav className="flex-1 px-4 pb-4 space-y-1 overflow-y-auto">
-          {navigation.map((item) => {
+          {navigation.map((item, idx) => {
+            if ('isHeader' in item && item.isHeader) {
+              return (
+                <div
+                  key={`header-${idx}`}
+                  className="px-3 pt-4 pb-1 text-xs font-bold tracking-wider text-gray-400"
+                >
+                  {item.name}
+                </div>
+              );
+            }
+
             const Icon = item.icon;
             return (
               <Link
                 key={item.name}
-                to={item.href}
+                to={item.href || "#"}
                 className={cn(
                   "flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors",
                   item.current
@@ -380,11 +436,6 @@ export function ManagerLayout({ children }: ManagerLayoutProps) {
               >
                 <Icon className="w-5 h-5 mr-3 flex-shrink-0" />
                 <span className="truncate">{item.name}</span>
-                {item.name === "Dashboard" && (
-                  <Badge className="ml-auto bg-red-500 text-white text-xs px-1.5 py-0.5 flex-shrink-0">
-                    5
-                  </Badge>
-                )}
               </Link>
             );
           })}
@@ -413,35 +464,98 @@ export function ManagerLayout({ children }: ManagerLayoutProps) {
       </aside>
 
       {/* Main content area - FIXED with explicit width */}
-      <div className="w-full lg:ml-64 lg:w-[calc(100vw-16rem)]">
-        {/* Mobile header */}
-        <header className="lg:hidden sticky top-0 z-30">
-          <div className="flex items-center justify-between h-16 px-4 bg-white border-b border-gray-200">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setIsSidebarOpen(true)}
-            >
-              <Menu className="h-5 w-5" />
-            </Button>
-            <div className="flex items-center space-x-2">
+      <div className="w-full lg:ml-64 lg:w-[calc(100vw-16rem)] flex flex-col min-h-screen">
+        {/* Unified Mobile & Desktop Header */}
+        <header className="sticky top-0 z-30 flex-shrink-0 bg-white border-b border-gray-200">
+          <div className="flex items-center justify-between h-16 px-4">
+            <div className="flex items-center">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsSidebarOpen(true)}
+                className="lg:hidden h-9 w-9 p-0 mr-4"
+              >
+                <Menu className="h-5 w-5" />
+              </Button>
+            </div>
+            
+            <div className="flex items-center space-x-4">
               {currentUser && (
-                <span className="text-sm font-medium text-gray-700 hidden sm:block truncate max-w-[150px]">
+                <span className="hidden sm:block text-sm font-medium text-gray-700">
                   {currentUser.full_name}
                 </span>
               )}
-              <Button variant="ghost" size="sm" className="relative">
-                <Bell className="h-4 w-4" />
-                <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs bg-red-500 text-white">
-                  5
-                </Badge>
-              </Button>
+              
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="relative h-9 w-9 rounded-full">
+                    <Bell className="h-5 w-5 text-gray-600 hover:text-gray-900" />
+                    {alerts.length > 0 && (
+                      <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-[10px] leading-none bg-red-500 text-white rounded-full border border-white">
+                        {alerts.length > 9 ? '9+' : alerts.length}
+                      </Badge>
+                    )}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-80 mt-2">
+                  <DropdownMenuLabel className="font-normal border-b pb-2">
+                    <div className="flex flex-col space-y-1">
+                      <p className="text-sm font-medium leading-none">Notifikasi</p>
+                      <p className="text-xs text-muted-foreground">
+                        Anda memiliki {alerts.length} notifikasi baru
+                      </p>
+                    </div>
+                  </DropdownMenuLabel>
+                  <div className="max-h-[300px] overflow-y-auto">
+                    {alerts.length === 0 ? (
+                      <div className="p-4 text-center text-sm text-gray-500">
+                        Tidak ada notifikasi saat ini
+                      </div>
+                    ) : (
+                      alerts.map((alert, idx) => {
+                        let Icon = Info;
+                        let iconColor = "text-blue-500";
+                        if (alert.type === "warning") {
+                          Icon = AlertTriangle;
+                          iconColor = "text-yellow-500";
+                        } else if (alert.type === "danger") {
+                          Icon = AlertCircle;
+                          iconColor = "text-red-500";
+                        }
+                        
+                        return (
+                          <DropdownMenuItem key={idx} asChild className="p-3 cursor-pointer border-b last:border-0 hover:bg-gray-50">
+                            <Link to={alert.link || "#"} className="flex gap-3 w-full items-start">
+                              <div className={cn("mt-0.5", iconColor)}>
+                                <Icon className="h-4 w-4" />
+                              </div>
+                              <div className="flex flex-col gap-1 w-full">
+                                <div className="flex justify-between items-center w-full">
+                                  <span className="text-sm font-medium leading-none whitespace-normal">{alert.title}</span>
+                                </div>
+                                <span className="text-xs text-muted-foreground line-clamp-2">{alert.message}</span>
+                              </div>
+                            </Link>
+                          </DropdownMenuItem>
+                        );
+                      })
+                    )}
+                  </div>
+                  {alerts.length > 0 && (
+                    <div className="p-2 border-t mt-1">
+                      <Button variant="outline" className="w-full text-xs h-8" asChild>
+                        <Link to="/manager" onClick={() => setIsSidebarOpen(false)}>Lihat Dashboard</Link>
+                      </Button>
+                    </div>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
         </header>
 
         {/* Page content */}
-        <main className="min-h-screen">
+        <main className="flex-1 overflow-x-hidden">
           <div className="p-4 sm:p-6 lg:p-8">{children}</div>
         </main>
       </div>

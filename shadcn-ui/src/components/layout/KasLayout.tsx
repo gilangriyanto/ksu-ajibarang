@@ -38,11 +38,22 @@ export function KasLayout({ children }: KasLayoutProps) {
   };
 
   const navigation = [
+    // --- BERANDA ---
+    {
+      name: "BERANDA",
+      isHeader: true,
+    },
     {
       name: "Dashboard",
       href: `/kas/${kasId}`,
       icon: LayoutDashboard,
       current: location.pathname === `/kas/${kasId}`,
+    },
+    
+    // --- TRANSAKSI & OPERASIONAL ---
+    {
+      name: "TRANSAKSI & OPERASIONAL",
+      isHeader: true,
     },
     {
       name: "Manajemen Pinjaman",
@@ -57,16 +68,22 @@ export function KasLayout({ children }: KasLayoutProps) {
       current: location.pathname === `/kas/${kasId}/savings`,
     },
     {
+      name: "Transfer Kas",
+      href: `/kas/${kasId}/cash-transfers`,
+      icon: ArrowLeftRight,
+      current: location.pathname.includes("/cash-transfers"),
+    },
+
+    // --- AKUNTANSI & LAPORAN ---
+    {
+      name: "AKUNTANSI & LAPORAN",
+      isHeader: true,
+    },
+    {
       name: "Akuntansi & Jurnal",
       href: `/kas/${kasId}/accounting`,
       icon: Calculator,
       current: location.pathname === `/kas/${kasId}/accounting`,
-    },
-    {
-      name: "Transfer Kas",
-      href: `/kas/${kasId}/cash-transfers`, // kasId dari route params
-      icon: ArrowLeftRight,
-      current: location.pathname.includes("/cash-transfers"),
     },
   ];
 
@@ -150,13 +167,24 @@ export function KasLayout({ children }: KasLayoutProps) {
         </div>
 
         {/* Navigation - Scrollable */}
-        <nav className="flex-1 px-4 pb-4 space-y-1 overflow-y-auto">
-          {navigation.map((item) => {
-            const Icon = item.icon;
+        <nav className="flex-1 px-4 pb-4 space-y-1 overflow-y-auto mt-4">
+          {navigation.map((item, idx) => {
+            if (item.isHeader) {
+              return (
+                <div
+                  key={`header-${idx}`}
+                  className="px-3 pt-4 pb-1 text-xs font-bold tracking-wider text-gray-400"
+                >
+                  {item.name}
+                </div>
+              );
+            }
+
+            const Icon = item.icon as any;
             return (
               <Link
                 key={item.name}
-                to={item.href}
+                to={item.href || "#"}
                 className={cn(
                   "flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors",
                   item.current
@@ -165,13 +193,8 @@ export function KasLayout({ children }: KasLayoutProps) {
                 )}
                 onClick={() => setIsSidebarOpen(false)}
               >
-                <Icon className="w-5 h-5 mr-3 flex-shrink-0" />
+                {Icon && <Icon className="w-5 h-5 mr-3 flex-shrink-0" />}
                 <span className="truncate">{item.name}</span>
-                {item.name === "Dashboard" && kasData.notifications > 0 && (
-                  <Badge className="ml-auto bg-red-500 text-white text-xs px-1.5 py-0.5 flex-shrink-0">
-                    {kasData.notifications}
-                  </Badge>
-                )}
               </Link>
             );
           })}
@@ -200,22 +223,30 @@ export function KasLayout({ children }: KasLayoutProps) {
       </aside>
 
       {/* Main content area - FIXED with explicit width */}
-      <div className="w-full lg:ml-64 lg:w-[calc(100vw-16rem)]">
-        {/* Mobile header */}
-        <header className="lg:hidden sticky top-0 z-30">
-          <div className="flex items-center justify-between h-16 px-4 bg-white border-b border-gray-200">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setIsSidebarOpen(true)}
-            >
-              <Menu className="h-5 w-5" />
-            </Button>
-            <div className="flex items-center space-x-2">
-              <Button variant="ghost" size="sm" className="relative">
-                <Bell className="h-4 w-4" />
+      <div className="w-full lg:ml-64 lg:w-[calc(100vw-16rem)] flex flex-col min-h-screen">
+        {/* Unified Mobile & Desktop Header */}
+        <header className="sticky top-0 z-30 flex-shrink-0 bg-white border-b border-gray-200 shadow-sm">
+          <div className="flex items-center justify-between h-16 px-4 sm:px-6">
+            <div className="flex items-center">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsSidebarOpen(true)}
+                className="lg:hidden h-9 w-9 p-0 mr-4"
+              >
+                <Menu className="h-5 w-5" />
+              </Button>
+            </div>
+            
+            <div className="flex items-center space-x-4">
+              <span className="hidden sm:block text-sm font-medium text-gray-700">
+                {kasData.name}
+              </span>
+              
+              <Button variant="ghost" size="icon" className="relative h-9 w-9 rounded-full">
+                <Bell className="h-5 w-5 text-gray-600 hover:text-gray-900 transition-colors" />
                 {kasData.notifications > 0 && (
-                  <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs bg-red-500 text-white">
+                  <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-[10px] leading-none bg-red-500 text-white rounded-full border border-white">
                     {kasData.notifications}
                   </Badge>
                 )}
@@ -225,7 +256,7 @@ export function KasLayout({ children }: KasLayoutProps) {
         </header>
 
         {/* Page content */}
-        <main className="min-h-screen">
+        <main className="flex-1 overflow-x-hidden">
           <div className="p-4 sm:p-6 lg:p-8">{children}</div>
         </main>
       </div>

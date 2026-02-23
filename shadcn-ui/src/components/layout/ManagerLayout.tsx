@@ -233,6 +233,12 @@ export function ManagerLayout({ children }: ManagerLayoutProps) {
       current: location.pathname === "/manager/accounting",
     },
     {
+      name: "Buku Besar",
+      href: "/manager/general-ledger",
+      icon: FileText, // Updated icon
+      current: location.pathname === "/manager/general-ledger",
+    },
+    {
       name: "Laporan Arus Kas",
       href: "/manager/cash-flow",
       icon: TrendingUp, // Updated icon

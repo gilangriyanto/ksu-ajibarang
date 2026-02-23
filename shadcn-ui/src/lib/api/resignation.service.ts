@@ -40,6 +40,11 @@ export interface Resignation {
       remaining_balance: number;
     };
   };
+  withdrawal?: {
+    id: number;
+    total_withdrawal: number | string;
+    withdrawal_date: string;
+  };
   processed_by?: number;
   processed_by_user?: {
     id: number;

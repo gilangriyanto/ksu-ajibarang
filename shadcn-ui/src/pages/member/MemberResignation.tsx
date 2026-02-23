@@ -172,7 +172,23 @@ export default function MemberResignation() {
                     {formatDate(latestResignation.resignation_date)}
                   </p>
                 </div>
-                {latestResignation.return_amount !== undefined && (
+                {latestResignation.withdrawal ? (
+                  <div>
+                    <p className="text-sm text-gray-600 flex items-center">
+                      <DollarSign className="h-4 w-4 mr-2" />
+                      Total Dicairkan
+                    </p>
+                    <div className="mt-1">
+                      <p className="font-semibold text-lg text-green-600">
+                        {formatCurrency(Number(latestResignation.withdrawal.total_withdrawal))}
+                      </p>
+                      <p className="text-xs text-gray-500 flex items-center mt-1">
+                        <Calendar className="h-3 w-3 mr-1" />
+                        Cair: {formatDate(latestResignation.withdrawal.withdrawal_date)}
+                      </p>
+                    </div>
+                  </div>
+                ) : latestResignation.return_amount !== undefined && (
                   <div>
                     <p className="text-sm text-gray-600 flex items-center">
                       <DollarSign className="h-4 w-4 mr-2" />

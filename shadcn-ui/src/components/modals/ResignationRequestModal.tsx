@@ -6,7 +6,8 @@
 // ✅ Reason minimal 10 karakter
 
 import { useState, useEffect } from "react";
-import { X, AlertTriangle, Calendar, FileText, Info } from "lucide-react";
+import { X, AlertTriangle, Calendar, FileText, Info, AlertCircle } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import resignationService from "@/lib/api/resignation.service";
 import { toast } from "sonner";
 
@@ -28,6 +29,7 @@ const ResignationRequestModal = ({
   const [reason, setReason] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
+  const [apiError, setApiError] = useState("");
 
   useEffect(() => {
     if (isOpen) {
@@ -35,6 +37,7 @@ const ResignationRequestModal = ({
       setResignationDate(today);
       setReason("");
       setErrors({});
+      setApiError("");
     }
   }, [isOpen, today]);
 
@@ -72,6 +75,7 @@ const ResignationRequestModal = ({
     if (!validate()) return;
 
     setLoading(true);
+    setApiError("");
 
     try {
       // ✅ UPDATED: Member submit tanpa user_id
@@ -86,7 +90,9 @@ const ResignationRequestModal = ({
       onClose();
     } catch (error: any) {
       console.error("Error submitting resignation:", error);
-      toast.error(error.message || "Gagal mengajukan pengunduran diri");
+      const errMsg = error.message || "Gagal mengajukan pengunduran diri";
+      setApiError(errMsg);
+      toast.error(errMsg);
     } finally {
       setLoading(false);
     }
@@ -129,6 +135,14 @@ const ResignationRequestModal = ({
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          {/* API Error Alert */}
+          {apiError && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{apiError}</AlertDescription>
+            </Alert>
+          )}
+
           {/* Warning Alert */}
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
             <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />

@@ -377,7 +377,16 @@ export default function ResignationManagement() {
                           </div>
                         </td>
                         <td className="py-3 px-4">
-                          {resignation.return_amount !== undefined ? (
+                          {resignation.withdrawal ? (
+                            <div>
+                              <span className="font-medium text-green-600 block">
+                                {formatCurrency(Number(resignation.withdrawal.total_withdrawal))}
+                              </span>
+                              <span className="text-xs text-gray-500">
+                                Cair: {formatDate(resignation.withdrawal.withdrawal_date)}
+                              </span>
+                            </div>
+                          ) : resignation.return_amount !== undefined ? (
                             <span className="font-medium text-green-600">
                               {formatCurrency(resignation.return_amount)}
                             </span>

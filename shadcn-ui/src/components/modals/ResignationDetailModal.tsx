@@ -216,10 +216,25 @@ export function ResignationDetailModal({
                     </div>
                   )}
 
-                {resignation.return_amount !== undefined && (
+                {resignation.withdrawal ? (
+                  <div className="border-t border-blue-300 pt-3 space-y-2">
+                    <div className="flex justify-between">
+                      <span className="text-blue-900 font-semibold">Total Dicairkan:</span>
+                      <span className="font-bold text-xl text-green-600">
+                        {formatCurrency(Number(resignation.withdrawal.total_withdrawal))}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-blue-700">Tanggal Pencairan:</span>
+                      <span className="font-medium text-blue-900">
+                        {formatDate(resignation.withdrawal.withdrawal_date)}
+                      </span>
+                    </div>
+                  </div>
+                ) : resignation.return_amount !== undefined && (
                   <div className="border-t border-blue-300 pt-3 flex justify-between">
                     <span className="text-blue-900 font-semibold">
-                      Total Pengembalian:
+                      Estimasi Pengembalian:
                     </span>
                     <span className="font-bold text-xl text-blue-900">
                       {formatCurrency(resignation.return_amount)}
